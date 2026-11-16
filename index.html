@@ -37,14 +37,28 @@
     <button id="renamePageBtn" class="tool" title="Renombrar hoja">✎ <span>Nombre</span></button>
   </div>
   <section class="workspace">
-    <div class="page-top"><div><strong id="pageTitle">Hoja 1</strong><small id="pageInfo">Formato vectorial editable</small></div><div class="page-top-actions"><button id="exportSvg" class="subtle">SVG</button><button id="exportPng" class="subtle">PNG</button><button id="printPdf" class="subtle">PDF</button></div></div>
+    <div class="page-top">
+      <div class="page-heading"><strong id="pageTitle">Hoja 1</strong><small id="pageInfo">Formato vectorial editable</small></div>
+      <nav class="page-pager" aria-label="Navegar entre hojas">
+        <button id="prevPage" type="button" aria-label="Hoja anterior" title="Hoja anterior" disabled>‹</button>
+        <button id="pageNumber" class="page-number" type="button" aria-label="Ver todas las hojas" title="Ver hojas y administrar páginas">1</button>
+        <button id="nextPage" type="button" aria-label="Siguiente hoja" title="Crear nueva hoja">›</button>
+      </nav>
+      <div class="page-top-actions"><button id="exportSvg" class="subtle">SVG</button><button id="exportPng" class="subtle">PNG</button><button id="printPdf" class="subtle">PDF</button></div>
+    </div>
     <div class="paper-shell"><canvas id="paper" aria-label="Lienzo de escritura"></canvas></div>
   </section>
-  <footer class="pages-bar"><div class="pages-label">HOJAS</div><div id="pageList" class="page-list"></div><button id="addPage" class="add-page">+ Hoja</button><button id="deletePage" class="delete-page" title="Eliminar hoja">Eliminar hoja</button></footer>
+  
   <div class="bottom-actions"><button id="backupBtn" class="subtle">↓ Respaldo JSON</button><button id="importBtn" class="subtle">↑ Importar archivo</button><button id="renameNotebookBtn" class="subtle">Renombrar cuaderno</button></div>
  </main>
 </div>
 <input id="importInput" type="file" accept=".json,application/json" hidden>
+<dialog id="pagesDialog" class="dialog pages-dialog" aria-labelledby="pagesDialogTitle">
+  <div class="dialog-head"><h2 id="pagesDialogTitle">Hojas del cuaderno</h2><button id="closePages" type="button" class="icon-btn" aria-label="Cerrar">✕</button></div>
+  <p>Selecciona una hoja o crea una nueva.</p>
+  <div id="pageList" class="page-list"></div>
+  <div class="pages-dialog-actions"><button id="addPage" type="button" class="add-page">+ Nueva hoja</button><button id="deletePage" type="button" class="delete-page">Eliminar hoja actual</button></div>
+</dialog>
 <dialog id="driveDialog" class="dialog"><form method="dialog"><div class="dialog-head"><h2>Google Drive</h2><button class="icon-btn" value="cancel" aria-label="Cerrar">✕</button></div><p>Primero se guardan tus notas localmente. Drive es un respaldo y una forma de transferirlas entre equipos.</p><label class="field">OAuth Client ID (aplicación web)<input id="clientId" type="text" placeholder="xxxxxxxx.apps.googleusercontent.com" autocomplete="off"></label><small>Introduce únicamente el <b>Client ID público</b>. Nunca una clave secreta ni una contraseña. Debes autorizar este sitio en Google Cloud.</small><div class="dialog-actions"><button id="connectDrive" type="button" class="primary">Conectar Google</button><button id="uploadDrive" type="button" class="subtle">↑ Crear respaldo en Drive</button><button id="pullDrive" type="button" class="subtle">↓ Combinar último respaldo</button></div><p id="driveStatus" class="drive-status">Sin conectar. Las copias de Drive requieren internet y configuración OAuth.</p><div class="privacy-info">Esta versión no realiza sincronización automática ni resuelve ediciones simultáneas. Al combinar, nunca sustituye silenciosamente una hoja diferente: crea una copia de conflicto.</div></form></dialog>
 <script src="./app.js" defer></script>
 </body>
