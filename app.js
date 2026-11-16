@@ -155,7 +155,7 @@ function x10Reorient(){
  pg.updatedAt=now();paint();updatePage();x10SetStatus('Orientación '+rot+'° aplicada a '+targets.length+' trazos, sin cambiar los datos físicos originales.');
 }
 /* Vincular una sola vez; después utilizar getDevices() del navegador si conservó el permiso. */
-let x10AutoTimer=null,x10AutoTries=0,x10Connecting=false,x10ManualPause=false,
+let x10AutoTimer=null,x10AutoTries=0,x10Connecting=false,x10ManualPause=false,x10ManualAttempt=null,
  x10InMemoryDevice=null; // BluetoothDevice autorizado vivo durante la sesión, también en Android.
 function x10AutoEnabled(){return $('x10AutoConnect').checked&&localStorage.getItem('minote_x10_auto_connect')!=='false';}
 function x10CancelRetry(){if(x10AutoTimer!==null)clearTimeout(x10AutoTimer);x10AutoTimer=null;}
@@ -214,7 +214,10 @@ async function x10TryAutomatic(reason='inicio'){
  if(x10Connecting||x10Connection?.connected||!x10AutoEnabled()||x10ManualPause||document.hidden)return false;
  const id=localStorage.getItem('minote_x10_device_id');
  if(!id&&!x10InMemoryDevice)return false;
- x10Connecting=true;$('x10Connect').disabled=true;
+ // Android instalado: no intentar recuperar permisos al arrancar si aún no hay
+ // un BluetoothDevice vivo. La petición pendiente podría interferir con el toque.
+ if(/Android/i.test(navigator.userAgent||'')&&!x10InMemoryDevice)return false;
+ x10Connecting=true;
  try{
   // En Android getDevices() suele estar deshabilitado, pero el objeto retornado
   // por requestDevice() sigue siendo reutilizable mientras la página esté viva.
@@ -242,7 +245,7 @@ async function x10TryAutomatic(reason='inicio'){
   x10Log('Error reconexión: '+err.message);
   x10ScheduleRetry();
   return false;
- }finally{x10Connecting=false;$('x10Connect').disabled=false;x10Details();}
+ }finally{x10Connecting=false;x10Details();}
 }
 function x10RefreshCapability(){
  const el=$('x10ReconnectHint');
@@ -281,40 +284,66 @@ function setupX10(){
   try{await navigator.clipboard.writeText(txt);x10SetStatus('Diagnóstico copiado. No incluye trazos ni contenido de tus notas.');}
   catch(e){x10SetStatus('No se pudo copiar: '+e.message);}
  };
- $('x10Connect').onclick=async()=>{
-  if(x10Connecting)return;
+ $('x10Connect').onclick=()=>{
+  // No awaits antes de requestDevice: el selector requiere activación táctil.
   if(x10Connection?.connected){
-   x10ManualPause=true;x10CancelRetry();x10Flush();
-   x10InMemoryDevice=null; // El usuario ordenó desconectar, no reconectar.
-   x10Connection.disconnect();x10SetStatus('X10 desconectada manualmente. Al volver a abrir Mi Note puede reconectarse.');
+   x10ManualPause=true;x10CancelRetry();x10Flush();x10InMemoryDevice=null;
+   x10Connection.disconnect();x10SetStatus('X10 desconectada manualmente.');
    x10Details();return;
   }
   x10ManualPause=false;x10CancelRetry();x10AutoTries=0;
-  // El selector del sistema debe iniciarse con el botón todavía activo:
-  // algunas PWA standalone Android dejan requestDevice pendiente si se deshabilita antes.
-  x10Connecting=true;
-  x10SetStatus('Abriendo selector Bluetooth…');
-  const connection=x10MakeConnection();x10Connection=connection;
-  let selectorPending=true;
-  const watchdog=setTimeout(()=>{
-   if(selectorPending){
-    x10SetStatus('El selector Bluetooth no respondió. Si estás en Mi Note instalada, usa «Abrir en Chrome» para conectar. Puedes volver a intentar sin borrar tus notas.');
-    $('x10Connect').disabled=false;
-   }
-  },12000);
+  // Un intento automático puede quedar pendiente sin resolver en Android.
+  // No bloquear el clic del usuario por ese intento anterior.
+  const connection=x10MakeConnection();
+  const previous=x10Connection;
+  x10Connection=connection;
+  let selection;
   try{
-   await connection.connect();
-   x10InMemoryDevice=connection.device;
-   if(connection.device?.id){
-    localStorage.setItem('minote_x10_device_id',connection.device.id);
-    // Primera autorización: activar el ajuste elegido; nunca sobreescribir una desactivación previa.
-    if(localStorage.getItem('minote_x10_auto_connect')===null)
-     localStorage.setItem('minote_x10_auto_connect',String($('x10AutoConnect').checked));
-   }
-   x10SetStatus('X10 conectada. La próxima vez se intentará conectar automáticamente si mantienes activada la opción.');
+   x10SetStatus('Abriendo selector Bluetooth de Android…');
+   selection=connection.selectDevice(false); // petición inmediata, sin await
+  }catch(e){
+   x10SetStatus('No se pudo abrir el selector: '+e.name+' · '+e.message);
+   x10Details();return;
+  }
+  const attempt=Symbol('selección X10');
+  x10ManualAttempt=attempt;
+  let waiting=true;
+  const watchdog=setTimeout(()=>{
+   if(waiting&&x10ManualAttempt===attempt)
+    x10SetStatus('Android no mostró el selector Bluetooth. Prueba «Buscar solo Huion»; si tampoco aparece, envía el diagnóstico.');
+  },10000);
+  selection.then(async device=>{
+   if(x10ManualAttempt!==attempt)return;
+   waiting=false;clearTimeout(watchdog);
+   x10SetStatus('Dispositivo seleccionado: '+(device.name||'X10')+'. Estableciendo conexión…');
+   await connection.connectSaved(device);
+   if(x10ManualAttempt!==attempt)return;
+   x10InMemoryDevice=device;
+   if(device.id)localStorage.setItem('minote_x10_device_id',device.id);
+   x10SetStatus('X10 conectada. Escribe con el lápiz de tinta.');
    x10Details();
-  }catch(e){x10SetStatus('No se pudo conectar: '+e.message);x10Details();}
-  finally{selectorPending=false;clearTimeout(watchdog);x10Connecting=false;$('x10Connect').disabled=false;}
+  }).catch(e=>{
+   if(x10ManualAttempt!==attempt)return;
+   waiting=false;clearTimeout(watchdog);
+   x10SetStatus('Bluetooth: '+(e.name||'Error')+' · '+e.message);
+   x10Details();
+  });
+ };
+ $('x10FilteredConnect').onclick=()=>{
+  if(x10Connection?.connected)return;
+  const connection=x10MakeConnection();x10Connection=connection;
+  let selection;
+  try{selection=connection.selectDevice(true);x10SetStatus('Buscando dispositivos Huion…');}
+  catch(e){x10SetStatus('Bluetooth: '+e.name+' · '+e.message);return;}
+  const attempt=Symbol('Huion filtrada');x10ManualAttempt=attempt;
+  selection.then(async device=>{
+   if(x10ManualAttempt!==attempt)return;
+   await connection.connectSaved(device);
+   if(x10ManualAttempt!==attempt)return;
+   x10InMemoryDevice=device;
+   if(device.id)localStorage.setItem('minote_x10_device_id',device.id);
+   x10SetStatus('X10 conectada.');x10Details();
+  }).catch(e=>{if(x10ManualAttempt===attempt)x10SetStatus('Bluetooth: '+e.name+' · '+e.message);});
  };
  $('x10ProbeTablet').onclick=async()=>{
   try{if(!x10Connection?.connected)throw Error('Primero conecta X10');await x10Connection.probeAgenda();}

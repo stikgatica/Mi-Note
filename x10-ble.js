@@ -53,11 +53,17 @@ class Connection{
  }
  get connected(){return !!this.device?.gatt?.connected;}
  status(s){this.handlers.onStatus?.(s);}
- async connect(){
+ selectDevice(filtered=false){
   if(!navigator.bluetooth||!window.isSecureContext)
    throw Error('Web Bluetooth no está disponible. Usa Chrome o Edge en HTTPS con Bluetooth activo.');
-  // Primera conexión: requestDevice debe iniciarse desde un clic de usuario.
-  const device=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[SERVICE]});
+  // Debe ejecutarse sin await previo, dentro del evento táctil del usuario.
+  const options=filtered
+   ?{filters:[{namePrefix:'HUION'},{namePrefix:'Huion'},{namePrefix:'T218'}],optionalServices:[SERVICE]}
+   :{acceptAllDevices:true,optionalServices:[SERVICE]};
+  return navigator.bluetooth.requestDevice(options);
+ }
+ async connect(filtered=false){
+  const device=await this.selectDevice(filtered);
   return this._connectDevice(device);
  }
  async connectSaved(device){
