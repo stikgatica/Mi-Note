@@ -94,3 +94,8 @@ ARQUITECTURA.md
 - En Chrome Android estable la disponibilidad de `getDevices()` puede ser limitada. Si Android destruye completamente el proceso o recarga la página y la API falta, será necesaria nueva acción del usuario: «Conectar X10». No se puede eludir este permiso desde una PWA.
 - Interfaz X10 informa qué tipo de reconexión admite el navegador. Permanecen los reintentos acotados, la desconexión voluntaria y la captura de trazos procedente de Data Ink V10. No hay reconexión Bluetooth en segundo plano cuando la web está cerrada.
 - Los cuadernos siguen almacenados localmente en IndexedDB; sin cambios de esquema ni telemetría.
+
+## V0.2.10: actualización segura de PWA instalada en Android
+- Caché Service Worker mi-note-shell-v0.2.10 y actualización network-first de archivos de la aplicación.
+- Botón «Actualizar Mi Note» dentro del menú X10, con guardado local antes de recargar.
+- No eliminar almacenamiento ni desinstalar la PWA: cuadernos en IndexedDB.

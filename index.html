@@ -67,6 +67,11 @@
   <div class="dialog-head"><h2 id="x10Title">Huion Note X10 · Agenda</h2><button id="x10Close" type="button" class="icon-btn" aria-label="Cerrar">✕</button></div>
   <p class="x10-intro">El lápiz de tinta se conecta con el protocolo de Data Ink V10. Esta conexión Bluetooth es experimental y nunca borra datos de la X10.</p>
   <div id="x10Status" class="drive-status" role="status" aria-live="polite">No conectada.</div>
+  <div class="x10-details" style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <strong id="pwaVersion">Mi Note V0.2.10</strong>
+    <button id="pwaUpdateBtn" class="subtle" type="button">↻ Actualizar Mi Note</button>
+    <small id="pwaUpdateStatus" aria-live="polite" style="width:100%">Comprobando actualizaciones sin borrar cuadernos…</small>
+  </div>
   <div id="x10BrowserCheck" class="x10-details" role="status" aria-live="polite" style="white-space:pre-line;margin-top:8px">Comprobando Bluetooth del navegador…</div>
   <div class="x10-row"><button id="x10BrowserCheckBtn" type="button" class="subtle">Comprobar Bluetooth</button><button id="x10OpenChrome" type="button" class="subtle" hidden>Abrir en Chrome</button><button id="x10CopyUrl" type="button" class="subtle">Copiar enlace para Chrome</button></div>
   <div class="x10-row"><button id="x10Connect" type="button" class="primary">Conectar X10</button><button id="x10FilteredConnect" type="button" class="subtle">Buscar solo Huion</button><button id="x10ProbeTablet" type="button" class="subtle">Probar modo agenda</button></div>
@@ -86,5 +91,6 @@
 <script src="./x10-ble.js" defer></script>
 <script src="./app.js" defer></script>
 <script src="./x10-android-help.js" defer></script>
+<script src="./pwa-update.js" defer></script>
 </body>
 </html>

@@ -1,9 +1,12 @@
-/* Mi Note PWA 0.2.9: interfaz actualizada al recuperar conexión, cuadernos en IndexedDB intactos. */
-const CACHE='mi-note-shell-v0.2.9';
-const SHELL=['./','./index.html','./styles.css','./app.js','./x10-ble.js','./x10-android-help.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+/* Mi Note PWA 0.2.10: interfaz actualizada al recuperar conexión, cuadernos en IndexedDB intactos. */
+const CACHE='mi-note-shell-v0.2.10';
+const SHELL=['./','./index.html','./styles.css','./app.js','./x10-ble.js','./x10-android-help.js','./pwa-update.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)));
  self.skipWaiting();
+});
+self.addEventListener('message',event=>{
+ if(event.data?.type==='SKIP_WAITING')self.skipWaiting();
 });
 self.addEventListener('activate',event=>{
  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('mi-note-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
