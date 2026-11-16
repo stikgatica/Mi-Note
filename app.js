@@ -154,40 +154,143 @@ function x10Reorient(){
  }
  pg.updatedAt=now();paint();updatePage();x10SetStatus('Orientación '+rot+'° aplicada a '+targets.length+' trazos, sin cambiar los datos físicos originales.');
 }
+/* Vincular una sola vez; después utilizar getDevices() del navegador si conservó el permiso. */
+let x10AutoTimer=null,x10AutoTries=0,x10Connecting=false,x10ManualPause=false;
+function x10AutoEnabled(){return $('x10AutoConnect').checked&&localStorage.getItem('minote_x10_auto_connect')!=='false';}
+function x10CancelRetry(){if(x10AutoTimer!==null)clearTimeout(x10AutoTimer);x10AutoTimer=null;}
+function x10ScheduleRetry(){
+ if(!x10AutoEnabled()||x10ManualPause||!localStorage.getItem('minote_x10_device_id')||x10Connection?.connected)return;
+ if(x10AutoTimer!==null||document.hidden)return;
+ const delays=[2000,5000,12000,25000];
+ if(x10AutoTries>=delays.length){
+  x10SetStatus('Reconexión automática agotada. Enciende la X10 y pulsa «Conectar X10».');
+  return;
+ }
+ const delay=delays[x10AutoTries++];
+ x10Log('Reintento de conexión automática '+x10AutoTries+'/'+delays.length);
+ x10AutoTimer=setTimeout(()=>{
+  x10AutoTimer=null;
+  if(!document.hidden)void x10TryAutomatic('reintento');
+ },delay);
+}
+function x10MakeConnection(){
+ const {Connection}=MiNoteX10Ble;
+ const connection=new Connection({
+  onStatus:x10SetStatus,
+  onConnected:name=>{
+   if(x10Connection!==connection)return;
+   if(!x10ActiveNoteId||!x10ActivePageId||!state.notebooks.some(n=>n.id===x10ActiveNoteId&&n.pages.some(p=>p.id===x10ActivePageId))){
+    x10BindCurrent();
+   }
+   $('x10Connect').textContent='Desconectar X10';
+   x10Details();
+  },
+  onDisconnected:info=>{
+   if(x10Connection!==connection)return;
+   x10Flush();
+   $('x10Connect').textContent='Conectar X10';
+   x10Details();
+   if(info?.unexpected&&!x10Connecting)x10ScheduleRetry();
+  },
+  onMode:(mode,limits)=>{x10SetStatus('Modo '+mode+' identificado.');x10Log('Límites: '+JSON.stringify(limits));x10Details();},
+  onLimits:limits=>{x10Log('Límites físicos actualizados: '+JSON.stringify(limits));x10Details();},
+  onPen:x10Pen,
+  onNewPage:x10NewPhysicalPage,
+  onPageCount:n=>{x10Log('Contador lógico X10: '+n);x10Details();},
+  onUndecodedNote:b=>{
+   x10Unknown++;
+   if(x10Unknown===1)x10SetStatus('La X10 envía tinta en modo agenda, pero aún falta validar este formato.');
+   if(x10Unknown%20===0)x10Details();
+  },
+  onDiagnostic:x10Log
+ });
+ return connection;
+}
+async function x10TryAutomatic(reason='inicio'){
+ if(x10Connecting||x10Connection?.connected||!x10AutoEnabled()||x10ManualPause||document.hidden)return false;
+ const id=localStorage.getItem('minote_x10_device_id');
+ if(!id)return false;
+ if(!navigator.bluetooth||typeof navigator.bluetooth.getDevices!=='function'){
+  x10SetStatus('Este navegador no admite reconectar automáticamente. Usa «Conectar X10».');
+  return false;
+ }
+ x10Connecting=true;$('x10Connect').disabled=true;
+ try{
+  const devices=await navigator.bluetooth.getDevices();
+  const known=devices.find(d=>d.id===id&&/huion|note.?x10|t218/i.test(d.name||''));
+  if(!known){
+   x10SetStatus('El permiso anterior de la X10 ya no está disponible. Pulsa «Conectar X10» para autorizarla otra vez.');
+   return false;
+  }
+  x10SetStatus('Reconectando X10 automáticamente ('+reason+')…');
+  const connection=x10MakeConnection();x10Connection=connection;
+  await connection.connectSaved(known);
+  x10AutoTries=0;x10CancelRetry();
+  x10SetStatus('X10 reconectada automáticamente. Puedes escribir en la agenda.');
+  x10Details();return true;
+ }catch(err){
+  x10SetStatus('La X10 no respondió a la reconexión: '+err.message);
+  x10Log('Error reconexión: '+err.message);
+  x10ScheduleRetry();
+  return false;
+ }finally{x10Connecting=false;$('x10Connect').disabled=false;x10Details();}
+}
 function setupX10(){
  if(!window.MiNoteX10Ble){$('x10OpenBtn').disabled=true;return;}
- const {Connection}=MiNoteX10Ble;
  $('x10Rotation').value=localStorage.getItem('minote_x10_rotation')||'auto';
  $('x10AutoPage').checked=localStorage.getItem('minote_x10_auto_page')!=='false';
+ $('x10AutoConnect').checked=localStorage.getItem('minote_x10_auto_connect')!=='false';
  $('x10Rotation').onchange=e=>{localStorage.setItem('minote_x10_rotation',e.target.value);x10SetStatus('Orientación seleccionada. Se aplicará a los nuevos trazos.');};
  $('x10AutoPage').onchange=e=>localStorage.setItem('minote_x10_auto_page',String(e.target.checked));
+ $('x10AutoConnect').onchange=e=>{
+  localStorage.setItem('minote_x10_auto_connect',String(e.target.checked));
+  x10CancelRetry();x10AutoTries=0;
+  if(e.target.checked){x10ManualPause=false;void x10TryAutomatic('preferencia activada');}
+  else x10SetStatus('Conexión automática desactivada. Puedes seguir conectando de forma manual.');
+ };
  $('x10OpenBtn').onclick=()=>$('x10Dialog').showModal();
  $('x10Close').onclick=()=>$('x10Dialog').close();
  $('x10BindPage').onclick=x10BindCurrent;
  $('x10ApplyRotation').onclick=x10Reorient;
- $('x10CopyDiagnostic').onclick=async()=>{const txt=x10Logs.join('\\n')+'\\n'+JSON.stringify({mode:x10Connection?.mode,limits:x10Connection?.limits,unknown:x10Unknown,points:x10PointCount,physicalPages:x10PhysicalPages},null,2);
-   try{await navigator.clipboard.writeText(txt);x10SetStatus('Diagnóstico copiado. No incluye trazos ni contenido de tus notas.');}
-   catch(e){x10SetStatus('No se pudo copiar: '+e.message);}
+ $('x10CopyDiagnostic').onclick=async()=>{
+  const txt=x10Logs.join('\\n')+'\\n'+JSON.stringify({mode:x10Connection?.mode,limits:x10Connection?.limits,unknown:x10Unknown,points:x10PointCount,physicalPages:x10PhysicalPages},null,2);
+  try{await navigator.clipboard.writeText(txt);x10SetStatus('Diagnóstico copiado. No incluye trazos ni contenido de tus notas.');}
+  catch(e){x10SetStatus('No se pudo copiar: '+e.message);}
  };
  $('x10Connect').onclick=async()=>{
-  if(x10Connection?.connected){x10Flush();x10Connection.disconnect();x10SetStatus('X10 desconectada manualmente.');x10Details();return;}
-  x10Connection=new Connection({
-   onStatus:x10SetStatus,
-   onConnected:name=>{x10BindCurrent();$('x10Connect').textContent='Desconectar X10';x10Details();},
-   onDisconnected:()=>{x10Flush();$('x10Connect').textContent='Conectar X10';x10Details();},
-   onMode:(mode,limits)=>{x10SetStatus('Modo '+mode+' identificado.');x10Log('Límites: '+JSON.stringify(limits));x10Details();},
-   onLimits:limits=>{x10Log('Límites físicos actualizados: '+JSON.stringify(limits));x10Details();},
-   onPen:x10Pen,
-   onNewPage:x10NewPhysicalPage,
-   onPageCount:n=>{x10Log('Contador lógico X10: '+n);x10Details();},
-   onUndecodedNote:b=>{x10Unknown++;if(x10Unknown===1)x10SetStatus('La X10 está enviando tinta en modo agenda, pero falta verificar las coordenadas del protocolo. No se crearán trazos erróneos.');if(x10Unknown%20===0)x10Details();},
-   onDiagnostic:x10Log
-  });
-  try{await x10Connection.connect();x10Details();}catch(e){x10SetStatus('No se pudo conectar: '+e.message);x10Details();}
+  if(x10Connecting)return;
+  if(x10Connection?.connected){
+   x10ManualPause=true;x10CancelRetry();x10Flush();
+   x10Connection.disconnect();x10SetStatus('X10 desconectada manualmente. Al volver a abrir Mi Note puede reconectarse.');
+   x10Details();return;
+  }
+  x10ManualPause=false;x10CancelRetry();x10AutoTries=0;
+  x10Connecting=true;$('x10Connect').disabled=true;
+  const connection=x10MakeConnection();x10Connection=connection;
+  try{
+   await connection.connect();
+   if(connection.device?.id){
+    localStorage.setItem('minote_x10_device_id',connection.device.id);
+    // Primera autorización: activar el ajuste elegido; nunca sobreescribir una desactivación previa.
+    if(localStorage.getItem('minote_x10_auto_connect')===null)
+     localStorage.setItem('minote_x10_auto_connect',String($('x10AutoConnect').checked));
+   }
+   x10SetStatus('X10 conectada. La próxima vez se intentará conectar automáticamente si mantienes activada la opción.');
+   x10Details();
+  }catch(e){x10SetStatus('No se pudo conectar: '+e.message);x10Details();}
+  finally{x10Connecting=false;$('x10Connect').disabled=false;}
  };
- $('x10ProbeTablet').onclick=async()=>{try{if(!x10Connection?.connected)throw Error('Primero conecta X10');await x10Connection.probeAgenda();}catch(e){x10SetStatus('Diagnóstico: '+e.message);}};
- document.addEventListener('visibilitychange',()=>{if(document.hidden)x10Flush();});
+ $('x10ProbeTablet').onclick=async()=>{
+  try{if(!x10Connection?.connected)throw Error('Primero conecta X10');await x10Connection.probeAgenda();}
+  catch(e){x10SetStatus('Diagnóstico: '+e.message);}
+ };
+ document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)x10Flush();
+  else if(!x10Connection?.connected){x10CancelRetry();x10AutoTries=0;void x10TryAutomatic('volver a la aplicación');}
+ });
  x10Details();
+ // Nunca solicita nuevos permisos en segundo plano: usa únicamente el dispositivo ya autorizado.
+ Promise.resolve().then(()=>x10TryAutomatic('inicio'));
 }
 
 function loadGoogleScript(){if(window.google?.accounts?.oauth2)return Promise.resolve();return new Promise((resolve,reject)=>{if(!navigator.onLine)return reject(Error('Necesitas conexión a internet.'));const existing=document.querySelector('script[data-gis]');if(existing){existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',()=>reject(Error('No se pudo cargar el servicio de Google.')),{once:true});return;}const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;s.dataset.gis='true';s.onload=resolve;s.onerror=()=>reject(Error('No se pudo cargar el servicio de Google.'));document.head.append(s);});}

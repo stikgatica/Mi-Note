@@ -1,4 +1,4 @@
-/* Mi Note 0.2.2 | X10 BLE compatible con Data Ink V10.
+/* Mi Note 0.2.3 | X10 BLE con reconexión autorizada y Data Ink V10.
    Compatibilidad de lápiz: 55 54, respuestas LEN C8, C9/C8/CA, keepalive D1.
    Agenda: aviso 0x8A y enlace opcional. Nunca se envían DELETE/CLEAR.
    Referencias: DataInk_V10.html del usuario; Reginleif86/huion-note-x10-ble (MIT).
@@ -56,8 +56,24 @@ class Connection{
  async connect(){
   if(!navigator.bluetooth||!window.isSecureContext)
    throw Error('Web Bluetooth no está disponible. Usa Chrome o Edge en HTTPS con Bluetooth activo.');
-  // Debe ejecutarse desde el clic (permiso explícito).
+  // Primera conexión: requestDevice debe iniciarse desde un clic de usuario.
   const device=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[SERVICE]});
+  return this._connectDevice(device);
+ }
+ async connectSaved(device){
+  // getDevices() devuelve únicamente equipos que ya autorizó el usuario para este origen.
+  if(!navigator.bluetooth||!window.isSecureContext||!device?.gatt)
+   throw Error('Este navegador no permite recuperar la conexión autorizada.');
+  return this._connectDevice(device);
+ }
+ async _connectDevice(device){
+  if(this.connected)return;
+  this.intentionalDisconnect=false;
+  // Tras una desconexión, las características GATT deben obtenerse otra vez.
+  if(this.data)try{this.data.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
+  if(this.cmd)try{this.cmd.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
+  if(this.device)try{this.device.removeEventListener('gattserverdisconnected',this._onDisconnected);}catch{}
+  this.data=null;this.cmd=null;
   this.device=device;this.mode='conectando';
   this.status('Conectando con '+(device.name||'la Huion X10')+'…');
   device.addEventListener('gattserverdisconnected',this._onDisconnected);
@@ -172,17 +188,18 @@ class Connection{
  }
  _onDisconnected(){
   this.mode='desconectado';clearInterval(this.keepalive);this.keepalive=null;
-  this.handlers.onDisconnected?.();
+  this.handlers.onDisconnected?.({unexpected:!this.intentionalDisconnect});
   this.status('X10 desconectada. Las notas locales permanecen guardadas.');
  }
  disconnect(){
+  this.intentionalDisconnect=true;
   clearInterval(this.keepalive);this.keepalive=null;
   if(this.data)try{this.data.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
   if(this.cmd)try{this.cmd.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
-  if(this.device){try{this.device.gatt?.disconnect();}catch{}
-   this.device.removeEventListener('gattserverdisconnected',this._onDisconnected);}
+  if(this.device){this.device.removeEventListener('gattserverdisconnected',this._onDisconnected);
+   try{this.device.gatt?.disconnect();}catch{}}
   this.device=null;this.cmd=null;this.data=null;this.mode='desconectado';
-  this.handlers.onDisconnected?.();
+  this.handlers.onDisconnected?.({unexpected:false});
  }
 }
 const api={Connection,mapPoint,parseTabletPen,parseTabletInfo,frame,DEFAULT_NOTE,DEFAULT_TABLET};

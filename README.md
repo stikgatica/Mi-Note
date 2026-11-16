@@ -1,4 +1,4 @@
-# Mi Note — versión 0.2.2 (integración de lápiz Data Ink V10)
+# Mi Note — versión 0.2.3 (reconexión automática X10)
 
 Aplicación PWA independiente, diseñada para Windows y Android. Los cuadernos se guardan **en IndexedDB del navegador local**, no en GitHub. No hay telemetría, cuentas propias ni servidor de datos.
 
@@ -80,3 +80,10 @@ ARQUITECTURA.md
 - Por defecto, la orientación vertical coincide con Data Ink V10: giro horario (270° en coordenadas normalizadas); la zona útil de la X10 se coloca centrada dentro de la hoja física A5 148×210 mm, usando área aproximada 140,9×186,9 mm. Estos parámetros necesitan confirmación empírica en la agenda real.
 - El botón opcional «Probar modo agenda» envía el saludo 0x81 y permite diagnosticar eventos físicos de hoja 0x8A. La escritura online del protocolo de agenda 0x8D sigue sin decodificación validada. La conexión de lápiz tipo Data Ink no garantiza eventos 0x8A.
 - No modificar el esquema IndexedDB ni borrar almacenamiento del navegador. Prueba física obligatoria antes de considerar la conexión plenamente compatible.
+
+## V0.2.3 — reconexión X10
+- Primera conexión manual mediante permiso Bluetooth del usuario. Se conserva en el dispositivo el identificador opaco del equipo permitido (no una dirección MAC ni una contraseña).
+- Al abrir la aplicación intenta recuperar el equipo desde `navigator.bluetooth.getDevices()`, solo si está disponible y si el usuario mantiene marcada la opción «Reconectar automáticamente».
+- Si la X10 se desconecta inesperadamente, se realizan como máximo cuatro reintentos escalonados durante la sesión; al volver a la aplicación se puede iniciar otra ronda. Tras pulsar «Desconectar X10» no se reconecta en esa sesión sin intervención del usuario.
+- La reconexión depende del permiso persistente del navegador, Bluetooth encendido, dispositivo al alcance y disponibilidad Web Bluetooth. Puede requerir un nuevo permiso si este caduca o se revoca. Sin `getDevices()` sigue disponible «Conectar X10».
+- No existe servicio Bluetooth en segundo plano: la pestaña/PWA debe estar abierta. No modifica ni migra el contenido de IndexedDB y conserva la interfaz V0.2.
