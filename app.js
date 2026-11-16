@@ -155,11 +155,12 @@ function x10Reorient(){
  pg.updatedAt=now();paint();updatePage();x10SetStatus('Orientación '+rot+'° aplicada a '+targets.length+' trazos, sin cambiar los datos físicos originales.');
 }
 /* Vincular una sola vez; después utilizar getDevices() del navegador si conservó el permiso. */
-let x10AutoTimer=null,x10AutoTries=0,x10Connecting=false,x10ManualPause=false;
+let x10AutoTimer=null,x10AutoTries=0,x10Connecting=false,x10ManualPause=false,
+ x10InMemoryDevice=null; // BluetoothDevice autorizado vivo durante la sesión, también en Android.
 function x10AutoEnabled(){return $('x10AutoConnect').checked&&localStorage.getItem('minote_x10_auto_connect')!=='false';}
 function x10CancelRetry(){if(x10AutoTimer!==null)clearTimeout(x10AutoTimer);x10AutoTimer=null;}
 function x10ScheduleRetry(){
- if(!x10AutoEnabled()||x10ManualPause||!localStorage.getItem('minote_x10_device_id')||x10Connection?.connected)return;
+ if(!x10AutoEnabled()||x10ManualPause||(!localStorage.getItem('minote_x10_device_id')&&!x10InMemoryDevice)||x10Connection?.connected)return;
  if(x10AutoTimer!==null||document.hidden)return;
  const delays=[2000,5000,12000,25000];
  if(x10AutoTries>=delays.length){
@@ -179,6 +180,9 @@ function x10MakeConnection(){
   onStatus:x10SetStatus,
   onConnected:name=>{
    if(x10Connection!==connection)return;
+   // Mantener la referencia BLE incluso tras perder GATT: permite reabrirla
+   // sin selector mientras Chrome Android no destruya esta pestaña/PWA.
+   x10InMemoryDevice=connection.device;
    if(!x10ActiveNoteId||!x10ActivePageId||!state.notebooks.some(n=>n.id===x10ActiveNoteId&&n.pages.some(p=>p.id===x10ActivePageId))){
     x10BindCurrent();
    }
@@ -209,24 +213,29 @@ function x10MakeConnection(){
 async function x10TryAutomatic(reason='inicio'){
  if(x10Connecting||x10Connection?.connected||!x10AutoEnabled()||x10ManualPause||document.hidden)return false;
  const id=localStorage.getItem('minote_x10_device_id');
- if(!id)return false;
- if(!navigator.bluetooth||typeof navigator.bluetooth.getDevices!=='function'){
-  x10SetStatus('Este navegador no admite reconectar automáticamente. Usa «Conectar X10».');
-  return false;
- }
+ if(!id&&!x10InMemoryDevice)return false;
  x10Connecting=true;$('x10Connect').disabled=true;
  try{
-  const devices=await navigator.bluetooth.getDevices();
-  const known=devices.find(d=>d.id===id&&/huion|note.?x10|t218/i.test(d.name||''));
+  // En Android getDevices() suele estar deshabilitado, pero el objeto retornado
+  // por requestDevice() sigue siendo reutilizable mientras la página esté viva.
+  let known=x10InMemoryDevice&&(!id||x10InMemoryDevice.id===id)?x10InMemoryDevice:null;
+  let method=known?'sesión activa':'permiso guardado';
+  if(!known&&navigator.bluetooth&&typeof navigator.bluetooth.getDevices==='function'){
+   const devices=await navigator.bluetooth.getDevices();
+   // El identificador procede de la autorización de esta misma web.
+   known=devices.find(d=>d.id===id);
+  }
   if(!known){
-   x10SetStatus('El permiso anterior de la X10 ya no está disponible. Pulsa «Conectar X10» para autorizarla otra vez.');
+   x10SetStatus('La X10 necesita autorización manual en este navegador. Pulsa «Conectar X10»; la reconexión durante la sesión sí puede ser automática.');
+   x10RefreshCapability();
    return false;
   }
-  x10SetStatus('Reconectando X10 automáticamente ('+reason+')…');
+  x10SetStatus('Reconectando X10 ('+method+', '+reason+')…');
   const connection=x10MakeConnection();x10Connection=connection;
   await connection.connectSaved(known);
+  x10InMemoryDevice=known;
   x10AutoTries=0;x10CancelRetry();
-  x10SetStatus('X10 reconectada automáticamente. Puedes escribir en la agenda.');
+  x10SetStatus('X10 reconectada automáticamente. Puedes escribir en tu agenda.');
   x10Details();return true;
  }catch(err){
   x10SetStatus('La X10 no respondió a la reconexión: '+err.message);
@@ -235,11 +244,26 @@ async function x10TryAutomatic(reason='inicio'){
   return false;
  }finally{x10Connecting=false;$('x10Connect').disabled=false;x10Details();}
 }
+function x10RefreshCapability(){
+ const el=$('x10ReconnectHint');
+ if(!el)return;
+ const onAndroid=/Android/i.test(navigator.userAgent||'');
+ if(!navigator.bluetooth){
+  el.textContent='Bluetooth web no está disponible. Abre Mi Note en Chrome para Android mediante HTTPS.';
+ }else if(typeof navigator.bluetooth.getDevices==='function'){
+  el.textContent='Este Chrome permite recuperar equipos autorizados entre aperturas. Mantén Bluetooth encendido y el permiso de la X10 activo.';
+ }else if(onAndroid){
+  el.textContent='Android: Mi Note puede reconectar sin preguntar mientras siga abierta en memoria. Si Android cierra totalmente la PWA, Chrome puede exigir pulsar «Conectar X10» nuevamente.';
+ }else{
+  el.textContent='Reconexión automática mientras la página siga abierta. Si este navegador no dispone de getDevices(), tras cerrarla habrá que autorizar la conexión de nuevo.';
+ }
+}
 function setupX10(){
  if(!window.MiNoteX10Ble){$('x10OpenBtn').disabled=true;return;}
  $('x10Rotation').value=localStorage.getItem('minote_x10_rotation')||'auto';
  $('x10AutoPage').checked=localStorage.getItem('minote_x10_auto_page')!=='false';
  $('x10AutoConnect').checked=localStorage.getItem('minote_x10_auto_connect')!=='false';
+ x10RefreshCapability();
  $('x10Rotation').onchange=e=>{localStorage.setItem('minote_x10_rotation',e.target.value);x10SetStatus('Orientación seleccionada. Se aplicará a los nuevos trazos.');};
  $('x10AutoPage').onchange=e=>localStorage.setItem('minote_x10_auto_page',String(e.target.checked));
  $('x10AutoConnect').onchange=e=>{
@@ -261,6 +285,7 @@ function setupX10(){
   if(x10Connecting)return;
   if(x10Connection?.connected){
    x10ManualPause=true;x10CancelRetry();x10Flush();
+   x10InMemoryDevice=null; // El usuario ordenó desconectar, no reconectar.
    x10Connection.disconnect();x10SetStatus('X10 desconectada manualmente. Al volver a abrir Mi Note puede reconectarse.');
    x10Details();return;
   }
@@ -269,6 +294,7 @@ function setupX10(){
   const connection=x10MakeConnection();x10Connection=connection;
   try{
    await connection.connect();
+   x10InMemoryDevice=connection.device;
    if(connection.device?.id){
     localStorage.setItem('minote_x10_device_id',connection.device.id);
     // Primera autorización: activar el ajuste elegido; nunca sobreescribir una desactivación previa.

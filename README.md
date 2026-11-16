@@ -1,4 +1,4 @@
-# Mi Note — versión 0.2.3 (reconexión automática X10)
+# Mi Note — versión 0.2.4 (reconexión X10 adaptada a Android)
 
 Aplicación PWA independiente, diseñada para Windows y Android. Los cuadernos se guardan **en IndexedDB del navegador local**, no en GitHub. No hay telemetría, cuentas propias ni servidor de datos.
 
@@ -87,3 +87,10 @@ ARQUITECTURA.md
 - Si la X10 se desconecta inesperadamente, se realizan como máximo cuatro reintentos escalonados durante la sesión; al volver a la aplicación se puede iniciar otra ronda. Tras pulsar «Desconectar X10» no se reconecta en esa sesión sin intervención del usuario.
 - La reconexión depende del permiso persistente del navegador, Bluetooth encendido, dispositivo al alcance y disponibilidad Web Bluetooth. Puede requerir un nuevo permiso si este caduca o se revoca. Sin `getDevices()` sigue disponible «Conectar X10».
 - No existe servicio Bluetooth en segundo plano: la pestaña/PWA debe estar abierta. No modifica ni migra el contenido de IndexedDB y conserva la interfaz V0.2.
+
+## V0.2.4: Android sin app separada
+- Mismo sitio PWA, sin APK ni plugin nativo. La X10 autorizada mediante requestDevice permanece como objeto `BluetoothDevice` en memoria de la pestaña/PWA; al desconectarse se reutiliza con `gatt.connect()`, sin mostrar el selector mientras esa memoria sobreviva.
+- Si el navegador implementa `navigator.bluetooth.getDevices()`, tras recargar/abrir Mi Note se intenta recuperar el dispositivo autorizado sin solicitar un permiso nuevo.
+- En Chrome Android estable la disponibilidad de `getDevices()` puede ser limitada. Si Android destruye completamente el proceso o recarga la página y la API falta, será necesaria nueva acción del usuario: «Conectar X10». No se puede eludir este permiso desde una PWA.
+- Interfaz X10 informa qué tipo de reconexión admite el navegador. Permanecen los reintentos acotados, la desconexión voluntaria y la captura de trazos procedente de Data Ink V10. No hay reconexión Bluetooth en segundo plano cuando la web está cerrada.
+- Los cuadernos siguen almacenados localmente en IndexedDB; sin cambios de esquema ni telemetría.
