@@ -63,6 +63,8 @@
   <div class="dialog-head"><h2 id="x10Title">Huion Note X10 · Agenda</h2><button id="x10Close" type="button" class="icon-btn" aria-label="Cerrar">✕</button></div>
   <p class="x10-intro">El lápiz de tinta se conecta con el protocolo de Data Ink V10. Esta conexión Bluetooth es experimental y nunca borra datos de la X10.</p>
   <div id="x10Status" class="drive-status" role="status" aria-live="polite">No conectada.</div>
+  <div id="x10BrowserCheck" class="x10-details" role="status" aria-live="polite" style="white-space:pre-line;margin-top:8px">Comprobando Bluetooth del navegador…</div>
+  <div class="x10-row"><button id="x10BrowserCheckBtn" type="button" class="subtle">Comprobar Bluetooth</button><button id="x10CopyUrl" type="button" class="subtle">Copiar enlace para Chrome</button></div>
   <div class="x10-row"><button id="x10Connect" type="button" class="primary">Conectar X10</button><button id="x10ProbeTablet" type="button" class="subtle">Probar modo agenda</button></div>
   <label class="field">Orientación física de la escritura
     <select id="x10Rotation"><option value="auto">Automática (vertical)</option><option value="0">0° · normal</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select>
@@ -79,5 +81,6 @@
 <dialog id="driveDialog" class="dialog"><form method="dialog"><div class="dialog-head"><h2>Google Drive</h2><button class="icon-btn" value="cancel" aria-label="Cerrar">✕</button></div><p>Primero se guardan tus notas localmente. Drive es un respaldo y una forma de transferirlas entre equipos.</p><label class="field">OAuth Client ID (aplicación web)<input id="clientId" type="text" placeholder="xxxxxxxx.apps.googleusercontent.com" autocomplete="off"></label><small>Introduce únicamente el <b>Client ID público</b>. Nunca una clave secreta ni una contraseña. Debes autorizar este sitio en Google Cloud.</small><div class="dialog-actions"><button id="connectDrive" type="button" class="primary">Conectar Google</button><button id="uploadDrive" type="button" class="subtle">↑ Crear respaldo en Drive</button><button id="pullDrive" type="button" class="subtle">↓ Combinar último respaldo</button></div><p id="driveStatus" class="drive-status">Sin conectar. Las copias de Drive requieren internet y configuración OAuth.</p><div class="privacy-info">Esta versión no realiza sincronización automática ni resuelve ediciones simultáneas. Al combinar, nunca sustituye silenciosamente una hoja diferente: crea una copia de conflicto.</div></form></dialog>
 <script src="./x10-ble.js" defer></script>
 <script src="./app.js" defer></script>
+<script src="./x10-android-help.js" defer></script>
 </body>
 </html>
