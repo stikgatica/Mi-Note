@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1451b7">
+<meta name="description" content="Mi Note: tus cuadernos y trazos, en tu dispositivo y en tu Drive.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="stylesheet" href="./styles.css">
+<title>Mi Note · Cuaderno privado</title>
+</head>
+<body>
+<div class="layout">
+ <aside class="sidebar" id="sidebar" aria-label="Cuadernos">
+  <div class="brand"><div class="brand-symbol">✎</div><div><strong>Mi Note</strong><small>Cuadernos privados</small></div></div>
+  <button id="addNotebook" class="primary sidebar-new">+ Nuevo cuaderno</button>
+  <div class="section-header">MIS CUADERNOS</div>
+  <nav id="notebookList" class="notebook-list"></nav>
+  <div class="sidebar-foot"><div id="localStatus">● Guardado local</div><small>Tus notas no se publican en GitHub.</small></div>
+ </aside>
+ <main class="main">
+  <header class="topbar">
+   <div class="left-head"><button id="toggleSidebar" class="icon-btn mobile" title="Cuadernos" aria-label="Mostrar cuadernos">☰</button><div class="title-block"><h1 id="notebookTitle">Mi cuaderno</h1><span id="pageCount">1 hoja</span></div></div>
+   <div class="head-actions"><button id="installBtn" class="subtle" hidden>Instalar app</button><button id="settingsBtn" class="subtle">☁ Drive</button><button id="fullscreenBtn" class="icon-btn" title="Pantalla completa" aria-label="Pantalla completa">⛶</button></div>
+  </header>
+  <div id="notice" class="notice" aria-live="polite">Puedes escribir con el mouse, el dedo o un lápiz compatible.</div>
+  <div class="toolbar" role="toolbar" aria-label="Herramientas de dibujo">
+    <button id="penBtn" class="tool active" title="Lápiz">✎ <span>Lápiz</span></button>
+    <button id="eraserBtn" class="tool" title="Borrador de trazo completo">⌫ <span>Borrador</span></button>
+    <label class="control-label">Color <input id="penColor" type="color" value="#153f82" aria-label="Color de lápiz"></label>
+    <label class="control-label">Grosor <input id="penWidth" type="range" min="1" max="15" value="3" aria-label="Grosor de lápiz"><output id="penWidthLabel">3</output></label>
+    <span class="tool-separator"></span>
+    <button id="undoBtn" class="tool" title="Deshacer">↶ <span>Deshacer</span></button>
+    <button id="redoBtn" class="tool" title="Rehacer">↷ <span>Rehacer</span></button>
+    <label class="control-label">Papel <select id="paperSelect" aria-label="Tipo de hoja"><option value="grid">Cuadrícula</option><option value="ruled">Rayas</option><option value="plain">Blanco</option></select></label>
+    <button id="renamePageBtn" class="tool" title="Renombrar hoja">✎ <span>Nombre</span></button>
+  </div>
+  <section class="workspace">
+    <div class="page-top"><div><strong id="pageTitle">Hoja 1</strong><small id="pageInfo">Formato vectorial editable</small></div><div class="page-top-actions"><button id="exportSvg" class="subtle">SVG</button><button id="exportPng" class="subtle">PNG</button><button id="printPdf" class="subtle">PDF</button></div></div>
+    <div class="paper-shell"><canvas id="paper" aria-label="Lienzo de escritura"></canvas></div>
+  </section>
+  <footer class="pages-bar"><div class="pages-label">HOJAS</div><div id="pageList" class="page-list"></div><button id="addPage" class="add-page">+ Hoja</button><button id="deletePage" class="delete-page" title="Eliminar hoja">Eliminar hoja</button></footer>
+  <div class="bottom-actions"><button id="backupBtn" class="subtle">↓ Respaldo JSON</button><button id="importBtn" class="subtle">↑ Importar archivo</button><button id="renameNotebookBtn" class="subtle">Renombrar cuaderno</button></div>
+ </main>
+</div>
+<input id="importInput" type="file" accept=".json,application/json" hidden>
+<dialog id="driveDialog" class="dialog"><form method="dialog"><div class="dialog-head"><h2>Google Drive</h2><button class="icon-btn" value="cancel" aria-label="Cerrar">✕</button></div><p>Primero se guardan tus notas localmente. Drive es un respaldo y una forma de transferirlas entre equipos.</p><label class="field">OAuth Client ID (aplicación web)<input id="clientId" type="text" placeholder="xxxxxxxx.apps.googleusercontent.com" autocomplete="off"></label><small>Introduce únicamente el <b>Client ID público</b>. Nunca una clave secreta ni una contraseña. Debes autorizar este sitio en Google Cloud.</small><div class="dialog-actions"><button id="connectDrive" type="button" class="primary">Conectar Google</button><button id="uploadDrive" type="button" class="subtle">↑ Crear respaldo en Drive</button><button id="pullDrive" type="button" class="subtle">↓ Combinar último respaldo</button></div><p id="driveStatus" class="drive-status">Sin conectar. Las copias de Drive requieren internet y configuración OAuth.</p><div class="privacy-info">Esta versión no realiza sincronización automática ni resuelve ediciones simultáneas. Al combinar, nunca sustituye silenciosamente una hoja diferente: crea una copia de conflicto.</div></form></dialog>
+<script src="./app.js" defer></script>
+</body>
+</html>
