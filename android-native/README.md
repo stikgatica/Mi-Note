@@ -22,7 +22,7 @@ También puedes compilar localmente con Node 22, Java 21 y Android SDK:
 
 ```bash
 cd android-native
-npm ci
+npm install --no-audit --no-fund
 npm test
 npm run build:web
 npx cap add android
