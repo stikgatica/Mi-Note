@@ -1,4 +1,4 @@
-# Mi Note — versión 0.2 (navegación compacta de hojas)
+# Mi Note — versión 0.2.1 (V0.2 + integración X10 experimental)
 
 Aplicación PWA independiente, diseñada para Windows y Android. Los cuadernos se guardan **en IndexedDB del navegador local**, no en GitHub. No hay telemetría, cuentas propias ni servidor de datos.
 
@@ -60,3 +60,16 @@ icons/icon-512.png
 README.md
 ARQUITECTURA.md
 ```
+
+## Huion Note X10 (0.2.1): conexión experimental sin borrar nada
+- La interfaz V0.2 se mantiene. Botón «X10» arriba a la derecha abre la conexión.
+- Usa Chrome/Edge actualizado, Bluetooth activo, HTTPS, y selecciona la X10 al conectar.
+- El conector detecta el servicio GATT FFE0, notificaciones FFE1 y comandos FFE2.
+- Soporta identificación del modo agenda (challenge 0x81, verify 0x82), consulta de límites 0x95 y páginas 0x85; aviso de nueva hoja de X10 (0x8A).
+- Recibe y registra trazos en **modo tableta** con reportes 55 54 confirmados en la implementación externa. Para la escritura en tinta del **modo agenda**, el paquete 0x8D está identificado pero sus puntos no se han verificado; **aún no se asegura reproducción en tiempo real en modo agenda**. Se informa al usuario y permite copiar un diagnóstico voluntario para la próxima integración.
+- La orientación se fija por perfil (agenda vertical 0°; modo tableta vertical 270°) o manualmente. Cada trazo X10 capturado conserva `x10.raw` con sus coordenadas/ presión originales, límites y rotación; solo `pts` se proyecta sobre la hoja 1000×1400. Cambiar la orientación recalcula `pts` desde `raw`, sin alterar `raw`.
+- El botón físico que emita 0x8A genera una hoja nueva vinculada al cuaderno seleccionado, si «Crear hoja digital...» está marcado. Si no está, se detiene la captura hasta vincular una hoja, para evitar superposición.
+- No se envían comandos destructivos 0x8B (borrar hoja), 0x8C (limpiar caché), ni comandos de firmware.
+- La conexión Web Bluetooth depende del navegador y del firmware; hace falta probar con una X10 real. En Windows la app oficial puede reclamar el dispositivo en modo tableta; para papel/tinta usar el modo agenda cuando esté disponible.
+- El respaldo sigue siendo formato `mi-note-v1` compatible con V0.2; las propiedades adicionales de X10 son optativas. **No borres los datos del navegador** al actualizar.
+- Referencia técnica: https://github.com/Reginleif86/huion-note-x10-ble (MIT); manual Huion: https://www.huion.com/es/manual/huion-note/680

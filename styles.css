@@ -12,3 +12,17 @@
 .page-chip{max-width:none;min-width:0;white-space:normal;}
 .pages-dialog-actions{display:flex;flex-wrap:wrap;justify-content:space-between;gap:9px;margin-top:16px;}
 @media(max-width:700px){.page-top{padding:3px 6px;gap:8px;}.page-heading{min-width:calc(100% - 175px);flex:1;}.page-heading strong{max-width:140px;}.page-pager button{width:37px;height:35px;}.page-pager .page-number{width:40px;}.page-top-actions{width:100%;justify-content:flex-end;}}
+
+/* V0.2.1: controles discretos X10, sin rediseñar V0.2 */
+.x10-head{white-space:nowrap;color:#1358aa;}
+.x10-head.is-connected{background:#e8f9f0;color:#136d4b;border-color:#bde8d0;}
+.x10-dialog{max-height:min(90dvh,850px);overflow:auto;}
+.x10-intro{font-size:13px;color:#4b627c;}
+.x10-dialog .field select{width:100%;padding:10px;border:1px solid #bac9dc;border-radius:9px;background:white;color:#163252;}
+.x10-row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;}
+.x10-row button{flex:1;min-width:145px;}
+.x10-check{display:flex;align-items:flex-start;gap:9px;margin:16px 0 10px;font-size:12px;line-height:1.45;}
+.x10-check input{margin-top:3px;flex:none;accent-color:#1451b7;}
+.x10-details{background:#f4f7fc;border:1px solid #e0e7f0;border-radius:9px;font-size:12px;line-height:1.6;padding:10px;white-space:pre-line;}
+.x10-dialog small{font-size:11px;line-height:1.55;}
+@media(max-width:700px){.x10-head{padding:7px 8px}.x10-dialog{max-height:94dvh;padding:16px}.x10-dialog .x10-row button{min-width:0;flex-basis:100%;}}
