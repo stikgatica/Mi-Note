@@ -130,7 +130,7 @@ function x10Pen(raw,limits,mode){
  if(state.activeNotebookId!==x10ActiveNoteId||page().id!==x10ActivePageId){x10Flush();return;}
  if(!raw.touch||raw.press<=0){x10Flush();return;}
  const rot=x10RotationValue(mode);
- const coord=MiNoteX10Ble.mapPoint(raw,limits.maxX,limits.maxY,rot,W,H);
+ const coord=MiNoteX10Ble.mapPoint(raw,limits.maxX,limits.maxY,rot,W,H,true);
  if(!coord)return;
  coord[2]=Math.min(1,Math.max(.08,raw.press/(limits.maxPressure||8191)));
  if(!x10ActiveStroke){
@@ -149,7 +149,7 @@ function x10Reorient(){
  x10Flush();beforeChange();const rot=x10RotationValue();
  for(const s of targets){
   const {limits,raw}=s.x10;
-  s.pts=raw.map(([x,y,press])=>{const pt=MiNoteX10Ble.mapPoint({x,y,press},limits.maxX,limits.maxY,rot,W,H);if(pt)pt[2]=Math.min(1,Math.max(.08,press/(limits.maxPressure||8191)));return pt;}).filter(Boolean);
+  s.pts=raw.map(([x,y,press])=>{const pt=MiNoteX10Ble.mapPoint({x,y,press},limits.maxX,limits.maxY,rot,W,H,true);if(pt)pt[2]=Math.min(1,Math.max(.08,press/(limits.maxPressure||8191)));return pt;}).filter(Boolean);
   s.x10.rotation=rot;
  }
  pg.updatedAt=now();paint();updatePage();x10SetStatus('Orientación '+rot+'° aplicada a '+targets.length+' trazos, sin cambiar los datos físicos originales.');
@@ -185,7 +185,7 @@ function setupX10(){
   });
   try{await x10Connection.connect();x10Details();}catch(e){x10SetStatus('No se pudo conectar: '+e.message);x10Details();}
  };
- $('x10ProbeTablet').onclick=async()=>{try{if(!x10Connection?.connected)throw Error('Primero conecta X10');await x10Connection.probeTablet();}catch(e){x10SetStatus('Diagnóstico: '+e.message);}};
+ $('x10ProbeTablet').onclick=async()=>{try{if(!x10Connection?.connected)throw Error('Primero conecta X10');await x10Connection.probeAgenda();}catch(e){x10SetStatus('Diagnóstico: '+e.message);}};
  document.addEventListener('visibilitychange',()=>{if(document.hidden)x10Flush();});
  x10Details();
 }

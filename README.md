@@ -1,4 +1,4 @@
-# Mi Note — versión 0.2.1 (V0.2 + integración X10 experimental)
+# Mi Note — versión 0.2.2 (integración de lápiz Data Ink V10)
 
 Aplicación PWA independiente, diseñada para Windows y Android. Los cuadernos se guardan **en IndexedDB del navegador local**, no en GitHub. No hay telemetría, cuentas propias ni servidor de datos.
 
@@ -73,3 +73,10 @@ ARQUITECTURA.md
 - La conexión Web Bluetooth depende del navegador y del firmware; hace falta probar con una X10 real. En Windows la app oficial puede reclamar el dispositivo en modo tableta; para papel/tinta usar el modo agenda cuando esté disponible.
 - El respaldo sigue siendo formato `mi-note-v1` compatible con V0.2; las propiedades adicionales de X10 son optativas. **No borres los datos del navegador** al actualizar.
 - Referencia técnica: https://github.com/Reginleif86/huion-note-x10-ble (MIT); manual Huion: https://www.huion.com/es/manual/huion-note/680
+
+## V0.2.2: reaprovechar Data Ink V10
+- El flujo BLE principal reproduce el que ya funcionaba con el lápiz de tinta del usuario: conexión FFE0/FFE1/FFE2; mensajes C9, C8 y CA de 8 bytes, separados por 150 ms; keepalive D1 cada cinco segundos.
+- Analiza informes `55 54` de contacto/hover y respuestas de dimensiones `[LEN,C8,...]`. Se capturan coordenadas y presión en trazos vectoriales con originales guardados en `stroke.x10.raw`.
+- Por defecto, la orientación vertical coincide con Data Ink V10: giro horario (270° en coordenadas normalizadas); la zona útil de la X10 se coloca centrada dentro de la hoja física A5 148×210 mm, usando área aproximada 140,9×186,9 mm. Estos parámetros necesitan confirmación empírica en la agenda real.
+- El botón opcional «Probar modo agenda» envía el saludo 0x81 y permite diagnosticar eventos físicos de hoja 0x8A. La escritura online del protocolo de agenda 0x8D sigue sin decodificación validada. La conexión de lápiz tipo Data Ink no garantiza eventos 0x8A.
+- No modificar el esquema IndexedDB ni borrar almacenamiento del navegador. Prueba física obligatoria antes de considerar la conexión plenamente compatible.
