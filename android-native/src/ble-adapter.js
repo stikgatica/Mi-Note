@@ -10,7 +10,7 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
   async function ready() {
     if (!initialization) {
       initialization = (async () => {
-        await BleClient.initialize();
+        await BleClient.initialize({ androidNeverForLocation: true });
         if (!(await BleClient.isEnabled())) await BleClient.requestEnable();
       })().catch(err => { initialization = null; throw err; });
     }

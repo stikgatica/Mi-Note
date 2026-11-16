@@ -48,3 +48,11 @@ El archivo resultante estará en `android-native/android/app/build/outputs/apk/d
 - El APK de depuración está firmado con clave de prueba por GitHub Actions. **No** es una versión para Play Store. No almacenes información importante sin exportar respaldos.
 - Instalar el APK crea un almacenamiento distinto al de la PWA anterior; no desinstales ni borres los datos de la PWA antes de exportar un respaldo JSON.
 - Los archivos `stage/`, `dist/`, `node_modules/` y `android/` se generan durante la compilación y no se publican en Git.
+
+## V0.2 Android firmada: privacidad y advertencias
+- Se genera un APK **release** firmado, no una compilación debug; esta es una versión de prueba privada y no ha sido auditada ni certificada.
+- Se desactiva `android:allowBackup`, se restringe la extracción de datos y se excluye el permiso `INTERNET` del APK. Google Drive se deshabilita solo en la versión Android; usa respaldo JSON local.
+- La declaración `androidNeverForLocation: true` limita el escaneo en Android moderno a Bluetooth LE; algunos dispositivos BLE pueden dejar de ser visibles debido al filtro de Android.
+- La firma privada se genera dentro de GitHub Actions y se deposita durante **7 días** como artefacto **restringido** `PRIVADO-clave-firma-Mi-Note-X10-v0.2`. El propietario del repositorio debe descargarla y custodiarla de forma segura para firmar futuras actualizaciones, pues no se sube como secreto ni se incluye en el APK. Perderla impide actualizar esta instalación conservando la misma firma.
+- La V0.2 se firma con una clave distinta de la V0.1. Android **no permite instalarla como actualización encima de V0.1**; primero exporta tus apuntes a JSON si ya escribiste allí. No borres la PWA por error: es una instalación diferente.
+- Una firma propia no sustituye una auditoría y **no garantiza eliminar la alerta de Play Protect** si Google no reconoce al desarrollador. No desactives Play Protect.
