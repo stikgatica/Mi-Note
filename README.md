@@ -1,10 +1,11 @@
-# Mi Note — versión 0.2 (navegación compacta de hojas)
+# Mi Note — versión 0.3 (rediseño UX/UI profesional)
 
 Aplicación PWA independiente, diseñada para Windows y Android. Los cuadernos se guardan **en IndexedDB del navegador local**, no en GitHub. No hay telemetría, cuentas propias ni servidor de datos.
 
 ## Ya funciona
 
 - Crear y renombrar cuadernos; crear, renombrar y eliminar páginas.
+- Rediseño visual responsive: modo claro/oscuro, biblioteca plegable, herramientas ocultables, estados de guardado y atajos Ctrl/Cmd+B para biblioteca, Ctrl/Cmd+Z para deshacer.
 - Navegación compacta «‹ 1 ›» encima de la hoja; «›» avanza o crea nueva hoja en la última página; tocar el número abre administración de páginas.
 - Dibujar con mouse, pantalla táctil o lápiz reconocido por Windows/Android, con presión cuando el navegador la entrega.
 - Borrar trazos, deshacer/rehacer, distintos colores/grosores, fondos cuadriculado/rayado/blanco.
