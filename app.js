@@ -275,6 +275,49 @@ function setupX10(){
   if(e.target.checked){x10ManualPause=false;void x10TryAutomatic('preferencia activada');}
   else x10SetStatus('Conexión automática desactivada. Puedes seguir conectando de forma manual.');
  };
+ const directArea=$('x10DirectArea');
+ const installedAndroid=/Android/i.test(navigator.userAgent||'') &&
+  (window.matchMedia('(display-mode: standalone)').matches||window.matchMedia('(display-mode: fullscreen)').matches);
+ directArea.hidden=!installedAndroid;
+ $('x10DirectConnect').onclick=()=>{
+  if(x10Connection?.connected){
+   notice('La Huion X10 ya está conectada.');return;
+  }
+  x10ManualPause=false;x10CancelRetry();x10AutoTries=0;
+  const connection=x10MakeConnection();x10Connection=connection;
+  let chooser;
+  // CRÍTICO: requestDevice() se inicia directamente en el clic, sin awaits,
+  // sin showModal y sin diálogos HTML activos.
+  try{
+   chooser=connection.selectDevice(false);
+   x10SetStatus('Selector Bluetooth solicitado fuera del diálogo.');
+   notice('Solicitando el selector Bluetooth desde la pantalla principal…');
+  }catch(e){
+   const msg='Bluetooth no pudo iniciar: '+(e.name||'Error')+' · '+e.message;
+   x10SetStatus(msg);notice(msg,true);return;
+  }
+  let pending=true;
+  const timer=setTimeout(()=>{
+   if(pending){
+    x10SetStatus('Android no abrió el selector ni respondió. Puede tratarse del permiso de Bluetooth de la instalación WebAPK.');
+    notice('Android no mostró el selector Bluetooth desde la pantalla principal.',true);
+   }
+  },10000);
+  chooser.then(async device=>{
+   pending=false;clearTimeout(timer);
+   x10SetStatus('Huion seleccionada. Conectando…');
+   await connection.connectSaved(device);
+   x10InMemoryDevice=device;
+   if(device.id)localStorage.setItem('minote_x10_device_id',device.id);
+   x10SetStatus('X10 conectada correctamente desde la aplicación.');
+   notice('Huion X10 conectada. Ya puedes escribir.');
+   x10Details();
+  }).catch(e=>{
+   pending=false;clearTimeout(timer);
+   const msg='Bluetooth: '+(e.name||'Error')+' · '+e.message;
+   x10SetStatus(msg);notice(msg,true);
+  });
+ };
  $('x10OpenBtn').onclick=()=>$('x10Dialog').showModal();
  $('x10Close').onclick=()=>$('x10Dialog').close();
  $('x10BindPage').onclick=x10BindCurrent;

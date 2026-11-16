@@ -1,5 +1,5 @@
-/* Mi Note PWA 0.2.8: interfaz actualizada al recuperar conexión, cuadernos en IndexedDB intactos. */
-const CACHE='mi-note-shell-v0.2.8';
+/* Mi Note PWA 0.2.9: interfaz actualizada al recuperar conexión, cuadernos en IndexedDB intactos. */
+const CACHE='mi-note-shell-v0.2.9';
 const SHELL=['./','./index.html','./styles.css','./app.js','./x10-ble.js','./x10-android-help.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)));
