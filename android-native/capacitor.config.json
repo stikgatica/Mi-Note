@@ -1,0 +1,18 @@
+{
+  "appId": "cl.stikgatica.minote.x10",
+  "appName": "Mi Note X10",
+  "webDir": "dist",
+  "plugins": {
+    "BluetoothLe": {
+      "displayStrings": {
+        "scanning": "Buscando dispositivos Bluetooth...",
+        "cancel": "Cancelar",
+        "availableDevices": "Dispositivos disponibles",
+        "noDeviceFound": "No se encontraron dispositivos"
+      }
+    }
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

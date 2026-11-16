@@ -9,13 +9,14 @@ const isEmbedded=()=>{const ua=navigator.userAgent||'';
  catch{return true;}
 };
 const standalone=()=>window.matchMedia('(display-mode: standalone)').matches||window.matchMedia('(display-mode: fullscreen)').matches;
-const hasBluetooth=()=>!!(window.isSecureContext&&navigator.bluetooth&&typeof navigator.bluetooth.requestDevice==='function');
+const hasBluetooth=()=>!!window.MiNoteNativeBLE||!!(window.isSecureContext&&navigator.bluetooth&&typeof navigator.bluetooth.requestDevice==='function');
 const blockedByPolicy=()=>{
  try{const p=document.permissionsPolicy||document.featurePolicy;
  return !!(p?.allowsFeature&&p.allowsFeature('bluetooth')===false);}
  catch{return false;}
 };
 const explain=()=>{
+ if(window.MiNoteNativeBLE)return '';
  if(!window.isSecureContext)return 'Mi Note necesita HTTPS para Bluetooth. Abre la dirección segura directamente en Chrome.';
  if(blockedByPolicy())return 'Este visor bloquea el permiso Bluetooth. Abre Mi Note directamente en Chrome para Android.';
  if(!navigator.bluetooth||typeof navigator.bluetooth.requestDevice!=='function')
@@ -26,10 +27,10 @@ async function check(){
  if(!info)return;
  const android=(navigator.userAgent||'').includes('Android');
  const embedded=isEmbedded();
- const lines=['Mi Note 0.2.8 · '+(android?'Android':'Otro sistema')+(standalone()?' · aplicación instalada':embedded?' · navegador integrado':' · pestaña de navegador'),
+ const lines=['Mi Note '+(window.MiNoteNativeBLE?'Android nativo 0.1':'Web 0.2.9')+' · '+(android?'Android':'Otro sistema')+(standalone()?' · aplicación instalada':embedded?' · navegador integrado':' · pestaña de navegador'),
   'Conexión segura: '+(window.isSecureContext?'sí':'no'),
-  'Selector Bluetooth: '+(hasBluetooth()?'disponible':'NO disponible')];
- if(hasBluetooth()&&navigator.bluetooth.getAvailability){
+  'Selector Bluetooth: '+(window.MiNoteNativeBLE?'NATIVO Android':hasBluetooth()?'disponible':'NO disponible')];
+ if(!window.MiNoteNativeBLE&&hasBluetooth()&&navigator.bluetooth.getAvailability){
   try{const available=await navigator.bluetooth.getAvailability();
    lines.push('Bluetooth del equipo: '+(available?'disponible':'no disponible; revisa que esté activado'));}
   catch{lines.push('Estado del adaptador: no se pudo consultar');}
@@ -55,7 +56,7 @@ connect?.addEventListener('click',event=>{
 },true);
 $('x10OpenBtn')?.addEventListener('click',()=>{void check();});
 const openBrowser=$('x10OpenChrome');
-if(openBrowser){openBrowser.hidden=!((navigator.userAgent||'').includes('Android')&&standalone());
+if(openBrowser){openBrowser.hidden=!!window.MiNoteNativeBLE||!((navigator.userAgent||'').includes('Android')&&standalone());
  openBrowser.addEventListener('click',()=>{
   // En Chrome Android, window.open desde un clic suele abrir una pestaña externa.
   const tab=window.open(URL_CHROME,'_blank','noopener');

@@ -54,6 +54,7 @@ class Connection{
  get connected(){return !!this.device?.gatt?.connected;}
  status(s){this.handlers.onStatus?.(s);}
  selectDevice(filtered=false){
+  if(window.MiNoteNativeBLE)return window.MiNoteNativeBLE.selectDevice(filtered);
   if(!navigator.bluetooth||!window.isSecureContext)
    throw Error('Web Bluetooth no está disponible. Usa Chrome o Edge en HTTPS con Bluetooth activo.');
   // Debe ejecutarse sin await previo, dentro del evento táctil del usuario.
@@ -68,8 +69,8 @@ class Connection{
  }
  async connectSaved(device){
   // getDevices() devuelve únicamente equipos que ya autorizó el usuario para este origen.
-  if(!navigator.bluetooth||!window.isSecureContext||!device?.gatt)
-   throw Error('Este navegador no permite recuperar la conexión autorizada.');
+  if((!window.MiNoteNativeBLE&&(!navigator.bluetooth||!window.isSecureContext))||!device?.gatt)
+   throw Error('Este dispositivo no permite recuperar la conexión autorizada.');
   return this._connectDevice(device);
  }
  async _connectDevice(device){

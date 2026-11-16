@@ -216,12 +216,13 @@ async function x10TryAutomatic(reason='inicio'){
  if(!id&&!x10InMemoryDevice)return false;
  // Android instalado: no intentar recuperar permisos al arrancar si aún no hay
  // un BluetoothDevice vivo. La petición pendiente podría interferir con el toque.
- if(/Android/i.test(navigator.userAgent||'')&&!x10InMemoryDevice)return false;
+ if(/Android/i.test(navigator.userAgent||'')&&!x10InMemoryDevice&&!window.MiNoteNativeBLE)return false;
  x10Connecting=true;
  try{
   // En Android getDevices() suele estar deshabilitado, pero el objeto retornado
   // por requestDevice() sigue siendo reutilizable mientras la página esté viva.
   let known=x10InMemoryDevice&&(!id||x10InMemoryDevice.id===id)?x10InMemoryDevice:null;
+  if(!known&&window.MiNoteNativeBLE)known=await window.MiNoteNativeBLE.getSavedDevice(id);
   let method=known?'sesión activa':'permiso guardado';
   if(!known&&navigator.bluetooth&&typeof navigator.bluetooth.getDevices==='function'){
    const devices=await navigator.bluetooth.getDevices();
@@ -276,7 +277,7 @@ function setupX10(){
   else x10SetStatus('Conexión automática desactivada. Puedes seguir conectando de forma manual.');
  };
  const directArea=$('x10DirectArea');
- const installedAndroid=/Android/i.test(navigator.userAgent||'') &&
+ const installedAndroid=!!window.MiNoteNativeBLE || /Android/i.test(navigator.userAgent||'') &&
   (window.matchMedia('(display-mode: standalone)').matches||window.matchMedia('(display-mode: fullscreen)').matches);
  directArea.hidden=!installedAndroid;
  $('x10DirectConnect').onclick=()=>{
@@ -408,5 +409,5 @@ async function driveList(q,fields='nextPageToken,files(id,name,createdTime,mimeT
 async function getDriveFolder(create=true){const q="name = 'Mi Note - Privado' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";const result=await driveList(q);if(result.files?.length)return result.files[0].id;if(!create)return null;const r=await driveFetch('/drive/v3/files?fields=id,name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Mi Note - Privado',mimeType:'application/vnd.google-apps.folder'})});const obj=await r.json();return obj.id;}
 async function uploadSnapshot(folderId){const data=JSON.stringify(backupObject());const filename=`MiNote_${stamp()}_${state.deviceId.slice(0,8)}.json`;const metadata={name:filename,parents:[folderId],mimeType:'application/json'};const boundary='minote_'+uid().replaceAll('-','');const body=new Blob([`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${data}\r\n--${boundary}--\r\n`],{type:'multipart/related; boundary='+boundary});const r=await driveFetch('/upload/drive/v3/files?uploadType=multipart&fields=id,name',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+boundary},body});return r.json();}
 async function loadLatestSnapshot(folderId){const q=`'${folderId}' in parents and mimeType = 'application/json' and trashed = false`;const result=await driveList(q,undefined,'sort');const files=(result.files||[]).filter(f=>f.name?.startsWith('MiNote_')).sort((a,b)=>String(b.createdTime).localeCompare(String(a.createdTime)));if(!files.length)return null;const r=await driveFetch(`/drive/v3/files/${encodeURIComponent(files[0].id)}?alt=media`);const obj=await r.json();if(!validBackup(obj))throw Error('El respaldo de Drive tiene un formato inválido.');return obj;}
-async function start(){try{db=await openDb();state=await getSaved();if(!state||state.schema!==VERSION||!Array.isArray(state.notebooks))state=starter();syncActive();setupEvents();render();await persist();if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{});}catch(err){console.error(err);document.body.innerHTML='<main style="padding:25px"><h1>No se pudo iniciar Mi Note</h1><p>El navegador debe permitir IndexedDB. Prueba Chrome o Edge en HTTPS o localhost.</p><pre>'+esc(err.message)+'</pre></main>';}}
+async function start(){try{db=await openDb();state=await getSaved();if(!state||state.schema!==VERSION||!Array.isArray(state.notebooks))state=starter();syncActive();setupEvents();render();await persist();if(!window.MiNoteNativeBLE&&'serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{});}catch(err){console.error(err);document.body.innerHTML='<main style="padding:25px"><h1>No se pudo iniciar Mi Note</h1><p>El navegador debe permitir IndexedDB. Prueba Chrome o Edge en HTTPS o localhost.</p><pre>'+esc(err.message)+'</pre></main>';}}
 start();
