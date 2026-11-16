@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-const URL_CHROME='https://stikgatica.github.io/Mi-Note/?v=0.2.6';
+const URL_CHROME='https://stikgatica.github.io/Mi-Note/?v=0.2.7';
 const info=$('x10BrowserCheck'),status=$('x10Status');
 const isEmbedded=()=>{const ua=navigator.userAgent||'';
  try{return window.self!==window.top||ua.includes('; wv)')||ua.includes('WebView');}
@@ -26,7 +26,7 @@ async function check(){
  if(!info)return;
  const android=(navigator.userAgent||'').includes('Android');
  const embedded=isEmbedded();
- const lines=['Mi Note 0.2.6 · '+(android?'Android':'Otro sistema')+(standalone()?' · aplicación instalada':embedded?' · navegador integrado':' · pestaña de navegador'),
+ const lines=['Mi Note 0.2.7 · '+(android?'Android':'Otro sistema')+(standalone()?' · aplicación instalada':embedded?' · navegador integrado':' · pestaña de navegador'),
   'Conexión segura: '+(window.isSecureContext?'sí':'no'),
   'Selector Bluetooth: '+(hasBluetooth()?'disponible':'NO disponible')];
  if(hasBluetooth()&&navigator.bluetooth.getAvailability){

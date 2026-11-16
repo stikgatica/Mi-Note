@@ -290,8 +290,18 @@ function setupX10(){
    x10Details();return;
   }
   x10ManualPause=false;x10CancelRetry();x10AutoTries=0;
-  x10Connecting=true;$('x10Connect').disabled=true;
+  // El selector del sistema debe iniciarse con el botón todavía activo:
+  // algunas PWA standalone Android dejan requestDevice pendiente si se deshabilita antes.
+  x10Connecting=true;
+  x10SetStatus('Abriendo selector Bluetooth…');
   const connection=x10MakeConnection();x10Connection=connection;
+  let selectorPending=true;
+  const watchdog=setTimeout(()=>{
+   if(selectorPending){
+    x10SetStatus('El selector Bluetooth no respondió. Si estás en Mi Note instalada, usa «Abrir en Chrome» para conectar. Puedes volver a intentar sin borrar tus notas.');
+    $('x10Connect').disabled=false;
+   }
+  },12000);
   try{
    await connection.connect();
    x10InMemoryDevice=connection.device;
@@ -304,7 +314,7 @@ function setupX10(){
    x10SetStatus('X10 conectada. La próxima vez se intentará conectar automáticamente si mantienes activada la opción.');
    x10Details();
   }catch(e){x10SetStatus('No se pudo conectar: '+e.message);x10Details();}
-  finally{x10Connecting=false;$('x10Connect').disabled=false;}
+  finally{selectorPending=false;clearTimeout(watchdog);x10Connecting=false;$('x10Connect').disabled=false;}
  };
  $('x10ProbeTablet').onclick=async()=>{
   try{if(!x10Connection?.connected)throw Error('Primero conecta X10');await x10Connection.probeAgenda();}
