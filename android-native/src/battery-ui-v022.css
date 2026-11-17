@@ -1,0 +1,20 @@
+/* V0.22 — Indicador real de batería X10; sin porcentaje estimado. */
+body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick .minote-battery-indicator:not([hidden]){
+ display:inline-flex!important;align-items:center!important;
+ padding:2px 3px!important;margin-left:3px!important;
+ font-size:11px!important;font-weight:700!important;color:#d4f6d9!important;
+}
+body.minote-android .minote-battery-status{
+ display:block;margin:5px 0 8px;font-size:12px;color:#4d6379;
+}
+body.minote-android #floatingX10Panel .minote-battery-refresh{
+ display:block;width:100%;min-height:36px;font-size:12px;
+ background:#e8f0fa;color:#1c456e;border:1px solid #cbd8e8;
+ border-radius:8px;padding:7px;margin-top:4px;
+}
+body.minote-android .paper-shell canvas#minoteLiveInkCanvas,
+body.minote-android.clean-notes .paper-shell canvas#minoteLiveInkCanvas{
+ background:transparent!important;opacity:1!important;
+ pointer-events:none!important;box-shadow:none!important;border:0!important;
+}
+body.minote-android .paper-shell canvas#paper{background:#fff!important;}
