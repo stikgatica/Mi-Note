@@ -73,7 +73,7 @@
     if(active.length!==1||!blank){sparse=false;break;}
     ink.push(active[0]);
    }
-   if(sparse&&ink.length>=2)return {
+   if(sparse&&ink.length>=8&&new Set(ink.map(p=>p.x+','+p.y)).size>=4)return {
     page:index,max_x:limits.maxX,max_y:limits.maxY,max_press:limits.maxPressure,
     strokes:ink.map(p=>[p]),partial:true,partialReason:'one-sample-per-packet',
     sampleCount:ink.length
