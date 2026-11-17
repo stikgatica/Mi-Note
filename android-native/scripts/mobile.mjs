@@ -111,7 +111,7 @@ html=html.replace('</head>','<link rel="stylesheet" href="./mobile-ui.css">\n<li
 html=html.replace(/<script type="module" src="\.\/native-main\.js"><\/script>\s*/,'');
 html=html.replace('</body>','<script type="module" src="./android-ui-main.js"></script>\n</body>');
 await fs.writeFile(path.join(stage,'index.html'),html);
-for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','personal-backup.js','memory-import.js','landscape-ui.css','landscape-ui.js','floating-ui.css','floating-ui.js','floating-geometry.mjs','floating-page-x10.js','library-page-ui.js','android-ui-main.js'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
+for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','personal-backup.js','memory-import.js','landscape-ui.css','landscape-ui.js','floating-ui.css','floating-ui.js','floating-geometry.mjs','floating-page-x10.js','library-page-ui.js','android-ui-main.js','menu-v019.js','menu-v019.css'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
 console.log('Mi Note Android V0.6 preparado: escritura principal y X10 directo');
 
 // Solo en el paquete Android: acceso seguro a una copia de la hoja actual.
