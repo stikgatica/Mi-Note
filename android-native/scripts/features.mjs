@@ -61,6 +61,11 @@ async function x10ImportOfflinePage(result,destinationId){
   });
  }
  if(!imported.strokes.length)throw Error('La hoja física '+result.page+' llegó sin trazos válidos. No se importó.');
+ // Un cuaderno creado para la importación no necesita conservar una primera hoja en blanco.
+ if(notebook.huionSource==='internal-memory'&&notebook.pages.length===1&&
+    notebook.pages[0].strokes.length===0&&notebook.pages[0].title==='Hoja 1'){
+  notebook.pages.splice(0,1);
+ }
  notebook.pages.push(imported);
  notebook.updatedAt=now();
  // No cambiar de cuaderno o página mientras se lee la memoria física.
@@ -83,6 +88,7 @@ function setupX10PhysicalTools(){
    const name=String(title||'Huion X10 · Memoria').trim().slice(0,90);
    if(!name)throw Error('Indique un nombre de cuaderno.');
    const nb=emptyNotebook(name);
+   nb.huionSource='internal-memory';
    state.notebooks.push(nb);
    await persist();
    render();
