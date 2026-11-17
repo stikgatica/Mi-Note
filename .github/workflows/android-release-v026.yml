@@ -3,7 +3,9 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/android-release-v025.yml'
+      - '.github/workflows/android-release-v026.yml'
+      - 'android-native/src/offline-x10.js'
+      - 'android-native/tests/offline-index-fallback.test.mjs'
   workflow_dispatch:
 
 permissions:
