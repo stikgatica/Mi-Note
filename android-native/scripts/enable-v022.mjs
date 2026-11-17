@@ -1,0 +1,13 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+const dir=path.join(process.cwd(),'stage');
+const file=path.join(dir,'android-ui-main.js');
+let c=await fs.readFile(file,'utf8');
+const style="import './library-v021.css';";
+if(!c.includes(style))throw Error('La V0.22 necesita la interfaz de biblioteca V0.21');
+c=c.replace(style,style+"\nimport './battery-ui-v022.css';");
+const start="await load('hojas y X10',()=>import('./floating-page-x10.js'));";
+if(!c.includes(start))throw Error('No se encontró la interfaz X10 para batería');
+c=c.replace(start,start+"\nawait load('batería X10',()=>import('./battery-ui-v022.js'));");
+await fs.writeFile(file,c);
+console.log('V0.22: interfaz de batería instalada sin afectar dibujo ni biblioteca.');
