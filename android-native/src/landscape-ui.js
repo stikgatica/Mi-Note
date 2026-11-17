@@ -40,7 +40,7 @@ async function fullscreenStop(){
 function updateTvLabel(){
  if(tv)tv.textContent=tvMode?'Salir de pizarra TV':'Proyectar en TV';
  document.body.classList.toggle('tv-board',tvMode);
- if(toolbar)toolbar.hidden=!tvMode;
+ if(toolbar)toolbar.hidden=false; // La barra permanece visible también en el cuaderno limpio.
  pageLayout()?.repaint();
 }
 async function toggleTv(next){
