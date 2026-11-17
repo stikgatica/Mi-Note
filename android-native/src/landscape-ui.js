@@ -47,7 +47,7 @@ async function toggleTv(next){
  if(next===tvMode)return;
  tvMode=next;
  if(tvMode){
-  previousOrientation=pageLayout()?.get()?.orientation||'portrait';
+  previousOrientation=pageLayout()?.get()?.orientation||'landscape-cw';
   // Pedir pantalla completa inmediatamente durante el gesto del usuario.
   // Evitar await antes de requestFullscreen, o Android puede rechazarlo.
   const entering=fullscreenStart();
@@ -69,8 +69,8 @@ get('tvBoardErase')?.addEventListener('click',()=>get('eraserBtn')?.click());
 get('tvBoardUndo')?.addEventListener('click',()=>get('undoBtn')?.click());
 get('tvBoardMore')?.addEventListener('click',()=>get('mobileMoreBtn')?.click());
 get('tvBoardOrientation')?.addEventListener('click',()=>{
- const cur=pageLayout()?.get()?.orientation||'portrait';
- void selectOrientation(cur==='landscape-cw'?'landscape-ccw':'landscape-cw');
+ const cur=pageLayout()?.get()?.orientation||'landscape-cw';
+ void selectOrientation(cur==='landscape-cw'?'portrait':'landscape-cw');
 });
 get('tvBoardFullscreen')?.addEventListener('click',()=>void fullscreenStart());
 document.addEventListener('fullscreenchange',()=>{if(tvMode&&document.fullscreenElement===null)toast('La vista de pizarra sigue activa. Para ocultar barras, toque pantalla completa.');});
