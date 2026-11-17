@@ -148,3 +148,17 @@
 #personalBackupUnlink {margin-top:4px;}
 .personal-backup-dialog small {display:block;font-size:11px;color:#526783;line-height:1.5;margin-top:14px;}
 @media(max-width:700px) {.personal-backup-dialog {max-height:calc(100dvh - max(60px,env(safe-area-inset-top,0px)) - max(42px,env(safe-area-inset-bottom,0px)));}}
+
+
+/* V1.0: importación de páginas físicas X10. Diseño compacto. */
+.memory-import-dialog {width:min(520px,calc(100vw - 20px));max-height:calc(100dvh - 44px);overflow:auto;padding:16px;}
+.memory-import-dialog h2 {font-size:18px;}
+.memory-import-dialog p {font-size:13px;color:#52647f;line-height:1.45;margin:12px 0;}
+.memory-import-dialog .field {display:flex;flex-direction:column;gap:7px;font-size:12px;margin-top:10px;}
+.memory-import-dialog select,.memory-import-dialog input {width:100%;min-height:43px;border:1px solid #cbd6e5;border-radius:8px;padding:8px;background:#fff;color:#183251;}
+.memory-import-dialog .memory-import-actions {display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.memory-import-dialog .memory-import-actions button {flex:1 1 145px;min-height:44px;}
+#x10MemoryProgress {margin-top:13px;min-height:55px;max-height:160px;overflow:auto;white-space:normal;overflow-wrap:anywhere;line-height:1.5;}
+#x10MemoryProgress[data-warning="true"] {background:#fff1f1;border-color:#f2c5c5;color:#942f37;}
+.memory-import-dialog small {display:block;margin-top:13px;color:#607189;line-height:1.5;font-size:11px;}
+@media(max-width:700px) {.memory-import-dialog {max-height:calc(100dvh - max(54px,env(safe-area-inset-top,0px)) - max(40px,env(safe-area-inset-bottom,0px)));}}
