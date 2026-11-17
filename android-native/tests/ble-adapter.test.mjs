@@ -8,7 +8,15 @@ test('seleccionar X10 y reutilizar permiso conocido',async()=>{
  const mock={
   async initialize(){ log.push('initialize'); },
   async isEnabled(){ return true; },
-  async requestDevice(){ log.push('requestDevice');return {deviceId:'test-x10',name:'Huion Note-X10'}; },
+  async requestDevice(options){
+    assert.equal(options.scanMode,2);
+    assert.equal(options.allowExtendedAdvertising,true);
+    assert.equal(options.namePrefix,undefined);
+    assert.equal(options.services,undefined);
+    log.push('requestDevice');
+    return {deviceId:'test-x10',name:'Huion Note-X10'};
+  },
+  async isLocationEnabled(){return true;},
   async connect(id,disconnected){ log.push('connect:'+id);mock.disconnected=disconnected; },
   async getServices(){return [{uuid:'0000ffe0-0000-1000-8000-00805f9b34fb',
     characteristics:[
@@ -39,4 +47,11 @@ test('seleccionar X10 y reutilizar permiso conocido',async()=>{
  assert.ok(log.includes('write:205'));
  chosen.gatt.disconnect();
  assert.equal(chosen.gatt.connected,false);
+});
+
+test('muestra ayuda si ubicacion del sistema apagada',async()=>{
+ const mock={async initialize(){},async isEnabled(){return true;},
+ async isLocationEnabled(){return false;},
+ async requestDevice(){throw Error('No debe escanear');}};
+ await assert.rejects(()=>createNativeBLE(mock,{getItem(){return null},setItem(){}}).selectDevice(),/Activa Ubicación/);
 });

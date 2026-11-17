@@ -27,7 +27,7 @@ let safeHtml=await fs.readFile(path.join(stage,'index.html'),'utf8');
 safeHtml=safeHtml.replace('<head>','<head>\n'+csp);
 safeHtml=safeHtml.replace('<button id="settingsBtn" class="subtle">☁ Drive</button>',
  '<button id="settingsBtn" class="subtle" hidden disabled aria-hidden="true">☁ Drive</button>');
-safeHtml=safeHtml.replace('<strong id="pwaVersion">Mi Note V0.2.10</strong>','<strong id="pwaVersion">Mi Note X10 Android V0.2</strong>');
+safeHtml=safeHtml.replace('<strong id="pwaVersion">Mi Note V0.2.10</strong>','<strong id="pwaVersion">Mi Note X10 Android V0.3</strong>');
 safeHtml=safeHtml.replace('<button id="pwaUpdateBtn" class="subtle" type="button">↻ Actualizar Mi Note</button>',
  '<button id="pwaUpdateBtn" class="subtle" type="button" hidden disabled>Actualizar Mi Note</button>');
 await fs.writeFile(path.join(stage,'index.html'),safeHtml);

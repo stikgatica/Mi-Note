@@ -10,7 +10,10 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
   async function ready() {
     if (!initialization) {
       initialization = (async () => {
-        await BleClient.initialize({ androidNeverForLocation: true });
+        // Escaneo de compatibilidad Android: sin "neverForLocation". Algunos periféricos
+        // (incluyendo beacons de notas BLE) se filtran con esa declaración.
+        // La app NO consulta coordenadas y el APK carece de permiso INTERNET.
+        await BleClient.initialize();
         if (!(await BleClient.isEnabled())) await BleClient.requestEnable();
       })().catch(err => { initialization = null; throw err; });
     }
@@ -127,9 +130,19 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
     isNative: true,
     async selectDevice(filtered = false) {
       await ready();
-      const options = filtered
-        ? { namePrefix: 'Huion', optionalServices: [SERVICE] }
-        : { optionalServices: [SERVICE] };
+      // La función no deriva la ubicación; únicamente comprueba que Android
+      // tenga habilitados los servicios necesarios para encontrar periféricos.
+      if (typeof BleClient.isLocationEnabled === 'function') {
+        const enabled = await BleClient.isLocationEnabled();
+        if (!enabled) throw Error('Activa Ubicación en los ajustes rápidos de Android para buscar la X10. Mi Note no lee tu posición ni utiliza internet.');
+      }
+      // No filtrar por nombre ni servicio: la X10 puede anunciarse de maneras
+      // diferentes antes de establecer la conexión GATT.
+      const options = {
+        optionalServices: [SERVICE],
+        scanMode: 2, // Android SCAN_MODE_LOW_LATENCY
+        allowExtendedAdvertising: true
+      };
       const found = await BleClient.requestDevice(options);
       if (!found?.deviceId) throw Error('No se seleccionó un dispositivo Bluetooth.');
       if (found.name) store?.setItem('minote_native_device_name', found.name);

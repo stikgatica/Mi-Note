@@ -30,9 +30,9 @@ await fs.writeFile(path.join(res,'mi_note_data_extraction_rules.xml'),`<?xml ver
 `);
 const gradle=path.join('android','app','build.gradle');
 let grad=await fs.readFile(gradle,'utf8');
-if(!grad.includes('versionCode 2')){
- grad=grad.replace(/versionCode\s+\d+/,'versionCode 2');
- grad=grad.replace(/versionName\s+["'][^"']+["']/,'versionName "0.2.0"');
+if(!grad.includes('versionCode 3')){
+ grad=grad.replace(/versionCode\s+\d+/,'versionCode 3');
+ grad=grad.replace(/versionName\s+["'][^"']+["']/,'versionName "0.3.0"');
 }
 await fs.writeFile(gradle,grad);
-console.log('Android: permisos limitados, red desactivada, backup desactivado y versión 0.2.0.');
+console.log('Android: permisos limitados, red desactivada, backup desactivado y versión 0.3.0.');

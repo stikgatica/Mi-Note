@@ -1,10 +1,5 @@
 name: Mi Note X10 Android v0.2 - APK release
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/android-release-v02.yml'
-      - 'android-native/**'
   workflow_dispatch:
 
 permissions:

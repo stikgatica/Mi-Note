@@ -1,7 +1,7 @@
 {
   "name": "mi-note-x10-android",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Mi Note X10: app Android con Bluetooth LE nativo basada en la interfaz V0.2",
   "scripts": {
