@@ -111,3 +111,133 @@
   width:min(100%,calc((100dvh - 180px) * 1.4));
  }
 }
+
+
+/* V0.12: eliminar la maqueta de escritorio residual al girar Android. */
+body.minote-android #x10DirectArea,
+body.minote-android #x10DirectArea[hidden] {display:none!important;visibility:hidden!important;}
+
+/* Pantallas horizontales: usar el ancho disponible y no repartir el contenido
+   entre la columna "Hoja 1/Exportaciones" y la hoja. */
+@media (orientation:landscape) and (max-height:900px) {
+ body.minote-android,body.minote-android html {overflow:hidden!important;}
+ body.minote-android .layout {
+  display:flex!important;flex-direction:row!important;
+  width:100vw!important;height:100dvh!important;min-height:0!important;
+  max-height:100dvh!important;overflow:hidden!important;
+ }
+ body.minote-android .sidebar {display:none!important;}
+ body.minote-android .main {
+  display:flex!important;flex-direction:column!important;flex:1 1 100%!important;
+  min-width:0!important;width:100vw!important;max-width:100vw!important;
+  height:100dvh!important;min-height:0!important;max-height:100dvh!important;
+  overflow:hidden!important;
+ }
+ body.minote-android .topbar {
+  min-height:54px!important;
+  padding:5px max(12px,env(safe-area-inset-right,0px)) 5px max(12px,env(safe-area-inset-left,0px))!important;
+  gap:8px!important;
+ }
+ body.minote-android .topbar .title-block h1{font-size:15px;max-width:40vw;}
+ body.minote-android .topbar .title-block span{display:none!important;}
+ body.minote-android .notice,
+ body.minote-android #x10DirectArea,
+ body.minote-android .bottom-actions {display:none!important;}
+ body.minote-android .toolbar {
+  min-height:46px!important;max-height:46px!important;height:46px!important;
+  flex:0 0 46px!important;flex-wrap:nowrap!important;
+  overflow-x:auto!important;overflow-y:hidden!important;
+  padding:4px 8px!important;gap:6px!important;
+ }
+ body.minote-android .toolbar .tool {min-height:36px;padding:4px 8px;}
+ body.minote-android .toolbar .tool span {display:none;}
+ body.minote-android .workspace {
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  flex:1 1 0!important;min-height:0!important;
+  width:100%!important;max-width:100%!important;max-height:none!important;
+  padding:4px!important;margin:0!important;overflow:hidden!important;
+ }
+ body.minote-android .page-top {display:none!important;}
+ body.minote-android .paper-shell {
+  display:block!important;flex:0 0 auto!important;
+  box-sizing:border-box!important;
+  width:min(calc(100vw - 16px),calc((100dvh - 164px) * .7142857))!important;
+  max-width:100%!important;max-height:100%!important;
+  margin:auto!important;padding:0!important;
+  border:0!important;box-shadow:0 1px 6px #0000001d!important;
+  aspect-ratio:5 / 7!important;overflow:hidden!important;
+ }
+ body.minote-android .paper-shell[data-orientation^="landscape"] {
+  width:min(calc(100vw - 16px),calc((100dvh - 164px) * 1.4))!important;
+  aspect-ratio:7 / 5!important;
+ }
+ body.minote-android .paper-shell canvas {
+  display:block!important;width:100%!important;height:100%!important;
+  aspect-ratio:inherit!important;
+ }
+ body.minote-android #mobilePageDock {
+  display:flex!important;flex:0 0 auto!important;
+  min-height:52px!important;height:52px!important;
+  box-sizing:border-box!important;padding:3px 10px 5px!important;
+  justify-content:center!important;align-items:center!important;
+ }
+ body.minote-android #mobileMoreBtn{display:inline-flex!important;}
+ body.minote-android .mobile-actions-dialog{max-width:min(420px,calc(100vw - 30px));}
+}
+
+/* Pizarra independiente del breakpoint: no puede quedar NINGÚN
+   encabezado ni exportaciones como hijo adicional de .workspace. */
+body.minote-android.tv-board .layout,
+body.minote-android.tv-board .main {
+ display:block!important;position:fixed!important;inset:0!important;
+ width:100vw!important;height:100dvh!important;
+ min-width:0!important;min-height:0!important;
+ max-width:100vw!important;max-height:100dvh!important;
+ overflow:hidden!important;background:#101820!important;
+}
+body.minote-android.tv-board .sidebar,
+body.minote-android.tv-board .topbar,
+body.minote-android.tv-board .notice,
+body.minote-android.tv-board .toolbar,
+body.minote-android.tv-board .bottom-actions,
+body.minote-android.tv-board #mobilePageDock,
+body.minote-android.tv-board .page-top,
+body.minote-android.tv-board .page-heading,
+body.minote-android.tv-board .page-pager,
+body.minote-android.tv-board .page-top-actions,
+body.minote-android.tv-board #x10DirectArea {
+ display:none!important;
+}
+body.minote-android.tv-board .workspace {
+ position:fixed!important;inset:0!important;
+ width:100vw!important;height:100dvh!important;
+ min-width:0!important;min-height:0!important;
+ max-width:100vw!important;max-height:100dvh!important;
+ display:flex!important;flex-direction:column!important;
+ align-items:center!important;justify-content:center!important;
+ padding:0!important;margin:0!important;
+ overflow:hidden!important;background:#101820!important;
+}
+body.minote-android.tv-board .paper-shell {
+ display:block!important;position:relative!important;
+ flex:0 0 auto!important;
+ width:min(100vw,calc(100dvh * .7142857))!important;
+ height:auto!important;max-width:100vw!important;max-height:100dvh!important;
+ aspect-ratio:5 / 7!important;
+ margin:auto!important;padding:0!important;
+ border:0!important;box-shadow:none!important;overflow:hidden!important;
+}
+body.minote-android.tv-board .paper-shell[data-orientation^="landscape"] {
+ width:min(100vw,calc(100dvh * 1.4))!important;
+ aspect-ratio:7 / 5!important;
+}
+body.minote-android.tv-board .paper-shell canvas{
+ display:block!important;width:100%!important;height:100%!important;
+ aspect-ratio:inherit!important;touch-action:none!important;
+}
+body.minote-android.tv-board #tvBoardToolbar:not([hidden]) {
+ position:fixed!important;z-index:350!important;
+ top:max(5px,env(safe-area-inset-top,0px))!important;
+ right:max(6px,env(safe-area-inset-right,0px))!important;
+ max-width:calc(100vw - 12px)!important;
+}
