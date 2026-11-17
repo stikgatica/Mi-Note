@@ -134,3 +134,17 @@
  .replay-dialog {max-height:calc(100dvh - 40px - env(safe-area-inset-bottom,0px));}
  .replay-dialog canvas{width:min(100%,275px);}
 }
+
+
+/* V0.9: controles de copia personal mediante selector Android. */
+.personal-backup-dialog {width:min(530px,calc(100vw - 22px));padding:16px;max-height:calc(100dvh - 48px);overflow:auto;}
+.personal-backup-dialog h2 {font-size:18px;}
+.personal-backup-dialog p {font-size:12px;color:#516783;}
+.personal-backup-dialog .field {font-size:12px;}
+.personal-backup-actions {display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.personal-backup-actions button {flex:1 1 150px;min-height:44px;}
+#personalBackupStatus {margin:12px 0;font-size:12px;white-space:normal;overflow-wrap:anywhere;}
+#personalBackupStatus[data-error="true"] {border-color:#efb7b7;background:#fff1f1;color:#8a2431;}
+#personalBackupUnlink {margin-top:4px;}
+.personal-backup-dialog small {display:block;font-size:11px;color:#526783;line-height:1.5;margin-top:14px;}
+@media(max-width:700px) {.personal-backup-dialog {max-height:calc(100dvh - max(60px,env(safe-area-inset-top,0px)) - max(42px,env(safe-area-inset-bottom,0px)));}}
