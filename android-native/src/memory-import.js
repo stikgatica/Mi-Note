@@ -2,11 +2,30 @@
 const $=id=>document.getElementById(id);
 const modal=$('x10MemoryDialog'),open=$('x10MemoryOpen'),select=$('x10MemoryNotebook');
 const message=$('x10MemoryProgress'),run=$('x10MemoryRun'),cancel=$('x10MemoryCancel');
+const exportDiagnostic=$('x10MemoryDiagnosticExport');
+function diagnostic(){
+ return window.MiNoteX10Offline?.getLastDiagnostic?.(false)||null;
+}
+function saveDiagnostic(){
+ const overview=diagnostic();
+ if(!overview){info('Aún no existe diagnóstico X10. Ejecute una lectura primero.',true);return;}
+ const raw=window.confirm('¿Incluir muestras HEX de los paquetes de tinta de su Huion? Pueden contener trazos de escritura personal. Seleccione Cancelar para exportar únicamente contadores y estadísticas.');
+ const data=window.MiNoteX10Offline.getLastDiagnostic(raw);
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');a.href=url;a.download='MiNote_X10_diagnostico_local.json';
+ document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),10000);
+ info('Diagnóstico X10 exportado localmente ('+(raw?'incluye muestras de paquetes':'solo estadísticas')+'). La memoria física no se modificó.');
+}
+exportDiagnostic?.addEventListener('click',saveDiagnostic);
+
 let active=false;
 const info=(value,warn=false)=>{if(message){message.textContent=value;message.dataset.warning=warn?'true':'false';}};
 function engine(){return window.MiNoteX10Import;}
 function refresh(){
  const api=engine();if(!api){info('La función de lectura todavía no está disponible.',true);return;}
+ if(exportDiagnostic)exportDiagnostic.hidden=!diagnostic();
  const old=select.value;
  const list=api.notebooks();
  select.replaceChildren();
@@ -70,6 +89,7 @@ async function importMemory(){
   updateNewField();
  }catch(e){info('Lectura interrumpida: '+(e?.message||e)+'. Las páginas recuperadas se conservan en Mi Note.',true);}
  finally{
+  if(exportDiagnostic)exportDiagnostic.hidden=!diagnostic();
   busy(false);
   if(api.connected()){
    try{await api.restore();}catch(e){info(message.textContent+' · Para continuar escribiendo, vuelva a conectar la Huion si fuese necesario.',true);}

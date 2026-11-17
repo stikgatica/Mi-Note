@@ -58,6 +58,7 @@ const memoryDialog=[
 '<label class="field">PIN de la agenda, solo si lo pide<input id="x10MemoryPin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Opcional"></label>',
 '<div id="x10MemoryProgress" class="x10-details" role="status" aria-live="polite">Conecte la Huion antes de importar.</div>',
 '<div class="memory-import-actions"><button id="x10MemoryRun" type="button" class="primary">↓ Importar memoria</button><button id="x10MemoryCancel" type="button" disabled>Cancelar lectura</button></div>',
+'<button type="button" id="x10MemoryDiagnosticExport" hidden>Exportar diagnóstico local X10 (JSON)</button>',
 '<small>Importación no destructiva. Se omiten páginas ya recuperadas. Las nuevas hojas se guardan localmente y entran en el respaldo cifrado de Drive si está configurado. La lectura del protocolo Bluetooth requiere validación con su Huion física.</small>',
 '</dialog>'
 ].join('\n');
