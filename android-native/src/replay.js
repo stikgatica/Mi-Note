@@ -66,7 +66,7 @@ function start(){
 function open(){
  if(!window.MiNoteReplaySnapshot){tell('No se pudo obtener la hoja.');return;}
  snapshot=window.MiNoteReplaySnapshot();
- timeline=createTimeline(snapshot.strokes);stop();dialog.showModal();drawAt(0);
+ timeline=createTimeline(snapshot.strokes);stop();$('mobileMoreDialog')?.close();dialog.showModal();drawAt(0);
  play.disabled=!timeline.strokes;video.disabled=!timeline.strokes;
  tell(timeline.strokes+' trazos. Se reproduce el orden original; el tiempo es aproximado.');
 }
