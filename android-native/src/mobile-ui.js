@@ -1,4 +1,4 @@
-/* Mi Note Android v0.6: escritura primero; la PWA pública no cambia. */
+/* Mi Note Android v0.7: escritura primero; la PWA pública no cambia. */
 const $ = (id) => document.getElementById(id);
 function initMobileUi() {
   const connect = $('x10OpenBtn');
@@ -18,7 +18,7 @@ function initMobileUi() {
   const widthOut = $('mobileWidthValue');
 
   if (!connect || !direct || !menu || !more || !nav || !dock || !pageNumber) {
-    console.error('Mi Note V0.6: faltan controles esenciales; no se modifica Bluetooth.');
+    console.error('Mi Note V0.7: faltan controles esenciales; no se modifica Bluetooth.');
     return;
   }
   // Mantener el botón original, incluido su estado BLE. Cambiar solo su acción.
@@ -35,9 +35,19 @@ function initMobileUi() {
   const marker = document.createComment('Paginador original Mi Note');
   originalParent.insertBefore(marker, nav);
   const mobile = window.matchMedia('(max-width:700px)');
+  const nextPage = $('nextPage');
+  const prevPage = $('prevPage');
   function placePager() {
-    if (mobile.matches) dock.insertBefore(nav, total);
-    else marker.parentNode?.insertBefore(nav, marker);
+    if (mobile.matches) {
+      dock.appendChild(nav);
+      // Un único selector centrado: ‹ 1 / 3 ›.
+      if (total && nextPage) nav.insertBefore(total, nextPage);
+      if (prevPage) prevPage.textContent = '‹';
+      if (nextPage) nextPage.textContent = '›';
+    } else {
+      marker.parentNode?.insertBefore(nav, marker);
+      if (total) dock.appendChild(total);
+    }
   }
   mobile.addEventListener?.('change', placePager);
   placePager();
