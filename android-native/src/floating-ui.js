@@ -29,8 +29,6 @@ const redo=node('tvBoardRedo','↷','Rehacer');
 $('tvBoardUndo')?.after(redo);
 const library=node('tvBoardLibrary','▤','Abrir biblioteca de cuadernos');
 $('tvBoardNext')?.after(library);
-const x10=node('tvBoardX10','⌁','Conectar Huion Note X10');
-library.after(x10);
 const minimize=node('floatingMinimize','−','Minimizar herramientas');
 $('tvBoardMore')?.after(minimize);
 const closeTv=$('tvBoardClose');
@@ -48,7 +46,7 @@ const menuButton=(id,text,handler)=>{
  });return b;
 };
 menuButton('floatingLibraryMenu','▤ Biblioteca de cuadernos',()=>openLibrary());
-menuButton('floatingX10Menu','⌁ Conectar Huion X10',()=>$('x10OpenBtn')?.click());
+menuButton('floatingX10Menu','● X10 · Conexión y estado',()=>{const dlg=$('x10Dialog');if(dlg&&!dlg.open)dlg.showModal();});
 const axisButton=menuButton('floatingAxisMenu','↕ Barra vertical / horizontal',()=>setAxis(axis==='horizontal'?'vertical':'horizontal'));
 const lockButton=menuButton('floatingLockMenu','◌ Bloquear posición de la barra',()=>setLocked(!locked));
 const colorLabel=document.createElement('label');colorLabel.className='floating-color-label field';
@@ -85,7 +83,6 @@ document.addEventListener('keydown',e=>{
  }
 });
 library.addEventListener('click',openLibrary);
-x10.addEventListener('click',()=>$('x10OpenBtn')?.click());
 redo.addEventListener('click',()=>$('redoBtn')?.click());
 function refresh(){
  toolbar.classList.toggle('floating-vertical',axis==='vertical');
