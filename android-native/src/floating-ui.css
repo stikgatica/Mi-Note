@@ -230,3 +230,75 @@ body.minote-android.clean-notes:not(.tv-board) .paper-shell {
 body.minote-android.clean-notes #tvBoardToolbar.floating-bar:not([hidden]) {
  display:flex!important;
 }
+
+
+/* V0.15: número entre flechas + indicador Bluetooth en barra desplazable. */
+body.minote-android #tvBoardToolbar.floating-bar #floatingPageNumber{
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;
+ flex:0 0 auto!important;min-width:58px!important;
+ min-height:37px!important;padding:4px 5px!important;
+ font-size:12px!important;font-weight:750!important;
+ color:#fff!important;white-space:nowrap!important;letter-spacing:.2px!important;
+ background:rgba(255,255,255,.14)!important;border-radius:9px!important;
+}
+body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick{
+ display:inline-flex!important;align-items:center!important;gap:5px!important;
+ min-width:45px!important;padding:5px 4px!important;font-size:12px!important;font-weight:700!important;
+}
+body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick[data-status="connected"]{
+ background:rgba(45,128,101,.37)!important;
+}
+body.minote-android .x10-status-dot{
+ display:inline-block;flex:0 0 auto;width:9px;height:9px;border-radius:50%;
+ background:#9aa5b5;box-shadow:0 0 0 1px rgba(255,255,255,.16);
+ vertical-align:middle;
+}
+body.minote-android .x10-status-dot[data-status="connected"]{background:#34ce86;}
+body.minote-android .x10-status-dot[data-status="connecting"]{background:#5cafff;animation:minote-x10-pulse 1.2s ease-in-out infinite;}
+body.minote-android .x10-status-dot[data-status="error"]{background:#f56c69;}
+body.minote-android .x10-status-dot[data-status="disconnected"]{background:#9ca5b3;}
+@keyframes minote-x10-pulse{50%{opacity:.36;}}
+body.minote-android #floatingX10Panel{
+ margin:8px 0 12px;padding:10px;border:1px solid #d5e0ed;
+ border-radius:10px;background:var(--surface,#f4f7fa);
+ color:#1c304b;
+}
+body.minote-android .floating-x10-indicator{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:9px;}
+body.minote-android .floating-x10-controls{display:flex;gap:7px;flex-wrap:wrap;}
+body.minote-android .floating-x10-controls button{
+ flex:1 1 96px;min-height:41px;padding:7px 9px;font-size:12px;
+ border:1px solid #cbd7e4;border-radius:8px;background:#fff;color:#24394f;
+}
+body.minote-android .floating-x10-controls button:disabled{opacity:.45;}
+body.minote-android .floating-page-dialog{
+ width:min(380px,calc(100vw - 28px));max-height:calc(100dvh - 36px);
+ padding:17px;border-radius:15px;
+}
+body.minote-android .floating-page-dialog h2{font-size:18px;}
+body.minote-android .floating-page-dialog p,
+body.minote-android .floating-page-dialog small{font-size:12px;line-height:1.45;}
+body.minote-android .floating-page-dialog > button{
+ display:block;width:100%;min-height:44px;margin-top:9px;
+ border-radius:9px;font-weight:600;
+}
+body.minote-android .floating-page-dialog #floatingPageDelete:not(:disabled){
+ background:#a92d36;color:#fff;border-color:#a92d36;
+}
+body.minote-android .floating-page-dialog #floatingPageDelete:disabled{opacity:.48;}
+body.minote-android .floating-page-dialog #floatingPageHint{display:block;margin-top:13px;color:#64758a;}
+body.minote-android #tvBoardToolbar.floating-bar.floating-minimized #floatingPageNumber,
+body.minote-android #tvBoardToolbar.floating-bar.floating-minimized #floatingX10Quick{display:none!important;}
+@media(orientation:portrait) and (max-width:700px){
+ body.minote-android #tvBoardToolbar.floating-bar:not(.floating-vertical) #tvBoardLibrary{
+  display:none!important; /* Biblioteca sigue disponible en ⋮ */
+ }
+ body.minote-android #tvBoardToolbar.floating-bar:not(.floating-vertical) button{
+  min-width:29px!important;padding:5px!important;
+ }
+ body.minote-android #tvBoardToolbar.floating-bar:not(.floating-vertical) #floatingPageNumber{
+  min-width:56px!important;padding:4px!important;
+ }
+ body.minote-android #tvBoardToolbar.floating-bar:not(.floating-vertical) #floatingX10Quick{
+  min-width:44px!important;padding:4px!important;
+ }
+}
