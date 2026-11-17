@@ -60,7 +60,26 @@
    }
   }
   flush();
-  return {page:index,max_x:limits.maxX,max_y:limits.maxY,max_press:limits.maxPressure,strokes};
+  // Determinados firmware rellenan 19 de 20 registros de cada paquete con
+  // cero. En ese caso la escritura disponible es una muestra MUY dispersa:
+  // conservar cada punto auténtico como marca aislada, sin interpolar trazos.
+  if(!strokes.length){
+   const ink=[];
+   let sparse=true;
+   for(const packet of packets){
+    const points=decodePacket(packet);
+    const active=points.filter(p=>p.pen_down&&p.x<=limits.maxX&&p.y<=limits.maxY);
+    const blank=points.every(p=>p.pen_down||(!p.x&&!p.y&&!p.press));
+    if(active.length!==1||!blank){sparse=false;break;}
+    ink.push(active[0]);
+   }
+   if(sparse&&ink.length>=8&&new Set(ink.map(p=>p.x+','+p.y)).size>=4)return {
+    page:index,max_x:limits.maxX,max_y:limits.maxY,max_press:limits.maxPressure,
+    strokes:ink.map(p=>[p]),partial:true,partialReason:'one-sample-per-packet',
+    sampleCount:ink.length
+   };
+  }
+  return {page:index,max_x:limits.maxX,max_y:limits.maxY,max_press:limits.maxPressure,strokes,partial:false};
  }
  async function digestPackets(packets,index){
   const length=packets.reduce((n,p)=>n+p.length,4);
@@ -120,7 +139,7 @@
   const hadBatteryPolling=!!connection.batteryTimer;
   if(connection.batteryTimer){clearInterval(connection.batteryTimer);connection.batteryTimer=null;}
   const inbox=new Inbox(connection);
-  let imported=0,empty=0,duplicate=0,undecodable=0,noReply=0;
+  let imported=0,partialImported=0,empty=0,duplicate=0,undecodable=0,noReply=0;
   const diagnostic={format:'MiNoteX10OfflineDiagnostic',version:1,startedAt:new Date().toISOString(),cursor:null,scanEnd:null,limits:null,pages:[],result:null,error:null};
   lastDiagnostic=diagnostic;
   try{
@@ -239,8 +258,10 @@
     }
     const ordered=Array.from({length:total},(_,k)=>got.get(k+1));
     const result=decodePage(ordered,index,limits);
-    entry.status=result.strokes.length?'decodable':'undecodable';
+    entry.status=result.partial?'partial':result.strokes.length?'decodable':'undecodable';
     entry.strokes=result.strokes.length;
+    entry.partial=!!result.partial;
+    entry.partialSamples=result.partial?result.sampleCount:0;
     entry.receivedPackets=ordered.length;
     entry.stats=pointStatistics(ordered,limits);
     if(!result.strokes.length){
@@ -262,14 +283,17 @@
     result.digest=await digestPackets(ordered,index);
     result.packet_count=total;
     const outcome=await onPage(result);
-    if(outcome==='duplicate'){duplicate++;entry.status='duplicate';}else {imported++;entry.status='imported';}
-    onProgress('Hoja física '+index+': '+result.strokes.length+' trazos; '+(outcome==='duplicate'?'ya estaba guardada':'guardada localmente')+'.');
+    if(outcome==='duplicate'){duplicate++;entry.status='duplicate';}
+    else {imported++;if(result.partial)partialImported++;entry.status=result.partial?'partial-imported':'imported';}
+    onProgress(result.partial
+     ?'Hoja física '+index+': guardadas '+result.sampleCount+' MARCAS AISLADAS como muestra parcial. NO es la escritura completa; no se unieron puntos ni se borró la X10.'
+     :'Hoja física '+index+': '+result.strokes.length+' trazos; '+(outcome==='duplicate'?'ya estaba guardada':'guardada localmente')+'.');
    }
    if(imported===0&&duplicate===0)
     throw Error('Se revisaron los índices 0 a '+scanEnd+' sin encontrar tinta importable: '+empty+' vacíos, '+undecodable+' con paquetes sin trazos y '+noReply+' sin respuesta. La memoria X10 NO se modificó. No borre las páginas con Huion Note.');
-   diagnostic.result={imported,duplicate,empty,undecodable,noReply};
-   onProgress('Lectura terminada: '+imported+' hojas nuevas, '+duplicate+' repetidas, '+empty+' vacías, '+undecodable+' sin trazos y '+noReply+' sin respuesta. X10 intacta.');
-   return {imported,duplicate,empty,undecodable,noReply,scanned:scanEnd+1,totalLogical:lastIndex+1};
+   diagnostic.result={imported,partialImported,duplicate,empty,undecodable,noReply};
+   onProgress('Lectura terminada: '+imported+' hojas nuevas ('+partialImported+' con muestras PARCIALES), '+duplicate+' repetidas, '+empty+' vacías, '+undecodable+' sin trazos y '+noReply+' sin respuesta. X10 intacta.');
+   return {imported,partialImported,duplicate,empty,undecodable,noReply,scanned:scanEnd+1,totalLogical:lastIndex+1};
   }catch(error){
    diagnostic.error=error?.message||String(error);
    throw error;

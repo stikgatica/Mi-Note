@@ -89,7 +89,7 @@ async function importMemory(){
    notebookId:destination,pin:enteredPin,
    onProgress:message=>info(message)
   });
-  info('Lectura finalizada: '+result.imported+' páginas nuevas, '+result.duplicate+' repetidas y '+result.empty+' vacías. Las páginas ya están guardadas en Mi Note; el respaldo Drive se actualizará cuando esté configurado y activo.');
+  info('Lectura finalizada: '+result.imported+' páginas nuevas ('+(result.partialImported||0)+' MUESTRAS PARCIALES: puntos aislados, no escritura completa), '+result.duplicate+' repetidas y '+result.empty+' vacías. Datos guardados en Mi Note; X10 intacta.');
   $('x10MemoryPin').value='';
   // Refrescar la lista de cuadernos sin ocultar el mensaje.
   const list=api.notebooks();
