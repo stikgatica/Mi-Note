@@ -37,7 +37,7 @@ const replayDialog=[
 '<div class="replay-controls"><button id="replayVideo" type="button">Guardar video WebM</button></div>',
 '<small>Los trazos se reproducen en orden. Para hojas antiguas, la duración es aproximada. La hoja original no se modifica.</small>',
 '</dialog>'
-].join('\\n');
+].join('\n');
 html=html.replace('</main>',menu+'\n'+replayDialog+'\n</main>');
 html=html.replace('</head>','<link rel="stylesheet" href="./mobile-ui.css">\n</head>');
 html=html.replace('</body>','<script type="module" src="./mobile-ui.js"></script>\n<script type="module" src="./replay.js"></script>\n</body>');
