@@ -59,6 +59,7 @@ const memoryDialog=[
 '<div id="x10MemoryProgress" class="x10-details" role="status" aria-live="polite">Conecte la Huion antes de importar.</div>',
 '<div class="memory-import-actions"><button id="x10MemoryRun" type="button" class="primary">↓ Importar memoria</button><button id="x10MemoryCancel" type="button" disabled>Cancelar lectura</button></div>',
 '<button type="button" id="x10MemoryDiagnosticExport">Guardar diagnóstico X10 (JSON) en Android</button>',
+'<div style="margin-top:12px;border-top:1px solid #b9c5d1;padding-top:12px"><strong>Importar archivo original Huion</strong><label class="field">Páginas del archivo .ahn/.ahns<select id="x10ArchiveSelection"><option value="last-two" selected>Solo las dos últimas páginas</option><option value="all">Todas las páginas con escritura</option></select></label><button type="button" id="x10ImportArchive">Importar archivo .ahn / .ahns</button><p id="x10ArchiveStatus" role="status">Archivo local, sin Bluetooth ni envío a Huion.</p></div>',
 '<small>Importación no destructiva. Se omiten páginas ya recuperadas. Las nuevas hojas se guardan localmente y entran en el respaldo cifrado de Drive si está configurado. La lectura del protocolo Bluetooth requiere validación con su Huion física.</small>',
 '</dialog>'
 ].join('\n');
@@ -112,7 +113,7 @@ html=html.replace('</head>','<link rel="stylesheet" href="./mobile-ui.css">\n<li
 html=html.replace(/<script type="module" src="\.\/native-main\.js"><\/script>\s*/,'');
 html=html.replace('</body>','<script type="module" src="./android-ui-main.js"></script>\n</body>');
 await fs.writeFile(path.join(stage,'index.html'),html);
-for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','personal-backup.js','memory-import.js','landscape-ui.css','landscape-ui.js','floating-ui.css','floating-ui.js','floating-geometry.mjs','floating-page-x10.js','library-page-ui.js','android-ui-main.js','menu-v019.js','menu-v019.css','library-v021.js','library-v021.css','battery-ui-v022.js','battery-ui-v022.css'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
+for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','personal-backup.js','memory-import.js','huion-archive.js','landscape-ui.css','landscape-ui.js','floating-ui.css','floating-ui.js','floating-geometry.mjs','floating-page-x10.js','library-page-ui.js','android-ui-main.js','menu-v019.js','menu-v019.css','library-v021.js','library-v021.css','battery-ui-v022.js','battery-ui-v022.css'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
 console.log('Mi Note Android V0.6 preparado: escritura principal y X10 directo');
 
 // Solo en el paquete Android: acceso seguro a una copia de la hoja actual.
