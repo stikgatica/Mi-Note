@@ -9,5 +9,10 @@ replace("get connected(){return !!this.device?.gatt?.connected;}","get connected
 replace("this.startKeepalive();\n   this.status('Conectada como Data Ink.","this.startKeepalive();\n   this.startBatteryPolling();\n   void this.refreshBattery();\n   this.status('Conectada como Data Ink.",'iniciar lectura');
 replace("this.mode='desconectado';clearInterval(this.keepalive);this.keepalive=null;","this.mode='desconectado';clearInterval(this.keepalive);this.keepalive=null;\n  clearInterval(this.batteryTimer);this.batteryTimer=null;this.notifyBattery(null);",'desconexión imprevista');
 replace("clearInterval(this.keepalive);this.keepalive=null;\n  if(this.data)","clearInterval(this.keepalive);this.keepalive=null;\n  clearInterval(this.batteryTimer);this.batteryTimer=null;this.notifyBattery(null);\n  if(this.data)",'desconexión voluntaria');
+// Puente de la interfaz al objeto X10 real; no inventa porcentajes.
+const appFile=path.join(process.cwd(),'stage','app.js');
+let app=await fs.readFile(appFile,'utf8');
+app+='\\nwindow.MiNoteX10BatteryRefresh=()=>x10Connection?.refreshBattery?.()??null;\\n';
+await fs.writeFile(appFile,app);
 await fs.writeFile(file,source);
 console.log('Batería estándar GATT opcional integrada.');
