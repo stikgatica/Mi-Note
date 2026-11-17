@@ -30,16 +30,19 @@ const anchor='function x10RefreshCapability(){';
 if(!js.includes(anchor))throw Error('No existe el punto de inserción x10RefreshCapability.');
 const features=`
 let x10DownloadController=null;
-async function x10ImportOfflinePage(result){
+async function x10ImportOfflinePage(result,destinationId){
  if(!result?.digest||!Array.isArray(result.strokes))throw Error('La página X10 no tiene un formato válido.');
- const notebook=note();
- if(notebook.pages.some(p=>p.huion?.digest===result.digest&&p.huion?.physicalPage===result.page))
+ const notebook=state.notebooks.find(n=>n.id===destinationId);
+ if(!notebook)throw Error('El cuaderno de destino ya no existe. No se importó esta página.');
+ if(state.notebooks.some(n=>n.pages.some(p=>p.huion?.digest===result.digest&&p.huion?.physicalPage===result.page)))
   return 'duplicate';
+ if(!result.strokes.length)throw Error('La hoja física '+result.page+' no contiene trazos decodificables. No se guardará una página vacía.');
+ 
  const imported=emptyPage(notebook.pages.length+1);
- imported.title='X10 · página física '+result.page;
+ imported.title='X10 · página física '+(result.page+1);
  imported.template='plain';
  imported.huion={device:'Huion Note X10',physicalPage:result.page,digest:result.digest,
-   packetCount:result.packet_count,createdBy:'offline-read-only',readAt:now()};
+   packetCount:result.packet_count,createdBy:'offline-read-only',readAt:now(),source:'internal-memory'};
  const limits={maxX:result.max_x,maxY:result.max_y,maxPressure:result.max_press};
  // El formato de la X10 entrega coordenadas absolutas de hoja A5.
  for(const source of result.strokes){
@@ -52,15 +55,16 @@ async function x10ImportOfflinePage(result){
     raw.push([p.x,p.y,p.press]);
    }
   }
-  if(points.length>1)imported.strokes.push({
+  if(points.length>=1)imported.strokes.push({
    id:uid(),color:'#173f7a',width:3,pts:points,
    x10:{device:'Huion Note X10',mode:'offline',rotation:0,limits:clone(limits),raw}
   });
  }
+ if(!imported.strokes.length)throw Error('La hoja física '+result.page+' llegó sin trazos válidos. No se importó.');
  notebook.pages.push(imported);
  notebook.updatedAt=now();
- state.activePageId=imported.id;
- render();
+ // No cambiar de cuaderno o página mientras se lee la memoria física.
+ // El guardado normal emitirá el evento de sincronización de Drive.
  await persist();
  return 'imported';
 }
@@ -69,6 +73,55 @@ function setupX10PhysicalTools(){
  const listen=$('x10ListenPage'),sync=$('x10OfflineDownload'),restore=$('x10RestorePen');
  const status=$('x10OfflineStatus'),cancel=$('x10CancelDownload'),pin=$('x10OfflinePin');
  if(!listen||!sync)return;
+
+ window.MiNoteX10Import={
+  connected:()=>!!x10Connection?.connected,
+  busy:()=>!!x10DownloadController,
+  notebooks:()=>state.notebooks.map(n=>({id:n.id,title:n.title,pages:n.pages.length})),
+  async createNotebook(title){
+   if(x10DownloadController)throw Error('No es posible crear un cuaderno mientras se importa.');
+   const name=String(title||'Huion X10 · Memoria').trim().slice(0,90);
+   if(!name)throw Error('Indique un nombre de cuaderno.');
+   const nb=emptyNotebook(name);
+   state.notebooks.push(nb);
+   await persist();
+   render();
+   return nb.id;
+  },
+  cancel(){if(x10DownloadController)x10DownloadController.abort();},
+  restore:()=>{if(!x10Connection?.connected)throw Error('Conecte primero la Huion X10.');return x10Connection.probeTablet();},
+  async start({notebookId,pin:pinCode='',onProgress=()=>{}}={}){
+   if(!x10Connection?.connected)throw Error('Primero conecte la Huion X10 desde el botón superior.');
+   if(!window.MiNoteX10Offline)throw Error('El lector de memoria física X10 no está disponible.');
+   if(x10DownloadController)throw Error('Ya hay una importación en curso.');
+   if(!state.notebooks.some(n=>n.id===notebookId))throw Error('Seleccione un cuaderno de destino válido.');
+   if(pinCode && !/^\\d{6}$/.test(pinCode))throw Error('El PIN debe contener seis cifras.');
+   x10Flush();
+   const controller=new AbortController();
+   x10DownloadController=controller;
+   sync.disabled=true;listen.disabled=true;restore.disabled=true;cancel.hidden=false;cancel.disabled=false;
+   const notify=message=>{onProgress(message);status.textContent=message;};
+   try{
+    notify('Comprobando memoria interna; no se borrará ningún dato físico…');
+    const result=await MiNoteX10Offline.download(x10Connection,{
+     pin:pinCode,signal:controller.signal,maxPages:64,
+     onProgress:notify,
+     onPage:async result=>x10ImportOfflinePage(result,notebookId)
+    });
+    notify('Importación terminada: '+result.imported+' páginas nuevas, '+result.duplicate+' repetidas y '+result.empty+' vacías. Sin borrado de memoria X10.');
+    return result;
+   }catch(err){
+    notify('Importación interrumpida: '+err.message+'. Las páginas que sí se guardaron se conservan.');
+    throw err;
+   }finally{
+    x10DownloadController=null;
+    sync.disabled=false;listen.disabled=false;restore.disabled=false;cancel.hidden=true;cancel.disabled=false;
+    pin.value='';
+    x10Details();
+   }
+  }
+ };
+
  listen.onclick=async()=>{
   if(!x10Connection?.connected){status.textContent='Primero conecta tu Huion X10.';return;}
   try{
@@ -85,41 +138,13 @@ function setupX10PhysicalTools(){
   }catch(e){status.textContent='No se pudo restaurar la escritura: '+e.message;}
  };
  cancel.onclick=()=>{x10DownloadController?.abort();cancel.disabled=true;status.textContent='Cancelando después del paquete en curso…';};
- sync.onclick=async()=>{
-  if(!x10Connection?.connected){status.textContent='Primero conecta tu Huion X10.';return;}
-  if(!window.MiNoteX10Offline){status.textContent='El extractor X10 no está cargado.';return;}
-  if(x10DownloadController){status.textContent='La lectura ya está en curso.';return;}
-  // La lectura es completamente no destructiva. Importación local, sin nube.
-  x10Flush();
-  x10DownloadController=new AbortController();
-  sync.disabled=true;listen.disabled=true;restore.disabled=true;cancel.hidden=false;cancel.disabled=false;
-  const targetNotebook=note().id;
-  status.textContent='Iniciando lectura…';
-  try{
-   const outcome=await MiNoteX10Offline.download(x10Connection,{
-    pin:pin.value.trim(),signal:x10DownloadController.signal,maxPages:64,
-    onProgress:msg=>{status.textContent=msg;},
-    onPage:async p=>{
-     // Evita escribir en un cuaderno diferente si el usuario cambió de sección.
-     if(note().id!==targetNotebook)throw Error('No cambies de cuaderno durante la descarga.');
-     return x10ImportOfflinePage(p);
-    }
-   });
-   status.textContent='Finalizado: '+outcome.imported+' hojas importadas, '+outcome.duplicate+
-      ' repetidas, '+outcome.empty+' vacías. No se borró ninguna página física.';
-   x10SetStatus('Importación terminada sin eliminar páginas de la Huion.');
-  }catch(err){
-   status.textContent='Lectura interrumpida: '+err.message+
-    '. Las páginas ya importadas se conservaron; las incompletas no se guardaron.';
-   x10SetStatus('Lectura X10 interrumpida: '+err.message);
-  }finally{
-   pin.value='';
-   x10DownloadController=null;
-   sync.disabled=false;listen.disabled=false;restore.disabled=false;cancel.hidden=true;cancel.disabled=false;
-   x10Details();
-  }
- };
-}
+ sync.onclick=()=>{
+  window.MiNoteX10Import.start({
+   notebookId:note().id,
+   pin:pin.value.trim(),
+   onProgress:msg=>{status.textContent=msg;}
+  }).catch(err=>{status.textContent='Importación interrumpida: '+err.message;});
+ };}
 `;
 js=js.replace(anchor,features+'\n'+anchor);
 const setupEnd='function setupX10(){';
