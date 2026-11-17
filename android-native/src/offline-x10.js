@@ -92,7 +92,7 @@
   const hadBatteryPolling=!!connection.batteryTimer;
   if(connection.batteryTimer){clearInterval(connection.batteryTimer);connection.batteryTimer=null;}
   const inbox=new Inbox(connection);
-  let imported=0,empty=0,duplicate=0;
+  let imported=0,empty=0,duplicate=0,undecodable=0,noReply=0;
   try{
    onProgress('Iniciando modo agenda y lectura local, sin borrar páginas…');
    check(signal);
@@ -120,15 +120,26 @@
    await connection.send(cmd(0x85));
    const countReply=await inbox.wait(0x85,6000,p=>p.length>=5);
    const lastIndex=u16(countReply,3);
-   if(lastIndex>maxPages)throw Error('La X10 informa '+lastIndex+' páginas; el límite seguro es '+maxPages+'. No se borró nada.');
+   if(lastIndex>=maxPages)throw Error('La X10 informa '+lastIndex+' páginas; el límite seguro de índices es '+(maxPages-1)+'. No se borró nada.');
+   // El firmware puede conservar páginas vacías iniciales y escribir en índices 7+.
+   // Consultar un mínimo acotado de 16 índices si 0x85 informa un contador bajo.
+   const scanEnd=Math.min(maxPages-1,Math.max(lastIndex,15));
    await connection.send(cmd(0x96,1,3));await pause(60);
    await connection.send(cmd(0x96,3,2));await pause(60);
-   onProgress('Páginas lógicas: '+lastIndex+'. Revisando índices 0 a '+lastIndex+' sin eliminar datos…');
-   for(let index=0;index<=lastIndex;index++){
+   onProgress('Indicador X10: '+lastIndex+'. Explorando índices físicos 0 a '+scanEnd+' (incluidos vacíos), sin eliminar datos…');
+   for(let index=0;index<=scanEnd;index++){
     check(signal);
     inbox.discard(0x86);inbox.discard(0x87);inbox.discard(0x88);
     await connection.send(cmd(0x86,index&255,index>>8,0,0));
-    const countFrame=await inbox.wait(0x86,10000,p=>p.length>=5&&p[2]===5);
+    let countFrame;
+    try{
+     countFrame=await inbox.wait(0x86,index<=lastIndex?10000:2100,p=>p.length>=5&&p[2]===5);
+    }catch(error){
+     if(index<=lastIndex)throw error;
+     noReply++;
+     onProgress('Índice '+index+': sin respuesta adicional; continuamos sin modificar la X10.');
+     continue;
+    }
     const total=u16(countFrame,3);
     if(total===0){empty++;onProgress('Hoja física '+index+': vacía. Seguimos buscando…');continue;}
     if(total>15000)throw Error('La hoja física '+index+' declara '+total+' paquetes: límite seguro alcanzado.');
@@ -194,14 +205,26 @@
     }
     const ordered=Array.from({length:total},(_,k)=>got.get(k+1));
     const result=decodePage(ordered,index,limits);
+    if(!result.strokes.length){
+     // Paquetes sin tinta decodificable no deben ocultar páginas posteriores.
+     // Nunca guardar hojas vacías ni borrarlas de la memoria física.
+     undecodable++;
+     const sample=ordered.slice(0,3).flatMap(decodePacket).slice(0,12);
+     const down=sample.filter(p=>p.pen_down).length;
+     const pressure=sample.filter(p=>p.press>0).length;
+     onProgress('Índice '+index+': '+total+' paquetes pero 0 trazos; muestra '+down+'/'+sample.length+' puntos activos y '+pressure+' con presión. Buscando otras hojas; memoria intacta.');
+     continue;
+    }
     result.digest=await digestPackets(ordered,index);
     result.packet_count=total;
     const outcome=await onPage(result);
     if(outcome==='duplicate')duplicate++;else imported++;
     onProgress('Hoja física '+index+': '+result.strokes.length+' trazos; '+(outcome==='duplicate'?'ya estaba guardada':'guardada localmente')+'.');
    }
-   onProgress('Lectura terminada: '+imported+' hojas nuevas, '+duplicate+' ya importadas, '+empty+' vacías. La memoria X10 no se modificó.');
-   return {imported,duplicate,empty,totalLogical:lastIndex+1};
+   if(imported===0&&duplicate===0)
+    throw Error('Se revisaron los índices 0 a '+scanEnd+' sin encontrar tinta importable: '+empty+' vacíos, '+undecodable+' con paquetes sin trazos y '+noReply+' sin respuesta. La memoria X10 NO se modificó. No borre las páginas con Huion Note.');
+   onProgress('Lectura terminada: '+imported+' hojas nuevas, '+duplicate+' repetidas, '+empty+' vacías, '+undecodable+' sin trazos y '+noReply+' sin respuesta. X10 intacta.');
+   return {imported,duplicate,empty,undecodable,noReply,scanned:scanEnd+1,totalLogical:lastIndex+1};
   }finally{
    inbox.close();connection.offlineReading=false;
    if(connection.connected){connection.startKeepalive();if(hadBatteryPolling)connection.startBatteryPolling?.();}
