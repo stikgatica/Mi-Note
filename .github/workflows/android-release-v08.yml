@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/android-release-v07.yml'
+      - '.github/workflows/android-release-v08.yml'
       - 'x10-ble.js'
       - 'styles.css'
       - 'app.js'
