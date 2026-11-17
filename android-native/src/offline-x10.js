@@ -88,6 +88,9 @@
   if(connection.offlineReading)throw Error('Ya hay una descarga de páginas en curso.');
   connection.offlineReading=true;
   if(connection.keepalive){clearInterval(connection.keepalive);connection.keepalive=null;}
+  // La lectura de batería opcional no debe competir por el canal BLE durante la descarga.
+  const hadBatteryPolling=!!connection.batteryTimer;
+  if(connection.batteryTimer){clearInterval(connection.batteryTimer);connection.batteryTimer=null;}
   const inbox=new Inbox(connection);
   let imported=0,empty=0,duplicate=0;
   try{
@@ -183,7 +186,7 @@
    return {imported,duplicate,empty,totalLogical:lastIndex+1};
   }finally{
    inbox.close();connection.offlineReading=false;
-   if(connection.connected)connection.startKeepalive();
+   if(connection.connected){connection.startKeepalive();if(hadBatteryPolling)connection.startBatteryPolling?.();}
   }
  }
  const api={download,decodePacket,decodePage,cmd};
