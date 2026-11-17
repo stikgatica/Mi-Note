@@ -12,7 +12,7 @@ replace("clearInterval(this.keepalive);this.keepalive=null;\n  if(this.data)","c
 // Puente de la interfaz al objeto X10 real; no inventa porcentajes.
 const appFile=path.join(process.cwd(),'stage','app.js');
 let app=await fs.readFile(appFile,'utf8');
-app+='\\nwindow.MiNoteX10BatteryRefresh=()=>x10Connection?.refreshBattery?.()??null;\\n';
+app+='\nwindow.MiNoteX10BatteryRefresh=()=>x10Connection?.refreshBattery?.()??null;\n';
 await fs.writeFile(appFile,app);
 await fs.writeFile(file,source);
 console.log('Batería estándar GATT opcional integrada.');
