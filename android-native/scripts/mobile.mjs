@@ -106,9 +106,12 @@ html=html.replace('<body>','<body class="minote-android clean-notes">');
 // El botón flotante está visible desde el HTML (sin depender del módulo JS).
 html=html.replace('id="tvBoardToolbar" hidden','id="tvBoardToolbar" class="floating-bar"');
 html=html.replace('</head>','<link rel="stylesheet" href="./mobile-ui.css">\n<link rel="stylesheet" href="./landscape-ui.css">\n<link rel=\"stylesheet\" href=\"./floating-ui.css\">\n</head>');
-html=html.replace('</body>','<script type="module" src="./mobile-ui.js"></script>\n<script type="module" src="./replay.js"></script>\n<script type="module" src="./personal-backup.js"></script>\n<script type="module" src="./memory-import.js"></script>\n<script type="module" src="./landscape-ui.js"></script>\n<script type=\"module\" src=\"./floating-ui.js\"></script>\n<script type=\"module\" src=\"./floating-page-x10.js\"></script>\n</body>');
+// El bootstrap importa primero el motor; evita scripts module con atributos escapados
+// que Android WebView interpretaba como tipo inválido y no ejecutaba.
+html=html.replace(/<script type="module" src="\.\/native-main\.js"><\/script>\s*/,'');
+html=html.replace('</body>','<script type="module" src="./android-ui-main.js"></script>\n</body>');
 await fs.writeFile(path.join(stage,'index.html'),html);
-for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','personal-backup.js','memory-import.js','landscape-ui.css','landscape-ui.js','floating-ui.css','floating-ui.js','floating-geometry.mjs','floating-page-x10.js'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
+for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','personal-backup.js','memory-import.js','landscape-ui.css','landscape-ui.js','floating-ui.css','floating-ui.js','floating-geometry.mjs','floating-page-x10.js','library-page-ui.js','android-ui-main.js'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
 console.log('Mi Note Android V0.6 preparado: escritura principal y X10 directo');
 
 // Solo en el paquete Android: acceso seguro a una copia de la hoja actual.
