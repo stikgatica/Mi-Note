@@ -59,6 +59,7 @@ jobs:
           node --check stage/menu-v019.js
           node scripts/assert-v019.mjs
           node scripts/assert-v020.mjs
+          # Revision final de mejoras en trazos, guardado e interfaz.
           # Validar selector sin expresiones regulares ambiguas en Node 22.
           npx vite build
           sed -i 's/Mi Note X10 Android V0.4/Mi Note X10 Android V0.20/g' dist/index.html
