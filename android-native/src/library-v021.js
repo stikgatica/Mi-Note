@@ -95,7 +95,7 @@ document.addEventListener('click',e=>{
  if(!hit)return;
  e.preventDefault();e.stopImmediatePropagation();openLibrary(hit.id==='floatingNewNotebookMenu');
 },true);
-$('floatingLibraryClose').addEventListener('click',closeLibrary);
+dialog.querySelector('#floatingLibraryClose').addEventListener('click',closeLibrary);
 $('huionNewNotebook').addEventListener('click',()=>showCreation(true));
 $('huionCancelNew').addEventListener('click',()=>showCreation(false));
 $('floatingCreateNotebook').addEventListener('click',()=>void createNotebook());
