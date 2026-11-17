@@ -1,16 +1,6 @@
 name: Android APK - Mi Note X10
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'android-native/**'
-      - 'app.js'
-      - 'index.html'
-      - 'styles.css'
-      - 'x10-ble.js'
-      - 'x10-android-help.js'
-      - 'icons/**'
-      - '.github/workflows/android-apk.yml'
 
 permissions:
   contents: read

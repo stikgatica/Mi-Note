@@ -1,101 +1,93 @@
-# Mi Note — versión 0.2.4 (reconexión X10 adaptada a Android)
+# Mi Note X10 — Android
 
-Aplicación PWA independiente, diseñada para Windows y Android. Los cuadernos se guardan **en IndexedDB del navegador local**, no en GitHub. No hay telemetría, cuentas propias ni servidor de datos.
+**Aplicación Android privada para Huion Note X10.** El proyecto principal es la **APK nativa** (Capacitor + Bluetooth LE Android), no la antigua PWA. La interfaz A5 conserva el diseño de Mi Note V0.2.
 
-## Ya funciona
+## Estado real del proyecto
 
-- Crear y renombrar cuadernos; crear, renombrar y eliminar páginas.
-- Navegación compacta «‹ 1 ›» encima de la hoja; «›» avanza o crea nueva hoja en la última página; tocar el número abre administración de páginas.
-- Dibujar con mouse, pantalla táctil o lápiz reconocido por Windows/Android, con presión cuando el navegador la entrega.
-- Borrar trazos, deshacer/rehacer, distintos colores/grosores, fondos cuadriculado/rayado/blanco.
-- Guardado automático local, caché PWA para uso sin internet tras primera visita, instalación cuando el navegador lo permite.
-- Exportación SVG, PNG, impresión a PDF, respaldo JSON local y combinación no destructiva de respaldos.
-- Importar un JSON de páginas Huion Note X10 en **el formato del extractor abierto** (`page`, `max_x`, `max_y`, `max_press`, `strokes`); se solicita rotación al importar.
-- Conexión configurable a Google Drive mediante OAuth 2.0, con permiso `drive.file`: respaldos versionados en carpeta propia y combinación manual del último respaldo. **No incluye todavía sincronización automática ni edición colaborativa.**
+| Función | Estado |
+|---|---|
+| Detección Bluetooth nativa | ✅ Confirmada en la X10 del usuario con V0.3 |
+| Reconexión automática Android | ✅ Confirmada por el usuario con V0.3 |
+| Cuadernos locales y trazos vectoriales | ✅ Disponibles; probar persistencia y escritura X10 en cada dispositivo |
+| Evento físico nueva página (0x8A) | 🧪 Integrado en V0.4; pendiente de validación física |
+| Extracción offline de páginas de la memoria X10 | 🧪 Implementada en V0.4; pendiente de validación física |
+| Borrar páginas físicas X10 | **NO IMPLEMENTADO** por seguridad |
+| Google Drive / conexión a internet en APK | No disponibles deliberadamente |
 
-## Aún no funciona
+> **Importante:** confirmar conexión y reconexión NO demuestra todavía que todos los eventos físicos y las descargas de memoria funcionen en el hardware. La V0.4 es experimental y no debe sustituir un respaldo existente.
 
-- La app NO establece conexión BLE directa con Huion X10. Falta un plugin nativo Android y validar el conector de Windows (Web Bluetooth directo podría presentar problemas específicos X10).
-- No extrae páginas de la memoria de X10 por sí sola: importa archivos JSON ya recuperados mediante un extractor externo.
-- No cifra de extremo a extremo los JSON subidos a Drive; se usa la seguridad normal de Google Drive. Cifrado local opcional es una etapa posterior.
-- No implementa sincronización automática ni reconciliación de cambios en tiempo real. La función de Drive es **respaldo/combinar manual**: preserva conflictos en copias, jamás sobreescribe páginas diferentes.
+## Descargar
 
-## Publicar en GitHub Pages
+- **Versión Android confirmada para conectar y reconectar:** [V0.3](https://github.com/stikgatica/Mi-Note/releases/tag/android-v0.3).
+- **Versión de prueba con botón de nueva página y descarga offline:** [V0.4](https://github.com/stikgatica/Mi-Note/releases/tag/android-v0.4) (cuando se haya generado la compilación).
+- [Todas las versiones](https://github.com/stikgatica/Mi-Note/releases).
 
-1. Copiar estos archivos en una carpeta propia dentro de tu repositorio, o usar el directorio raíz si deseas que Mi Note sea el sitio principal.
-2. En GitHub > Settings > Pages > Deploy from a branch, elegir `main` y `/ (root)` (o `/docs` si lo publicas allí).
-3. Abrir `https://TUUSUARIO.github.io/TUREPOSITORIO/` y elegir instalar en Chrome/Edge si está disponible.
-4. HTTPS es necesario para el Service Worker; también funciona en `http://localhost` durante desarrollo.
-5. Para probar localmente, desde la carpeta ejecutar `python -m http.server 8000` y abrir `http://localhost:8000`.
-6. Si se aloja en una subcarpeta, conservar las rutas relativas. El Service Worker solo guarda la interfaz, **nunca el contenido de cuadernos ni tokens OAuth**.
+**Atención con las actualizaciones:** las APK actuales se firman con una nueva clave por compilación. No se puede instalar una sobre otra sin desinstalar la anterior. **Exporta primero «Respaldo JSON»**, guarda el archivo en una ubicación segura y luego impórtalo en la nueva instalación. La PWA antigua tiene almacenamiento independiente; no es necesario borrarla.
 
-## Conectar Google Drive
+## Usar la X10
 
-1. En https://console.cloud.google.com/ crear o seleccionar un proyecto.
-2. Habilitar **Google Drive API**.
-3. Configurar **Google Auth Platform**: nombre Mi Note y los usuarios de prueba autorizados, si el proyecto sigue en modo Testing.
-4. Crear **OAuth 2.0 Client ID**, tipo **Aplicación web**.
-5. Registrar en **Orígenes autorizados de JavaScript**: `https://TUUSUARIO.github.io` (solo origen; no incluir ruta de repo). Para pruebas locales, registrar `http://localhost:8000`.
-6. Habilitar permiso `https://www.googleapis.com/auth/drive.file` en la pantalla de consentimiento según corresponda.
-7. En Mi Note, pulsar `Drive`, pegar el **Client ID** (no Client Secret) y pulsar **Conectar Google**.
-8. Pulsar **Crear respaldo en Drive** para guardar una versión de los cuadernos en la carpeta privada `Mi Note - Privado` de tu cuenta. En otro dispositivo, **Combinar último respaldo** para añadir sus páginas.
-9. El Client ID se guarda localmente; el token de acceso solo permanece en memoria, nunca dentro del respaldo, repositorio ni almacenamiento permanente.
+1. Activa Bluetooth y, cuando Android lo solicite, autoriza los dispositivos cercanos.
+2. Abre Mi Note Android → **Conectar Huion X10 directamente**; elige tu X10.
+3. El dispositivo se guarda como autorizado y puede reconectar si Bluetooth está disponible.
+4. Para probar el botón físico, abre **X10 → Activar botón físico de nueva página**, pulsa el botón de la X10 y verifica que Mi Note cree una página digital. El aviso 0x8A corresponde al modo agenda y puede requerir cambiar el modo Bluetooth.
+5. Para extraer apuntes almacenados, usa **X10 → Extraer páginas guardadas**. Se solicita el modo agenda y se leen páginas una por una. Un PIN de 6 dígitos solo se usa si lo solicita el dispositivo. Mi Note **no elimina contenido de la Huion**.
+6. Si deseas volver a capturar escritura en directo, pulsa **Volver a escritura en vivo**.
 
-**Seguridad:** No guardes datos reales sensibles de estudiantes en el prototipo sin revisar antes la política de tratamiento de datos y la protección del dispositivo/cuenta Google. Un repositorio público NO debe contener los respaldos JSON. Nunca comprometer Client Secret, claves API privadas ni tokens OAuth.
+### Cómo funciona la descarga offline
 
-## Enfoque Bluetooth
+- Consulta el número de páginas lógicas con `0x85`, y recorre los índices desde 0 hasta el indicado, incluidos aquellos que siguen a páginas vacías.
+- Descarga cada página mediante `0x86` y recibe paquetes `0x87` de puntos de 6 bytes; intenta reponer faltantes con `0x88`.
+- Decodifica posición/presión, conserva coordenadas originales, calcula una huella SHA-256 de los paquetes, importa páginas completas en el cuaderno activo y detecta duplicados por huella e índice.
+- Si faltan paquetes, muestra el error y **no guarda esa página incompleta**. Las páginas completas anteriores permanecen en el cuaderno.
+- No transmite los comandos destructivos `0x8B` (borrar página) ni `0x8C` (limpiar caché). Nunca modifica firmware.
 
-Protocolo de referencia: https://github.com/Reginleif86/huion-note-x10-ble (MIT). Aporta documentación de handshake, descarga offline y módulo Android, pero sus herramientas BLE para PC están probadas en Linux. Para Android se recomienda plugin Kotlin BLE (Capacitor o un puente nativo) y para Windows valorar Web Bluetooth primero y adaptador auxiliar si es necesario. Cualquier extracción debe ser de **solo lectura/no borrar del dispositivo** salvo orden explícita.
+**Aviso:** la recuperación depende del firmware y de los informes GATT reales. Primero prueba con notas de ejemplo. La captura del modo agenda y los botones requieren validación con la X10 física. No se garantiza recuperar archivos borrados previamente.
 
-## Estructura
+## Estructura del repositorio
 
 ```
-index.html
-styles.css
-app.js
-sw.js
-manifest.webmanifest
-icons/icon-192.png
-icons/icon-512.png
-README.md
-ARQUITECTURA.md
+android-native/
+  package.json                 # Capacitor Android, Bluetooth LE, Vite
+  src/ble-adapter.js           # Puente GATT nativo
+  src/offline-x10.js           # Extracción no destructiva + códec de páginas
+  src/native-main.js           # Punto de entrada de Android
+  scripts/prepare.mjs          # Interfaz web empaquetada para Android
+  scripts/features.mjs         # Controles propios de la APK
+  scripts/harden.mjs           # Privacidad y manifiesto Android
+  tests/                       # Pruebas de protocolo y Bluetooth
+.github/workflows/android-release-v04.yml
+app.js, x10-ble.js, index.html, styles.css  # Código compartido que empaqueta Android
+docs/README_PWA_LEGACY.md       # Documentación histórica PWA
 ```
 
-## Huion Note X10 (0.2.1): conexión experimental sin borrar nada
-- La interfaz V0.2 se mantiene. Botón «X10» arriba a la derecha abre la conexión.
-- Usa Chrome/Edge actualizado, Bluetooth activo, HTTPS, y selecciona la X10 al conectar.
-- El conector detecta el servicio GATT FFE0, notificaciones FFE1 y comandos FFE2.
-- Soporta identificación del modo agenda (challenge 0x81, verify 0x82), consulta de límites 0x95 y páginas 0x85; aviso de nueva hoja de X10 (0x8A).
-- Recibe y registra trazos en **modo tableta** con reportes 55 54 confirmados en la implementación externa. Para la escritura en tinta del **modo agenda**, el paquete 0x8D está identificado pero sus puntos no se han verificado; **aún no se asegura reproducción en tiempo real en modo agenda**. Se informa al usuario y permite copiar un diagnóstico voluntario para la próxima integración.
-- La orientación se fija por perfil (agenda vertical 0°; modo tableta vertical 270°) o manualmente. Cada trazo X10 capturado conserva `x10.raw` con sus coordenadas/ presión originales, límites y rotación; solo `pts` se proyecta sobre la hoja 1000×1400. Cambiar la orientación recalcula `pts` desde `raw`, sin alterar `raw`.
-- El botón físico que emita 0x8A genera una hoja nueva vinculada al cuaderno seleccionado, si «Crear hoja digital...» está marcado. Si no está, se detiene la captura hasta vincular una hoja, para evitar superposición.
-- No se envían comandos destructivos 0x8B (borrar hoja), 0x8C (limpiar caché), ni comandos de firmware.
-- La conexión Web Bluetooth depende del navegador y del firmware; hace falta probar con una X10 real. En Windows la app oficial puede reclamar el dispositivo en modo tableta; para papel/tinta usar el modo agenda cuando esté disponible.
-- El respaldo sigue siendo formato `mi-note-v1` compatible con V0.2; las propiedades adicionales de X10 son optativas. **No borres los datos del navegador** al actualizar.
-- Referencia técnica: https://github.com/Reginleif86/huion-note-x10-ble (MIT); manual Huion: https://www.huion.com/es/manual/huion-note/680
+Los archivos HTML/JS de la raíz se mantienen porque Android **los reutiliza durante la compilación**. El sitio GitHub Pages es **legado** y no es la distribución recomendada. No borrar estos archivos mientras Android dependa de ellos.
 
-## V0.2.2: reaprovechar Data Ink V10
-- El flujo BLE principal reproduce el que ya funcionaba con el lápiz de tinta del usuario: conexión FFE0/FFE1/FFE2; mensajes C9, C8 y CA de 8 bytes, separados por 150 ms; keepalive D1 cada cinco segundos.
-- Analiza informes `55 54` de contacto/hover y respuestas de dimensiones `[LEN,C8,...]`. Se capturan coordenadas y presión en trazos vectoriales con originales guardados en `stroke.x10.raw`.
-- Por defecto, la orientación vertical coincide con Data Ink V10: giro horario (270° en coordenadas normalizadas); la zona útil de la X10 se coloca centrada dentro de la hoja física A5 148×210 mm, usando área aproximada 140,9×186,9 mm. Estos parámetros necesitan confirmación empírica en la agenda real.
-- El botón opcional «Probar modo agenda» envía el saludo 0x81 y permite diagnosticar eventos físicos de hoja 0x8A. La escritura online del protocolo de agenda 0x8D sigue sin decodificación validada. La conexión de lápiz tipo Data Ink no garantiza eventos 0x8A.
-- No modificar el esquema IndexedDB ni borrar almacenamiento del navegador. Prueba física obligatoria antes de considerar la conexión plenamente compatible.
+## Compilar desde el código
 
-## V0.2.3 — reconexión X10
-- Primera conexión manual mediante permiso Bluetooth del usuario. Se conserva en el dispositivo el identificador opaco del equipo permitido (no una dirección MAC ni una contraseña).
-- Al abrir la aplicación intenta recuperar el equipo desde `navigator.bluetooth.getDevices()`, solo si está disponible y si el usuario mantiene marcada la opción «Reconectar automáticamente».
-- Si la X10 se desconecta inesperadamente, se realizan como máximo cuatro reintentos escalonados durante la sesión; al volver a la aplicación se puede iniciar otra ronda. Tras pulsar «Desconectar X10» no se reconecta en esa sesión sin intervención del usuario.
-- La reconexión depende del permiso persistente del navegador, Bluetooth encendido, dispositivo al alcance y disponibilidad Web Bluetooth. Puede requerir un nuevo permiso si este caduca o se revoca. Sin `getDevices()` sigue disponible «Conectar X10».
-- No existe servicio Bluetooth en segundo plano: la pestaña/PWA debe estar abierta. No modifica ni migra el contenido de IndexedDB y conserva la interfaz V0.2.
+Requiere Node 22, Java 21 y Android SDK.
 
-## V0.2.4: Android sin app separada
-- Mismo sitio PWA, sin APK ni plugin nativo. La X10 autorizada mediante requestDevice permanece como objeto `BluetoothDevice` en memoria de la pestaña/PWA; al desconectarse se reutiliza con `gatt.connect()`, sin mostrar el selector mientras esa memoria sobreviva.
-- Si el navegador implementa `navigator.bluetooth.getDevices()`, tras recargar/abrir Mi Note se intenta recuperar el dispositivo autorizado sin solicitar un permiso nuevo.
-- En Chrome Android estable la disponibilidad de `getDevices()` puede ser limitada. Si Android destruye completamente el proceso o recarga la página y la API falta, será necesaria nueva acción del usuario: «Conectar X10». No se puede eludir este permiso desde una PWA.
-- Interfaz X10 informa qué tipo de reconexión admite el navegador. Permanecen los reintentos acotados, la desconexión voluntaria y la captura de trazos procedente de Data Ink V10. No hay reconexión Bluetooth en segundo plano cuando la web está cerrada.
-- Los cuadernos siguen almacenados localmente en IndexedDB; sin cambios de esquema ni telemetría.
+```bash
+cd android-native
+npm install --no-audit --no-fund
+npm test
+npm run build:web
+npx cap add android
+npx cap sync android
+node scripts/harden.mjs
+cd android
+./gradlew assembleRelease
+```
 
-## V0.2.10: actualización segura de PWA instalada en Android
-- Caché Service Worker mi-note-shell-v0.2.10 y actualización network-first de archivos de la aplicación.
-- Botón «Actualizar Mi Note» dentro del menú X10, con guardado local antes de recargar.
-- No eliminar almacenamiento ni desinstalar la PWA: cuadernos en IndexedDB.
+El APK de Gradle sale sin firmar. Para distribuirlo hace falta firmarlo con `apksigner`. La acción `android-release-v04.yml` genera una firma efímera y publica un APK de prueba en Releases. **No publica la clave privada.** Para actualizaciones sin desinstalar debe configurarse a futuro una clave persistente custodiada mediante GitHub Actions Secrets, no en commits, logs ni artefactos públicos.
+
+## Privacidad
+
+- Base de datos local IndexedDB del WebView Android; sin cuentas ni telemetría propias.
+- APK sin permiso `INTERNET`; sin Drive en Android.
+- Backup automático Android desactivado, almacenamiento local aislado por Android, no cifrado propio del cuaderno.
+- Respaldos JSON se generan localmente y no deben subirse a un repositorio público.
+- Sin auditoría independiente de seguridad y sin publicación en Play Store.
+
+## Fuentes técnicas
+
+Protocolo abierto [Reginleif86/huion-note-x10-ble](https://github.com/Reginleif86/huion-note-x10-ble), documentación [offline-note-protocol.md](https://github.com/Reginleif86/huion-note-x10-ble/blob/main/docs/offline-note-protocol.md), MIT. El software de Mi Note se basa en observaciones y pruebas del propio proyecto; no es una aplicación oficial de Huion.

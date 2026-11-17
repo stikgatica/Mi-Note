@@ -21,13 +21,14 @@ for(const name of ['styles.css','app.js','x10-ble.js','x10-android-help.js'])
  await fs.copyFile(path.join(root,name),path.join(stage,name));
 await fs.copyFile(path.join(project,'src','native-main.js'),path.join(stage,'native-main.js'));
 await fs.copyFile(path.join(project,'src','ble-adapter.js'),path.join(stage,'ble-adapter.js'));
+await fs.copyFile(path.join(project,'src','offline-x10.js'),path.join(stage,'offline-x10.js'));
 await fs.cp(path.join(root,'icons'),path.join(stage,'icons'),{recursive:true});
 const csp='<meta http-equiv="Content-Security-Policy" content="default-src \'self\' data: blob:; connect-src \'none\'; object-src \'none\'; script-src \'self\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: blob:; base-uri \'none\'; form-action \'none\'">';
 let safeHtml=await fs.readFile(path.join(stage,'index.html'),'utf8');
 safeHtml=safeHtml.replace('<head>','<head>\n'+csp);
 safeHtml=safeHtml.replace('<button id="settingsBtn" class="subtle">☁ Drive</button>',
  '<button id="settingsBtn" class="subtle" hidden disabled aria-hidden="true">☁ Drive</button>');
-safeHtml=safeHtml.replace('<strong id="pwaVersion">Mi Note V0.2.10</strong>','<strong id="pwaVersion">Mi Note X10 Android V0.3</strong>');
+safeHtml=safeHtml.replace('<strong id="pwaVersion">Mi Note V0.2.10</strong>','<strong id="pwaVersion">Mi Note X10 Android V0.4</strong>');
 safeHtml=safeHtml.replace('<button id="pwaUpdateBtn" class="subtle" type="button">↻ Actualizar Mi Note</button>',
  '<button id="pwaUpdateBtn" class="subtle" type="button" hidden disabled>Actualizar Mi Note</button>');
 await fs.writeFile(path.join(stage,'index.html'),safeHtml);

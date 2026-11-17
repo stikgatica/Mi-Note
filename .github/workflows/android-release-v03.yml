@@ -1,10 +1,5 @@
 name: Mi Note X10 Android v0.3 - escaneo BLE compatible
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/android-release-v03.yml'
-      - 'android-native/**'
   workflow_dispatch:
 
 permissions:

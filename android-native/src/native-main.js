@@ -11,5 +11,6 @@ if (Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform()) {
 // Se importan en orden: el protocolo X10 precede a la interfaz y al diagnóstico.
 // La aplicación web del repositorio sigue utilizando sus scripts originales.
 await import('./x10-ble.js');
+await import('./offline-x10.js');
 await import('./app.js');
 await import('./x10-android-help.js');

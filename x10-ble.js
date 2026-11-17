@@ -49,6 +49,7 @@ class Connection{
   this.handlers=handlers;this.device=null;this.cmd=null;this.data=null;
   this.mode='desconectado';this.limits={...DEFAULT_TABLET};
   this.keepalive=null;this.pageEventAt=0;this.unknownTypes=new Set();this.packetCount=0;
+  this.frameListeners=new Set();this.offlineReading=false;
   this._onData=this._onData.bind(this);this._onDisconnected=this._onDisconnected.bind(this);
  }
  get connected(){return !!this.device?.gatt?.connected;}
@@ -118,6 +119,17 @@ class Connection{
   this.handlers.onDiagnostic?.('Comandos Data Ink C9, C8 y CA enviados.');
   this.status('Lápiz X10 activado. Esperando paquetes de escritura…');
  }
+ subscribeFrames(listener){
+  if(typeof listener!=='function')throw Error('Se requiere un receptor BLE.');
+  this.frameListeners.add(listener);
+  return ()=>this.frameListeners.delete(listener);
+ }
+ async enablePhysicalPageButton(){
+  if(!this.connected)throw Error('Conecta primero la X10.');
+  if(this.offlineReading)throw Error('Finaliza la extracción antes de escuchar el botón.');
+  await this.probeAgenda();
+  this.status('Escuchando avisos físicos 0x8A de nuevas páginas. Pulsa el botón de la X10.');
+ }
  async probeAgenda(){
   if(!this.connected)throw Error('Conecta primero la X10.');
   await this.send(frame(0x81));
@@ -136,6 +148,7 @@ class Connection{
  _onData(e){
   const value=e.target?.value;if(!value)return;
   const b=new Uint8Array(value.buffer,value.byteOffset,value.byteLength);this.packetCount++;
+  if(this.frameListeners.size&&b[0]===0xcd)for(const handler of this.frameListeners){try{handler(b);}catch(e){this.handlers.onDiagnostic?.('Receptor de datos X10: '+e.message);}}
   const limits=parseTabletInfo(b);
   if(limits){
    this.limits=limits;this.handlers.onLimits?.(limits);
@@ -171,7 +184,7 @@ class Connection{
     this.mode='agenda';this.limits={...DEFAULT_NOTE};
     this.handlers.onMode?.('agenda',this.limits);
     this.status('Modo agenda conectado. Esperando aviso de página.');
-    this._afterVerified();return;
+    if(!this.offlineReading)this._afterVerified();return;
    }
    if(op===0x95&&b.length>=11){
     const maxX=u24(b,3),maxY=u24(b,6),maxPressure=u16(b,9);
@@ -205,7 +218,7 @@ class Connection{
   if(this.cmd)try{this.cmd.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
   if(this.device){this.device.removeEventListener('gattserverdisconnected',this._onDisconnected);
    try{this.device.gatt?.disconnect();}catch{}}
-  this.device=null;this.cmd=null;this.data=null;this.mode='desconectado';
+  this.device=null;this.cmd=null;this.data=null;this.mode='desconectado';this.offlineReading=false;
   this.handlers.onDisconnected?.({unexpected:false});
  }
 }
