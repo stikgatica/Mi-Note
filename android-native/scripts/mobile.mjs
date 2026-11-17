@@ -9,6 +9,7 @@ const menu=[
 '<dialog id="mobileMoreDialog" class="dialog mobile-actions-dialog" aria-labelledby="mobileMoreTitle">',
 '<div class="dialog-head"><h2 id="mobileMoreTitle">Opciones del cuaderno</h2><button id="closeMobileMore" class="icon-btn" type="button" aria-label="Cerrar">✕</button></div>',
 '<div class="mobile-actions-list">',
+'<button type="button" id="replayOpen">▶ Reproducir escritura</button>',
 '<button type="button" data-action="pageNumber">Todas las hojas</button>',
 '<button type="button" data-action="renamePageBtn">Renombrar hoja</button>',
 '<button type="button" data-action="exportSvg">Exportar SVG</button>',
@@ -26,9 +27,28 @@ html=html.replace('aria-label="Opciones Huion Note X10"','aria-label="Conectar H
 html=html.replace('◌ X10</button><button id="settingsBtn"','◌ Conectar X10</button><button id="settingsBtn"');
 html=html.replace('<button id="fullscreenBtn" class="icon-btn" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>','<button id="fullscreenBtn" class="icon-btn" title="Pantalla completa" aria-label="Pantalla completa">⛶</button><button id="mobileMoreBtn" type="button" class="icon-btn mobile" title="Más opciones" aria-label="Más opciones">⋮</button>');
 if(!html.includes('id="mobileMoreBtn"'))throw Error('No se pudo insertar menú móvil');
-html=html.replace('</main>',menu+'\n</main>');
+const replayDialog=[
+'<dialog id="replayDialog" class="dialog replay-dialog" aria-labelledby="replayTitle">',
+'<div class="dialog-head"><h2 id="replayTitle">Reproducir escritura</h2><button type="button" id="replayClose" class="icon-btn" aria-label="Cerrar reproducción">✕</button></div>',
+'<p id="replayStatus" role="status" aria-live="polite">Preparando trazos…</p>',
+'<canvas id="replayCanvas" width="700" height="980" aria-label="Vista previa de la escritura"></canvas>',
+'<div class="replay-controls"><input id="replaySeek" type="range" min="0" max="1000" value="0" aria-label="Avance de la reproducción"><output id="replayProgress">0%</output></div>',
+'<div class="replay-controls"><button id="replayPlay" type="button" class="primary">▶ Reproducir</button><button id="replayRestart" type="button">↺ Reiniciar</button><label>Velocidad <select id="replaySpeed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label></div>',
+'<div class="replay-controls"><button id="replayVideo" type="button">Guardar video WebM</button></div>',
+'<small>Los trazos se reproducen en orden. Para hojas antiguas, la duración es aproximada. La hoja original no se modifica.</small>',
+'</dialog>'
+].join('\\n');
+html=html.replace('</main>',menu+'\n'+replayDialog+'\n</main>');
 html=html.replace('</head>','<link rel="stylesheet" href="./mobile-ui.css">\n</head>');
-html=html.replace('</body>','<script type="module" src="./mobile-ui.js"></script>\n</body>');
+html=html.replace('</body>','<script type="module" src="./mobile-ui.js"></script>\n<script type="module" src="./replay.js"></script>\n</body>');
 await fs.writeFile(path.join(stage,'index.html'),html);
-for(const file of ['mobile-ui.css','mobile-ui.js'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
+for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
 console.log('Mi Note Android V0.6 preparado: escritura principal y X10 directo');
+
+// Solo en el paquete Android: acceso seguro a una copia de la hoja actual.
+const appFile=path.join(stage,'app.js');
+let app=await fs.readFile(appFile,'utf8');
+const replayHook="window.MiNoteReplaySnapshot=()=>({title:page().title,template:page().template,strokes:clone(page().strokes)});";
+if(!app.includes('start();'))throw Error('No se pudo registrar la lectura de la hoja');
+app=app.replace(/start\(\);\s*$/,match=>match+'\n'+replayHook+'\n');
+await fs.writeFile(appFile,app);
