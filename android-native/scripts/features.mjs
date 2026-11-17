@@ -68,7 +68,8 @@ async function x10ImportOfflinePage(result,destinationId){
  }
  notebook.pages.push(imported);
  notebook.updatedAt=now();
- // No cambiar de cuaderno o página mientras se lee la memoria física.
+ // Refrescar los contadores sin cambiar la página visible.
+ render();
  // El guardado normal emitirá el evento de sincronización de Drive.
  await persist();
  return 'imported';
