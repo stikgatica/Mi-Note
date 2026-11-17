@@ -1,0 +1,84 @@
+/* Mi Note V0.21 — biblioteca de portadas A5 y creación Huion-like. */
+body.minote-android.clean-notes dialog.huion-library[open]{
+ display:block!important;position:fixed!important;
+ inset:max(8px,env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-right,0px)) max(8px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))!important;
+ margin:auto!important;padding:0!important;
+ width:min(940px,calc(100vw - 16px))!important;
+ height:min(95dvh,960px)!important;max-height:95dvh!important;
+ overflow-y:auto!important;
+ background:#fff!important;color:#263849!important;
+ border:0!important;border-radius:16px!important;
+ box-shadow:0 15px 55px #0006!important;
+}
+.huion-library-head{
+ display:flex;align-items:center;justify-content:space-between;
+ gap:12px;padding:18px 18px 12px;
+ border-bottom:1px solid #e7edf3;background:#fff;
+ position:sticky;top:0;z-index:5;
+}
+.huion-library-head h2{font-size:24px!important;margin:0!important;font-weight:650;}
+.huion-library-tools{display:flex;gap:7px;}
+.huion-library-tools button{
+ min-height:39px;min-width:39px;padding:4px 9px;
+ font-size:23px;color:#233e5a;background:transparent;
+ border:1px solid #e6eaf0;border-radius:10px;
+}
+#huionSearchWrap{padding:13px 19px 4px;}
+#huionSearchWrap[hidden]{display:none!important;}
+#huionSearch{width:100%;min-height:45px;padding:11px 12px;border:1px solid #d7e0e9;border-radius:10px;}
+.huion-sort{display:flex;gap:19px;padding:12px 19px 0;border-bottom:1px solid #e8ecf1;}
+.huion-sort button{background:none;border:0;border-bottom:3px solid transparent;font-size:13px;color:#7e8997;padding:8px 0 11px;}
+.huion-sort button.active{color:#2377c9;border-bottom-color:#2377c9;}
+body.minote-android.clean-notes #floatingLibraryItems.huion-notebook-grid{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:17px!important;overflow:visible!important;
+ max-height:none!important;margin:0!important;padding:20px 19px 26px!important;
+}
+.huion-book-card{
+ display:flex;flex-direction:column;gap:5px;min-width:0;
+ background:none!important;border:0!important;padding:0!important;
+ color:#223347;text-align:left!important;
+}
+.huion-book-card .huion-book-cover{
+ position:relative;display:block;width:100%;aspect-ratio:4 / 5;
+ max-height:245px;background:var(--book-cover,#52617c);
+ border-radius:11px;overflow:hidden;
+ box-shadow:0 2px 8px #172d4522;
+}
+.huion-book-card.selected .huion-book-cover{outline:3px solid #2b86db;outline-offset:2px;}
+.huion-book-preview{
+ display:block;position:absolute;inset:6% 15% 6% 11%;
+ width:74%;height:88%;border-radius:3px;
+ background:#fff;box-shadow:2px 2px 8px #0003;
+}
+.huion-a5-tag{position:absolute;bottom:7px;right:7px;color:#fff;font-size:11px;background:#388ff0;padding:3px 7px;border-radius:5px;}
+.huion-book-card strong{font-size:13px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+.huion-book-card small{font-size:11px;color:#7a899b;line-height:1.5;}
+.huion-create-panel{
+ position:sticky;bottom:0;z-index:6;
+ padding:17px 18px 21px;
+ background:#fff;border-top:1px solid #dce4ed;
+ box-shadow:0 -10px 22px #0001;
+}
+.huion-create-panel[hidden]{display:none!important;}
+.huion-create-head{display:flex;align-items:center;justify-content:space-between;}
+.huion-create-head h3{font-size:18px;margin:0 0 12px;}
+.huion-create-head button{border:0;background:none;font-size:21px;}
+.huion-create-panel label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#536579;font-weight:600;}
+.huion-create-panel input,.huion-create-panel select{
+ min-height:44px;width:100%;background:#fff;color:#253b52;
+ border:1px solid #d3dfe9;border-radius:9px;padding:8px 11px;
+}
+.huion-create-panel p{font-size:12px;margin:12px 0 8px;color:#536579;}
+.huion-cover-options{display:flex;gap:10px;}
+.huion-cover-choice{width:40px;height:51px;border:2px solid transparent;border-radius:8px;background:var(--cover-color)!important;}
+.huion-cover-choice.selected{border-color:#177cd4;box-shadow:0 0 0 2px #c9e6ff;}
+.huion-create-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
+#floatingCreateNotebook{width:100%;margin-top:13px;min-height:45px;border:0;background:#1450b5;color:#fff;border-radius:9px;font-weight:650;}
+#floatingLibraryStatus{font-size:12px;color:#7f3737;padding:6px 17px;}
+@media(max-width:500px){
+ body.minote-android.clean-notes #floatingLibraryItems.huion-notebook-grid{gap:12px!important;padding:14px 12px 20px!important;}
+ .huion-library-head{padding:12px;}
+ .huion-library-head h2{font-size:20px!important;}
+ .huion-create-fields{grid-template-columns:1fr 1fr;gap:7px;}
+}
