@@ -87,5 +87,14 @@ const alreadyInstrumented=oldSave.replace("function persist(){const snapshot=clo
 if(app.includes(alreadyInstrumented))replace(alreadyInstrumented,newSave,'guardar por lotes Android');
 else replace(oldSave,newSave,'guardar por lotes');
 
+
+replace("function beforeChange(){const h=historyFor(page().id);h.undo.push(clone(page().strokes));if(h.undo.length>35)h.undo.shift();h.redo=[];}",
+ "function beforeChange(deep=false){const h=historyFor(page().id);h.undo.push(deep?clone(page().strokes):page().strokes.slice());if(h.undo.length>35)h.undo.shift();h.redo=[];}",
+ "undo sin clonar toda la tinta");
+replace("x10Flush();beforeChange();const rot=x10RotationValue();",
+ "x10Flush();beforeChange(true);const rot=x10RotationValue();",
+ "undo profundo de reorientación");
+replace("h.redo.push(clone(page().strokes));","h.redo.push(page().strokes.slice());","redo de bajo costo");
+replace("h.undo.push(clone(page().strokes));","h.undo.push(page().strokes.slice());","undo de bajo costo");
 await fs.writeFile(file,app);
 console.log('V0.20: overlay de tinta, rAF y guardado diferido 400ms.');
