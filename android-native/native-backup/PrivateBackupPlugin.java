@@ -24,7 +24,7 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.getcapacitor.annotation.PluginMethod;
+import com.getcapacitor.PluginMethod;
 import androidx.activity.result.ActivityResult;
 
 @CapacitorPlugin(name = "PrivateBackup")
