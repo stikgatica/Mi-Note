@@ -13,7 +13,6 @@ const menu=[
 '<button type="button" id="x10MemoryOpen">▣ Importar memoria Huion X10</button>',
 '<button type="button" id="personalBackupOpen">☁ Copia automática en Drive</button>',
 '<button type="button" id="tvBoardToggle">▣ Proyectar en TV</button>',
-'<label class="landscape-control">Orientación de la hoja<select id="landscapeOrientation"><option value="portrait">Vertical A5</option><option value="landscape-cw">Horizontal · girar derecha ↻</option><option value="landscape-ccw">Horizontal · girar izquierda ↺</option></select></label>',
 '<button type="button" data-action="pageNumber">Todas las hojas</button>',
 '<button type="button" data-action="renamePageBtn">Renombrar hoja</button>',
 '<button type="button" data-action="exportSvg">Exportar SVG</button>',
@@ -23,6 +22,7 @@ const menu=[
 '<button type="button" data-action="importBtn">Importar archivo</button>',
 '<button type="button" data-action="renameNotebookBtn">Renombrar cuaderno</button>',
 '</div>',
+'<label class="landscape-control">Orientación de la hoja<select id="landscapeOrientation"><option value="portrait">Vertical A5</option><option value="landscape-cw">Horizontal · girar derecha ↻</option><option value="landscape-ccw">Horizontal · girar izquierda ↺</option></select></label>',
 '<label class="field">Papel<select id="mobilePaperSelect"><option value="grid">Cuadrícula</option><option value="ruled">Rayas</option><option value="plain">Blanco</option></select></label>',
 '<label class="field">Grosor del lápiz <output id="mobileWidthValue">3</output><input id="mobilePenWidth" type="range" min="1" max="15" value="3"></label>',
 '</dialog>'
