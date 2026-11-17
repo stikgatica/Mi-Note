@@ -1,0 +1,130 @@
+name: Mi Note X10 Android v0.12 - correccion horizontal y proyeccion TV
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'x10-ble.js'
+      - 'styles.css'
+      - 'app.js'
+      - 'index.html'
+      - 'android-native/**'
+      - '.github/workflows/android-release-v011.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: android-native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Comprobar SDK Android
+        run: test -d "$ANDROID_HOME/build-tools"
+      - name: Dependencias y pruebas
+        run: |
+          npm install --no-audit --no-fund
+          npm test
+      - name: Preparar Mi Note privada
+        run: |
+          npm run prepare:android
+          node scripts/features.mjs
+          node scripts/mobile.mjs
+          node scripts/landscape.mjs
+          node --check stage/app.js
+          node --check stage/memory-import.js
+          node --check stage/landscape-ui.js
+          node --check stage/personal-backup.js
+          # Comprobaciones de regresión: botón duplicado eliminado y hoja de TV aislada.
+          node -e "const fs=require('fs');const h=fs.readFileSync('stage/index.html','utf8');const css=fs.readFileSync('stage/landscape-ui.css','utf8');if(h.includes('Conectar Huion X10 directamente'))throw Error('Boton duplicado aun visible');if(!h.includes('id=\"x10DirectConnect\"'))throw Error('Se ha perdido el puente BLE');if(!css.includes('body.minote-android.tv-board .page-top'))throw Error('Falta ocultar titulo y exportaciones');if(!css.includes('body.minote-android .paper-shell[data-orientation^='))throw Error('Falta encaje A5 horizontal')"
+          npx vite build
+          sed -i 's/Mi Note X10 Android V0.4/Mi Note X10 Android V0.12/g' dist/index.html
+      - name: Crear Android y configurar privacidad
+        run: |
+          npx cap add android
+          npx cap sync android
+          node scripts/harden.mjs
+          node native-backup/setup.mjs
+          sed -i -E 's/versionCode [0-9]+/versionCode 12/; s/versionName "[^"]+"/versionName "0.12.0"/' android/app/build.gradle
+      - name: Generar APK release sin depuracion
+        run: |
+          cd android
+          chmod +x gradlew
+          for n in 1 2 3 4; do
+            if ./gradlew assembleRelease --max-workers=2 --no-daemon --stacktrace; then
+              exit 0
+            fi
+            if [ "$n" -eq 4 ]; then
+              echo 'La compilación Android no se pudo completar tras 4 intentos.'
+              exit 1
+            fi
+            echo "Fallo transitorio de dependencias: reintento $n/4."
+            sleep 20
+          done
+      - name: Firmar APK de produccion para pruebas privadas
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          UNSIGNED="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          test -s "$UNSIGNED"
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -x "$TOOLS/zipalign"
+          test -x "$TOOLS/apksigner"
+          mkdir -p signed
+          PASSWORD="$(openssl rand -hex 28)"
+          keytool -genkeypair -noprompt -keyalg RSA -keysize 3072 -validity 10000 \
+            -alias minote-x10 -dname "CN=Mi Note X10 Android, OU=Private Project" \
+            -keystore "$RUNNER_TEMP/minote-v02-release.jks" -storetype PKCS12 \
+            -storepass "$PASSWORD" -keypass "$PASSWORD"
+          "$TOOLS/zipalign" -p -f 4 "$UNSIGNED" signed/unsigned-aligned.apk
+          "$TOOLS/apksigner" sign --ks "$RUNNER_TEMP/minote-v02-release.jks" \
+            --ks-key-alias minote-x10 --ks-pass "pass:$PASSWORD" \
+            --key-pass "pass:$PASSWORD" --out signed/Mi-Note-X10-Android-v0.12.apk \
+            signed/unsigned-aligned.apk
+          "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.12.apk
+          sha256sum signed/Mi-Note-X10-Android-v0.12.apk | tee signed/SHA256SUMS.txt
+      - name: Verificar permisos del APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.12.apk | tee signed/PERMISOS.txt
+          if grep -Fq 'android.permission.INTERNET' signed/PERMISOS.txt; then
+            echo 'ERROR: permiso INTERNET incluido' >&2; exit 1
+          fi
+      - name: Guardar APK para respaldo
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mi-Note-X10-v0.12-APK
+          path: |
+            android-native/signed/Mi-Note-X10-Android-v0.12.apk
+            android-native/signed/SHA256SUMS.txt
+            android-native/signed/PERMISOS.txt
+          if-no-files-found: error
+      - name: Publicar Mi Note X10 Android v0.12
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          # La publicación final reemplaza artefactos de compilaciones previas de prueba.
+          if gh release view android-v0.12 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete android-v0.12 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          fi
+          gh release create android-v0.12 signed/Mi-Note-X10-Android-v0.12.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title 'Mi Note X10 Android V0.12 — horizontal y TV corregidos' \
+            --notes 'V0.12 corrige la interfaz horizontal Android de V0.11: ya no muestra sidebar ni el bloque Hoja 1, exportaciones o boton Conectar Huion X10 directamente. El lienzo A5 se centra y ajusta al ancho/alto disponible sin distorsionar. En modo pizarra TV se ocultan todos los controles de escritorio; solo permanecen los botones flotantes y la hoja. El boton X10 principal sigue conectado al adaptador BLE nativo. La duplicacion de pantalla hacia TV se realiza desde Android. Mantiene cuadernos y copia Drive de V0.11. APK de prueba sin validar en telefono: exporte Respaldo JSON antes de desinstalar; las firmas de version son diferentes.' \
+            --prerelease --latest=false
