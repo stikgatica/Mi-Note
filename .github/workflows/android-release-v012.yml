@@ -42,8 +42,8 @@ jobs:
           node --check stage/memory-import.js
           node --check stage/landscape-ui.js
           node --check stage/personal-backup.js
-          # Comprobaciones de regresión: botón duplicado eliminado y hoja de TV aislada.
-          node -e "const fs=require('fs');const h=fs.readFileSync('stage/index.html','utf8');const css=fs.readFileSync('stage/landscape-ui.css','utf8');if(h.includes('Conectar Huion X10 directamente'))throw Error('Boton duplicado aun visible');if(!h.includes('id=\"x10DirectConnect\"'))throw Error('Se ha perdido el puente BLE');if(!css.includes('body.minote-android.tv-board .page-top'))throw Error('Falta ocultar titulo y exportaciones');if(!css.includes('body.minote-android .paper-shell[data-orientation^='))throw Error('Falta encaje A5 horizontal')"
+          # Comprobaciones de regresión: sin botón duplicado, TV aislada y menú horizontal accesible.
+          node -e "const fs=require('fs');const h=fs.readFileSync('stage/index.html','utf8');const css=fs.readFileSync('stage/landscape-ui.css','utf8');if(h.includes('Conectar Huion X10 directamente'))throw Error('Boton duplicado aun visible');if(!h.includes('id=\"x10DirectConnect\"'))throw Error('Se ha perdido el puente BLE');if(!css.includes('body.minote-android.tv-board .page-top'))throw Error('Falta ocultar titulo y exportaciones');if(!css.includes('body.minote-android .paper-shell[data-orientation^='))throw Error('Falta encaje A5 horizontal');if(!css.includes('#mobileMoreDialog[open]'))throw Error('Menu horizontal no accesible')"
           npx vite build
           sed -i 's/Mi Note X10 Android V0.4/Mi Note X10 Android V0.12/g' dist/index.html
       - name: Crear Android y configurar privacidad
