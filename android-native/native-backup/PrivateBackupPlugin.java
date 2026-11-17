@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
-import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.provider.OpenableColumns;
@@ -16,7 +15,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.KeyStore;
 import java.security.MessageDigest;
-import java.security.SecureRandom;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -27,8 +25,6 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.PluginMethod;
-import com.getcapacitor.PluginResult;
-import com.getcapacitor.Bridge;
 import androidx.activity.result.ActivityResult;
 
 @CapacitorPlugin(name = "PrivateBackup")
