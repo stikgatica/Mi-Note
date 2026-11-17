@@ -30,6 +30,7 @@ await load('interfaz Android',()=>import('./mobile-ui.js'));
 await load('reproducción',()=>import('./replay.js'));
 await load('respaldo personal',()=>import('./personal-backup.js'));
 await load('memoria Huion X10',()=>import('./memory-import.js'));
+await load('archivos Huion AHN/AHNS',()=>import('./huion-archive.js'));
 await load('orientación y TV',()=>import('./landscape-ui.js'));
 await load('barra flotante',()=>import('./floating-ui.js'));
 await load('hojas y X10',()=>import('./floating-page-x10.js'));

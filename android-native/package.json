@@ -14,7 +14,8 @@
   "dependencies": {
     "@capacitor/core": "8.3.4",
     "@capacitor/android": "8.3.4",
-    "@capacitor-community/bluetooth-le": "8.3.0"
+    "@capacitor-community/bluetooth-le": "8.3.0",
+    "jszip": "3.10.1"
   },
   "devDependencies": {
     "@capacitor/cli": "8.3.4",
