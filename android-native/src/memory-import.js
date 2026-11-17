@@ -6,26 +6,38 @@ const exportDiagnostic=$('x10MemoryDiagnosticExport');
 function diagnostic(){
  return window.MiNoteX10Offline?.getLastDiagnostic?.(false)||null;
 }
-function saveDiagnostic(){
+let exportingDiagnostic=false;
+async function saveDiagnostic(){
+ if(exportingDiagnostic||active)return;
  const overview=diagnostic();
- if(!overview){info('Aún no existe diagnóstico X10. Ejecute una lectura primero.',true);return;}
- const raw=window.confirm('¿Incluir muestras HEX de los paquetes de tinta de su Huion? Pueden contener trazos de escritura personal. Seleccione Cancelar para exportar únicamente contadores y estadísticas.');
+ if(!overview){info('Todavía no hay diagnóstico. Conecte la X10 y ejecute Importar memoria; luego exporte el resultado.',true);return;}
+ if(!window.MiNotePrivateBackup?.saveDiagnostic){
+  info('El selector de archivos Android no está disponible en esta instalación. Compruebe que usa Mi Note V0.28.',true);return;
+ }
+ const raw=window.confirm('¿Incluir muestras HEX de los paquetes X10? Podrían revelar contenido manuscrito. Aceptar: incluir muestras. Cancelar: solo estadísticas.');
  const data=window.MiNoteX10Offline.getLastDiagnostic(raw);
- const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
- const url=URL.createObjectURL(blob);
- const a=document.createElement('a');a.href=url;a.download='MiNote_X10_diagnostico_local.json';
- document.body.append(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),10000);
- info('Diagnóstico X10 exportado localmente ('+(raw?'incluye muestras de paquetes':'solo estadísticas')+'). La memoria física no se modificó.');
+ exportingDiagnostic=true;
+ exportDiagnostic.disabled=true;
+ try{
+  info('Seleccione una carpeta y confirme el nombre del archivo JSON en Android.');
+  const result=await window.MiNotePrivateBackup.saveDiagnostic({content:JSON.stringify(data,null,2)});
+  if(result?.cancelled){info('Se canceló el guardado. Ningún archivo fue creado.',true);return;}
+  if(!result?.saved)throw Error('Android no confirmó la escritura del archivo.');
+  info('Diagnóstico guardado por Android: '+(result.name||'MiNote_X10_diagnostico_local.json')+' ('+(result.bytes||0)+' bytes).');
+ }catch(error){
+  info('No se pudo guardar el diagnóstico: '+(error?.message||String(error)),true);
+ }finally{
+  exportingDiagnostic=false;
+  exportDiagnostic.disabled=active;
+ }
 }
-exportDiagnostic?.addEventListener('click',saveDiagnostic);
+exportDiagnostic?.addEventListener('click',()=>void saveDiagnostic());
 
 let active=false;
 const info=(value,warn=false)=>{if(message){message.textContent=value;message.dataset.warning=warn?'true':'false';}};
 function engine(){return window.MiNoteX10Import;}
 function refresh(){
  const api=engine();if(!api){info('La función de lectura todavía no está disponible.',true);return;}
- if(exportDiagnostic)exportDiagnostic.hidden=!diagnostic();
  const old=select.value;
  const list=api.notebooks();
  select.replaceChildren();
@@ -52,6 +64,7 @@ function busy(flag){
  $('x10MemoryName').disabled=flag;
  $('x10MemoryPin').disabled=flag;
  cancel.disabled=!flag;
+ if(exportDiagnostic)exportDiagnostic.disabled=flag||exportingDiagnostic;
  $('x10MemoryClose').disabled=flag;
 }
 async function importMemory(){
@@ -89,7 +102,6 @@ async function importMemory(){
   updateNewField();
  }catch(e){info('Lectura interrumpida: '+(e?.message||e)+'. Las páginas recuperadas se conservan en Mi Note.',true);}
  finally{
-  if(exportDiagnostic)exportDiagnostic.hidden=!diagnostic();
   busy(false);
   if(api.connected()){
    try{await api.restore();}catch(e){info(message.textContent+' · Para continuar escribiendo, vuelva a conectar la Huion si fuese necesario.',true);}
