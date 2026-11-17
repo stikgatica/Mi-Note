@@ -1,10 +1,11 @@
 // Carga el puente BLE antes del código de Mi Note; el navegador web no cambia.
 import { BleClient } from '@capacitor-community/bluetooth-le';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { createNativeBLE } from './ble-adapter.js';
 
 if (Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform()) {
   window.MiNoteNativeBLE = createNativeBLE(BleClient);
+  window.MiNotePrivateBackup = registerPlugin('PrivateBackup');
 } else {
   console.warn('Este paquete Android necesita ejecutarse con Capacitor nativo.');
 }
