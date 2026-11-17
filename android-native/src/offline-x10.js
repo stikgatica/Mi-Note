@@ -261,7 +261,12 @@
     // Ask 0x88 for a small sample to see if retransmission restores more data.
     // This is read-only. Never replace a good packet with a sparser reply.
     const liveCount=p=>decodePacket(p).filter(v=>v.pen_down).length;
-    const sparseFrame=ordered.length>=8&&ordered.every(p=>liveCount(p)===1);
+    const paddedFrame=p=>p.length===126&&liveCount(p)===1&&
+      decodePacket(p).slice(1).every(v=>!v.x&&!v.y&&!v.press);
+    // Real anomaly: 20 point slots, only the first populated. Short packets
+    // carrying one legitimate point are NOT evidence of this firmware issue.
+    const sparseFrame=ordered.length>=8&&
+      ordered.filter(p=>paddedFrame(p)).length>=Math.ceil(ordered.length*.8);
     if(sparseFrame){
      const selected=[...new Set([1,Math.max(1,Math.floor(total/2)),total])];
      const checkResult={tested:0,moreComplete:0,lateResponses:0,recovered:0};
