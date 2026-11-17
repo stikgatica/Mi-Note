@@ -115,6 +115,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          # La publicación final reemplaza artefactos de compilaciones previas de prueba.
+          if gh release view android-v0.10 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete android-v0.10 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          fi
           gh release create android-v0.10 signed/Mi-Note-X10-Android-v0.10.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title 'Mi Note X10 Android V0.10 — importar páginas guardadas' \
