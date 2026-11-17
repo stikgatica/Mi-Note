@@ -80,6 +80,17 @@ const x10Panel=[
  '</div></section>'
 ].join('\n');
 html=html.replace('<div class="mobile-actions-list">',x10Panel+'<div class="mobile-actions-list">');
+const libraryDialog=[
+ '<dialog id="floatingLibraryDialog" class="dialog floating-library-dialog" aria-labelledby="floatingLibraryTitle">',
+ '<div class="dialog-head"><h2 id="floatingLibraryTitle">Mis cuadernos</h2><button type="button" id="floatingLibraryClose" class="icon-btn" aria-label="Cerrar biblioteca">✕</button></div>',
+ '<div id="floatingLibraryItems" class="floating-library-items" role="list"></div>',
+ '<label class="field" for="floatingNewNotebookName">Nombre del nuevo cuaderno<input id="floatingNewNotebookName" maxlength="90" autocomplete="off" placeholder="Ej.: Matemática"></label>',
+ '<button id="floatingCreateNotebook" type="button" class="primary">＋ Crear cuaderno</button>',
+ '<p id="floatingLibraryStatus" role="status" aria-live="polite"></p>',
+ '</dialog>'
+].join('\n');
+html=html.replace('<div class="mobile-actions-list">','<div class="mobile-actions-list"><button id="floatingLibraryOpenMenu" type="button">▤ Mis cuadernos</button><button id="floatingNewNotebookMenu" type="button">＋ Nuevo cuaderno</button>');
+html=html.replace('</main>',libraryDialog+'\n</main>');
 const pageDialog=[
  '<dialog id="floatingPageDialog" class="dialog floating-page-dialog" aria-labelledby="floatingPageDialogTitle">',
  '<div class="dialog-head"><h2 id="floatingPageDialogTitle">Página 1 de 1</h2><button type="button" id="floatingPageClose" class="icon-btn" aria-label="Cerrar">✕</button></div>',
