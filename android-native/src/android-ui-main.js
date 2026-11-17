@@ -1,3 +1,6 @@
+import './mobile-ui.css';
+import './landscape-ui.css';
+import './floating-ui.css';
 // Un único punto de entrada Android: primero motor de Mi Note, luego la UI.
 const failures=[];
 async function load(moduleName,fn){
