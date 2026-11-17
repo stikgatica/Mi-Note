@@ -66,7 +66,7 @@ const newSave=[
 " inkSavePending=false;",
 " const waiting=inkSaveWaiting.splice(0),snapshot=clone(state);",
 " saveQueue=saveQueue.catch(()=>{}).then(()=>putSaved(snapshot)).then(()=>{",
-"  $('localStatus').textContent='● Guardado local';waiting.forEach(({resolve})=>resolve());",
+"  $('localStatus').textContent='● Guardado local';window.dispatchEvent(new Event('minote:changed'));waiting.forEach(({resolve})=>resolve());",
 " }).catch(err=>{",
 "  console.error(err);$('localStatus').textContent='⚠ Error de guardado';",
 "  notice('No se pudo guardar localmente. Exporta un respaldo.',true);",
@@ -83,6 +83,9 @@ const newSave=[
 "document.addEventListener('visibilitychange',()=>{if(document.hidden)void flushInkSave();});",
 "window.addEventListener('pagehide',()=>{void flushInkSave();});"
 ].join('\n');
-replace(oldSave,newSave,'guardar por lotes');
+const alreadyInstrumented=oldSave.replace("function persist(){const snapshot=clone(state);","function persist(){const snapshot=clone(state);queueMicrotask(()=>window.dispatchEvent(new Event('minote:changed')));");
+if(app.includes(alreadyInstrumented))replace(alreadyInstrumented,newSave,'guardar por lotes Android');
+else replace(oldSave,newSave,'guardar por lotes');
+
 await fs.writeFile(file,app);
 console.log('V0.20: overlay de tinta, rAF y guardado diferido 400ms.');
