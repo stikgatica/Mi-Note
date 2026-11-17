@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   release:
@@ -18,6 +19,14 @@ jobs:
       run:
         working-directory: android-native
     steps:
+      - name: Retirar inmediatamente artefacto antiguo que contenia clave de firma
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/14284037545" || {
+            echo "No se pudo confirmar la eliminacion de la clave antigua" >&2
+            exit 1
+          }
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -60,7 +69,6 @@ jobs:
             -alias minote-x10 -dname "CN=Mi Note X10 Android, OU=Private Project" \
             -keystore "$RUNNER_TEMP/minote-v02-release.jks" -storetype PKCS12 \
             -storepass "$PASSWORD" -keypass "$PASSWORD"
-          printf '%s' "$PASSWORD" > "$RUNNER_TEMP/signing-password.txt"
           "$TOOLS/zipalign" -p -f 4 "$UNSIGNED" signed/unsigned-aligned.apk
           "$TOOLS/apksigner" sign --ks "$RUNNER_TEMP/minote-v02-release.jks" \
             --ks-key-alias minote-x10 --ks-pass "pass:$PASSWORD" \
@@ -68,10 +76,6 @@ jobs:
             signed/unsigned-aligned.apk
           "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.2.apk
           sha256sum signed/Mi-Note-X10-Android-v0.2.apk | tee signed/SHA256SUMS.txt
-          mkdir -p signing-backup
-          cp "$RUNNER_TEMP/minote-v02-release.jks" signing-backup/minote-v02-release.jks
-          cp "$RUNNER_TEMP/signing-password.txt" signing-backup/signing-password.txt
-          echo 'CONFIDENCIAL: Guarda la clave y contraseña fuera de GitHub. Necesarias para futuras versiones firmadas con la misma identidad.' > signing-backup/INSTRUCCIONES.txt
       - name: Verificar permisos del APK
         shell: bash
         run: |
@@ -90,21 +94,14 @@ jobs:
             android-native/signed/SHA256SUMS.txt
             android-native/signed/PERMISOS.txt
           if-no-files-found: error
-      - name: Respaldo PRIVADO de firma para futuras actualizaciones
-        uses: actions/upload-artifact@v4
-        with:
-          name: PRIVADO-clave-firma-Mi-Note-X10-v0.2
-          path: android-native/signing-backup/*
-          retention-days: 7
-          if-no-files-found: error
-      - name: Publicar descarga directa del APK
+      - name: Sustituir APK publicado por nueva firma no expuesta
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release create android-v0.2 signed/Mi-Note-X10-Android-v0.2.apk signed/SHA256SUMS.txt \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title 'Mi Note X10 Android V0.2 — prueba privada firmada' \
-            --notes 'APK Android firmado en modo release (sin depuración). Sin permiso Internet y sin sincronización Drive en este APK; respaldo automático desactivado. Bluetooth LE nativo y cuadernos locales. Esta versión NO ha superado auditoría independiente ni prueba con una X10 física; Play Protect puede seguir mostrando avisos por ser desarrollador nuevo. La firma privada solo se entrega como artefacto restringido del flujo por 7 días; guárdala fuera de GitHub para futuras actualizaciones. La firma es diferente de la V0.1: no instalar encima de la V0.1.' \
-            --prerelease --latest=false
+          set -euo pipefail
+          gh release upload android-v0.2 signed/Mi-Note-X10-Android-v0.2.apk signed/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit android-v0.2 --repo "$GITHUB_REPOSITORY" \
+            --notes 'Versión de prueba privada: APK release sin depuración. Firma ROTADA por precaución, sin publicar clave privada. Sin Internet ni Google Drive dentro de este APK; cuadernos locales y Bluetooth LE. No hay auditoría independiente ni prueba física X10 y Play Protect puede alertar. La firma se genera solo para esta compilación y NO puede recuperarse; para versiones futuras será necesario reinstalar, exportando respaldo JSON antes. Este APK NO puede actualizar V0.1 ni la V0.2 firmada previamente.' \
+            --prerelease
