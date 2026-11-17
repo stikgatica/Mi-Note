@@ -52,6 +52,7 @@ jobs:
           node scripts/assert-v016.mjs
           node scripts/assert-v017.mjs
           node scripts/assert-v018.mjs
+          # Validar selector sin expresiones regulares ambiguas en Node 22.
           npx vite build
           sed -i 's/Mi Note X10 Android V0.4/Mi Note X10 Android V0.18/g' dist/index.html
       - name: Crear Android y configurar privacidad
