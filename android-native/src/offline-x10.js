@@ -257,6 +257,42 @@
       '. No se importó ni borró esa hoja.');
     }
     const ordered=Array.from({length:total},(_,k)=>got.get(k+1));
+    // Some X10 firmware responds to 0x87 with 1 ink point + zero padding.
+    // Ask 0x88 for a small sample to see if retransmission restores more data.
+    // This is read-only. Never replace a good packet with a sparser reply.
+    const liveCount=p=>decodePacket(p).filter(v=>v.pen_down).length;
+    const sparseFrame=ordered.length>=8&&ordered.every(p=>liveCount(p)===1);
+    if(sparseFrame){
+     const selected=[...new Set([1,Math.max(1,Math.floor(total/2)),total])];
+     const checkResult={tested:0,moreComplete:0,lateResponses:0,recovered:0};
+     for(const seq of selected){
+      check(signal);
+      inbox.discard(0x88);
+      await connection.send(cmd(0x88,index&255,index>>8,seq&255,seq>>8));
+      try{
+       const answer=await inbox.waitAny([0x87,0x88],1000,p=>validPacket(p)&&u16(p,3)===seq);
+       checkResult.tested++;
+       if(liveCount(answer)>liveCount(ordered[seq-1])){
+        ordered[seq-1]=answer;checkResult.moreComplete++;checkResult.recovered++;
+       }
+      }catch{checkResult.lateResponses++;}
+     }
+     if(checkResult.moreComplete){
+      for(let seq=1;seq<=total&&seq<=1000;seq++){
+       if(selected.includes(seq))continue;
+       check(signal);
+       await connection.send(cmd(0x88,index&255,index>>8,seq&255,seq>>8));
+       try{
+        const answer=await inbox.waitAny([0x87,0x88],650,p=>validPacket(p)&&u16(p,3)===seq);
+        if(liveCount(answer)>liveCount(ordered[seq-1])){
+         ordered[seq-1]=answer;checkResult.recovered++;
+        }
+       }catch{}
+      }
+     }
+     entry.retransmitProbe=checkResult;
+     onProgress('Hoja '+index+': verificados '+selected.length+' paquetes con 0x88; '+checkResult.recovered+' se recibieron con más puntos de escritura. Sin borrar datos.');
+    }
     const result=decodePage(ordered,index,limits);
     entry.status=result.partial?'partial':result.strokes.length?'decodable':'undecodable';
     entry.strokes=result.strokes.length;
