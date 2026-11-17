@@ -10,6 +10,7 @@ const menu=[
 '<div class="dialog-head"><h2 id="mobileMoreTitle">Opciones del cuaderno</h2><button id="closeMobileMore" class="icon-btn" type="button" aria-label="Cerrar">✕</button></div>',
 '<div class="mobile-actions-list">',
 '<button type="button" id="replayOpen">▶ Reproducir escritura</button>',
+'<button type="button" id="personalBackupOpen">☁ Copia automática en Drive</button>',
 '<button type="button" data-action="pageNumber">Todas las hojas</button>',
 '<button type="button" data-action="renamePageBtn">Renombrar hoja</button>',
 '<button type="button" data-action="exportSvg">Exportar SVG</button>',
@@ -38,11 +39,12 @@ const replayDialog=[
 '<small>Los trazos se reproducen en orden. Para hojas antiguas, la duración es aproximada. La hoja original no se modifica.</small>',
 '</dialog>'
 ].join('\n');
-html=html.replace('</main>',menu+'\n'+replayDialog+'\n</main>');
+const personalDialog="<dialog id=\"personalBackupDialog\" class=\"dialog personal-backup-dialog\" aria-labelledby=\"personalBackupTitle\">\n<div class=\"dialog-head\"><h2 id=\"personalBackupTitle\">Copia privada en Drive</h2><button id=\"personalBackupClose\" class=\"icon-btn\" aria-label=\"Cerrar\">✕</button></div>\n<p>Seleccione Google Drive desde el selector de archivos de Android. Mi Note accederá únicamente al archivo que usted autorice.</p>\n<div class=\"personal-backup-actions\"><button id=\"personalBackupNew\" type=\"button\">Crear copia nueva</button><button id=\"personalBackupExisting\" type=\"button\">Vincular copia existente</button></div>\n<label class=\"field\">Contraseña de cifrado (mínimo 12 caracteres)<input id=\"personalBackupPassword\" type=\"password\" autocomplete=\"new-password\" minlength=\"12\"></label>\n<label class=\"field\">Repita la contraseña si crea una copia nueva<input id=\"personalBackupConfirm\" type=\"password\" autocomplete=\"new-password\" minlength=\"12\"></label>\n<div class=\"personal-backup-actions\"><button id=\"personalBackupUnlock\" type=\"button\" class=\"primary\">Activar copia cifrada</button><button id=\"personalBackupSync\" type=\"button\">Sincronizar ahora</button></div>\n<div id=\"personalBackupStatus\" class=\"x10-details\" role=\"status\" aria-live=\"polite\">Sin configurar</div>\n<button id=\"personalBackupUnlink\" type=\"button\" class=\"subtle\">Desvincular archivo</button>\n<small>La contraseña no se envía a Google. La clave de cifrado se protege en Android Keystore. La copia es un archivo cifrado; sin la contraseña no se podrá recuperar tras reinstalar. La sincronización funciona mientras la app está activa y puede quedar pendiente hasta que Google Drive suba el archivo. No se eliminan sus cuadernos locales.</small>\n</dialog>";
+html=html.replace('</main>',menu+'\n'+replayDialog+'\n'+personalDialog+'\n</main>');
 html=html.replace('</head>','<link rel="stylesheet" href="./mobile-ui.css">\n</head>');
-html=html.replace('</body>','<script type="module" src="./mobile-ui.js"></script>\n<script type="module" src="./replay.js"></script>\n</body>');
+html=html.replace('</body>','<script type="module" src="./mobile-ui.js"></script>\n<script type="module" src="./replay.js"></script>\n<script type="module" src="./personal-backup.js"></script>\n</body>');
 await fs.writeFile(path.join(stage,'index.html'),html);
-for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
+for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','personal-backup.js'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
 console.log('Mi Note Android V0.6 preparado: escritura principal y X10 directo');
 
 // Solo en el paquete Android: acceso seguro a una copia de la hoja actual.
@@ -50,5 +52,13 @@ const appFile=path.join(stage,'app.js');
 let app=await fs.readFile(appFile,'utf8');
 const replayHook="window.MiNoteReplaySnapshot=()=>({title:page().title,template:page().template,strokes:clone(page().strokes)});";
 if(!app.includes('start();'))throw Error('No se pudo registrar la lectura de la hoja');
-app=app.replace(/start\(\);\s*$/,match=>match+'\n'+replayHook+'\n');
+app=app.replace(/start\(\);\s*$/,match=>match+'\n'+replayHook+'\n'
+ +'window.MiNoteBackupSnapshot=()=>({schema:VERSION,notebooks:clone(state.notebooks),exportedAt:now()});\n'
+ +'window.MiNoteBackupMerge=(data)=>mergeBackup(data);\n');
+await fs.writeFile(appFile,app);
+
+if(!app.includes('minote:changed')){
+  app=app.replace("function persist(){const snapshot=clone(state);",
+    "function persist(){const snapshot=clone(state);queueMicrotask(()=>window.dispatchEvent(new Event('minote:changed')));");
+}
 await fs.writeFile(appFile,app);
