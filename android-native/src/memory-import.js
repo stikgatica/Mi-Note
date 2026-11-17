@@ -48,6 +48,9 @@ async function importMemory(){
   if(destination==='__new__'){
    const name=$('x10MemoryName').value.trim()||'Huion X10 · Memoria';
    destination=await api.createNotebook(name);
+   // Mantener el cuaderno recién creado como destino si falla un paquete:
+   // al reintentar no se generan cuadernos vacíos duplicados.
+   refresh();select.value=destination;updateNewField();
    info('Cuaderno creado. Iniciando lectura física…');
   }
   const result=await api.start({
