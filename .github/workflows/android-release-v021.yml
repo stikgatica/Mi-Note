@@ -60,6 +60,7 @@ jobs:
           node scripts/assert-v020.mjs
           node --check stage/library-v021.js
           node scripts/assert-v021.mjs
+          # Revision final de mejoras en trazos, guardado e interfaz.
           # Validar selector sin expresiones regulares ambiguas en Node 22.
           npx vite build
           sed -i 's/Mi Note X10 Android V0.4/Mi Note X10 Android V0.21/g' dist/index.html
