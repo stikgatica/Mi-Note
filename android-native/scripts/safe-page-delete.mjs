@@ -1,0 +1,10 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+const file=path.join(process.cwd(),'stage','app.js');
+let app=await fs.readFile(file,'utf8');
+const before=" $('deletePage').onclick=()=>{x10Flush();const nb=note();if(nb.pages.length<=1){notice('Un cuaderno debe conservar al menos una hoja.',true);return;}if(!confirm(\`¿Eliminar «\${page().title}»? Este cambio no se puede deshacer.\`))return;nb.pages=nb.pages.filter(x=>x.id!==page().id);state.activePageId=nb.pages.at(-1).id;render();persist();};";
+const after=" $('deletePage').onclick=()=>{x10Flush();const nb=note(),current=page();if(nb.pages.length<=1){notice('Un cuaderno debe conservar al menos una hoja.',true);return;}if(!confirm(\`¿Eliminar «\${current.title}»? Este cambio no se puede deshacer.\`))return;const index=nb.pages.findIndex(x=>x.id===current.id);if(index<0)throw Error('La hoja seleccionada ya no existe.');nb.pages.splice(index,1);undoState.delete(current.id);nb.updatedAt=now();state.activePageId=nb.pages[Math.min(index,nb.pages.length-1)].id;const dlg=$('pagesDialog');if(dlg.open)dlg.close();render();if(x10Connection?.connected)x10BindCurrent();persist();};";
+if(!app.includes(before))throw Error('La eliminación original cambió; no se modifica para evitar riesgos de datos.');
+app=app.replace(before,after);
+await fs.writeFile(file,app);
+console.log('Eliminación con selección de hoja vecina, confirmación y reconexión lógica X10 habilitada.');
