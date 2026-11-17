@@ -10,7 +10,9 @@ const toast=message=>{const note=get('tvBoardHint');if(note){note.textContent=me
 function updateSelection(){
  const layout=pageLayout();
  if(!layout||!orientation)return;
- orientation.value=layout.get().orientation;
+ const current=layout.get().orientation;
+ if(current==='landscape-ccw'){void selectOrientation('landscape-cw');return;}
+ orientation.value=current;
  document.body.dataset.pageOrientation=orientation.value;
  layout.repaint();
 }
@@ -23,7 +25,7 @@ async function selectOrientation(value){
 }
 orientation?.addEventListener('change',()=>{void selectOrientation(orientation.value);});
 document.addEventListener('minote:page-rendered',()=>{
- const layout=pageLayout();if(layout&&orientation)orientation.value=layout.get().orientation;
+ const layout=pageLayout();if(layout&&orientation){const value=layout.get().orientation;if(value==='landscape-ccw')void selectOrientation('landscape-cw');else orientation.value=value;}
 });
 async function fullscreenStart(){
  if(!document.fullscreenElement&&document.documentElement.requestFullscreen){
