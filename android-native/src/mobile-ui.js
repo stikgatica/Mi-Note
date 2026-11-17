@@ -1,6 +1,8 @@
 /* Mi Note Android v0.7: escritura primero; la PWA pública no cambia. */
 const $ = (id) => document.getElementById(id);
 function initMobileUi() {
+  // Identifica esta interfaz Android sin afectar la PWA pública.
+  document.body.classList.add('minote-android');
   const connect = $('x10OpenBtn');
   const direct = $('x10DirectConnect');
   const menu = $('mobileMoreDialog');
@@ -23,8 +25,8 @@ function initMobileUi() {
   }
   // Mantener el botón original, incluido su estado BLE. Cambiar solo su acción.
   // El selector Android se invoca SIN await ni diálogo intermediario.
-  connect.title = 'Conectar Huion X10 directamente';
-  connect.setAttribute('aria-label', 'Conectar Huion X10 directamente');
+  connect.title = 'Conectar Huion X10';
+  connect.setAttribute('aria-label', 'Conectar Huion X10');
   connect.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -34,7 +36,8 @@ function initMobileUi() {
   const originalParent = nav.parentElement;
   const marker = document.createComment('Paginador original Mi Note');
   originalParent.insertBefore(marker, nav);
-  const mobile = window.matchMedia('(max-width:700px)');
+  // En horizontal un teléfono puede superar 700px CSS: conservar siempre el paginador compacto.
+  const mobile = window.matchMedia('(max-width:700px), (orientation:landscape)');
   const nextPage = $('nextPage');
   const prevPage = $('prevPage');
   function placePager() {
