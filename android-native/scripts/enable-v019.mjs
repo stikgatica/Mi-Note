@@ -1,0 +1,12 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+const root=path.join(process.cwd(),'stage');
+const main=path.join(root,'android-ui-main.js');
+let c=await fs.readFile(main,'utf8');
+if(!c.includes("import './floating-ui.css';"))throw Error('V0.19: falta CSS flotante');
+c=c.replace("import './floating-ui.css';","import './floating-ui.css';\nimport './menu-v019.css';");
+const anchor="await load('biblioteca y navegación',()=>import('./library-page-ui.js'));";
+if(!c.includes(anchor))throw Error('V0.19: falta etapa de biblioteca');
+c=c.replace(anchor,anchor+"\nawait load('menú compacto',()=>import('./menu-v019.js'));");
+await fs.writeFile(main,c);
+console.log('V0.19: modo Proyectar retirado de opciones; menú organizado.');
