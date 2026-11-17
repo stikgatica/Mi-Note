@@ -1,0 +1,43 @@
+/* APK Mi Note X10 v0.6: diseño de escritura compacto, sin afectar PWA. */
+@media (max-width:700px) {
+ html,body {height:100%;overflow:hidden;}
+ .layout {height:100dvh;min-height:0;overflow:hidden;}
+ .main {height:100dvh;min-height:0;overflow:hidden;display:flex;flex-direction:column;background:#f2f4f8;}
+ .topbar {flex:0 0 auto;min-height:52px;padding:6px calc(10px + env(safe-area-inset-right,0px)) 6px calc(10px + env(safe-area-inset-left,0px));gap:5px;}
+ .topbar .left-head {flex:1 1 auto;min-width:0;gap:7px;}
+ .topbar .title-block {min-width:0;flex:1 1 auto;}
+ .topbar .title-block h1 {font-size:15px;max-width:100%;text-overflow:ellipsis;}
+ .topbar .title-block span {display:none;}
+ .topbar .head-actions {flex:0 0 auto;gap:4px;}
+ .topbar .head-actions button {min-height:40px;min-width:40px;padding:6px 9px;}
+ #settingsBtn,#installBtn {display:none!important;}
+ #x10DirectArea {display:none!important;}
+ #x10DirectArea[hidden] {display:none!important;}
+ .notice {display:none!important;}
+ .toolbar {flex:0 0 auto;display:flex;flex-wrap:nowrap;align-items:center;gap:4px;padding:5px 7px;max-height:52px;min-height:52px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none;}
+ .toolbar::-webkit-scrollbar {display:none;}
+ .toolbar .tool {flex:0 0 auto;min-width:39px;min-height:39px;padding:6px;font-size:22px;}
+ .toolbar .tool span {display:none;}
+ .toolbar .control-label {flex:0 0 auto;font-size:0;gap:0;min-height:39px;}
+ .toolbar .control-label input[type=color] {width:37px;height:37px;}
+ .toolbar .minote-width-control,.toolbar .minote-paper-control,#renamePageBtn,.toolbar .tool-separator {display:none!important;}
+ .workspace {flex:1 1 0;min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain;padding:0 0 6px;}
+ .page-top {display:none!important;}
+ .paper-shell {width:100%;max-width:none;margin:0;border:0;box-shadow:none;}
+ .paper-shell canvas {width:100%;display:block;aspect-ratio:5/7;touch-action:none;}
+ .bottom-actions {display:none!important;}
+ #mobilePageDock {flex:0 0 auto;height:50px;min-height:50px;background:#fff;display:flex;justify-content:center;align-items:center;border-top:1px solid #e1e7f0;padding-bottom:env(safe-area-inset-bottom,0px);}
+ #mobilePageDock .page-pager {background:transparent;border:0;padding:0;gap:3px;}
+ #mobilePageDock .page-pager button {height:37px;min-width:38px;width:auto;padding:0 8px;}
+ #mobilePageDock .page-number {min-width:40px;width:auto;font-size:16px;}
+ #mobileTotalPages {font-size:12px;color:#8390a0;min-width:29px;white-space:nowrap;}
+ .dialog {max-height:calc(100dvh - 28px - env(safe-area-inset-bottom,0px));overflow:auto;}
+ .mobile-actions-dialog {width:min(420px,calc(100vw - 24px));padding:16px;}
+ .mobile-actions-list {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;}
+ .mobile-actions-list button {min-height:46px;text-align:left;white-space:normal;}
+ .mobile-actions-dialog .field select,.mobile-actions-dialog .field input {width:100%;min-height:40px;}
+ .sidebar {padding-top:calc(12px + env(safe-area-inset-top,0px));}
+}
+@media (min-width:701px) {
+ #mobilePageDock,#mobileMoreBtn,#mobileMoreDialog {display:none!important;}
+}
