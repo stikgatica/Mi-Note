@@ -31,7 +31,16 @@ function initMobileUi() {
     direct.click();
   }, true);
 
-  dock.append(nav);
+  const originalParent = nav.parentElement;
+  const marker = document.createComment('Paginador original Mi Note');
+  originalParent.insertBefore(marker, nav);
+  const mobile = window.matchMedia('(max-width:700px)');
+  function placePager() {
+    if (mobile.matches) dock.insertBefore(nav, total);
+    else marker.parentNode?.insertBefore(nav, marker);
+  }
+  mobile.addEventListener?.('change', placePager);
+  placePager();
   nav.setAttribute('aria-label', 'Cambiar páginas');
   function refreshPages() {
     if (!total) return;
