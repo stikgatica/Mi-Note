@@ -10,6 +10,7 @@ const menu=[
 '<div class="dialog-head"><h2 id="mobileMoreTitle">Opciones del cuaderno</h2><button id="closeMobileMore" class="icon-btn" type="button" aria-label="Cerrar">✕</button></div>',
 '<div class="mobile-actions-list">',
 '<button type="button" id="replayOpen">▶ Reproducir escritura</button>',
+'<button type="button" id="x10MemoryOpen">▣ Importar memoria Huion X10</button>',
 '<button type="button" id="personalBackupOpen">☁ Copia automática en Drive</button>',
 '<button type="button" data-action="pageNumber">Todas las hojas</button>',
 '<button type="button" data-action="renamePageBtn">Renombrar hoja</button>',
@@ -39,12 +40,25 @@ const replayDialog=[
 '<small>Los trazos se reproducen en orden. Para hojas antiguas, la duración es aproximada. La hoja original no se modifica.</small>',
 '</dialog>'
 ].join('\n');
+
+const memoryDialog=[
+'<dialog id="x10MemoryDialog" class="dialog memory-import-dialog" aria-labelledby="x10MemoryTitle">',
+'<div class="dialog-head"><h2 id="x10MemoryTitle">Importar memoria Huion X10</h2><button type="button" id="x10MemoryClose" class="icon-btn" aria-label="Cerrar">✕</button></div>',
+'<p>Recupere las páginas que escribió con la Huion desconectada. No se eliminará ninguna hoja de la memoria física.</p>',
+'<label class="field">Guardar páginas en<select id="x10MemoryNotebook" aria-label="Cuaderno de destino"></select></label>',
+'<label id="x10MemoryNewNameWrap" class="field">Nombre del cuaderno nuevo<input id="x10MemoryName" type="text" maxlength="90" value="Huion X10 · Memoria"></label>',
+'<label class="field">PIN de la agenda, solo si lo pide<input id="x10MemoryPin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Opcional"></label>',
+'<div id="x10MemoryProgress" class="x10-details" role="status" aria-live="polite">Conecte la Huion antes de importar.</div>',
+'<div class="memory-import-actions"><button id="x10MemoryRun" type="button" class="primary">↓ Importar memoria</button><button id="x10MemoryCancel" type="button" disabled>Cancelar lectura</button></div>',
+'<small>Importación no destructiva. Se omiten páginas ya recuperadas. Las nuevas hojas se guardan localmente y entran en el respaldo cifrado de Drive si está configurado. La lectura del protocolo Bluetooth requiere validación con su Huion física.</small>',
+'</dialog>'
+].join('\n');
 const personalDialog="<dialog id=\"personalBackupDialog\" class=\"dialog personal-backup-dialog\" aria-labelledby=\"personalBackupTitle\">\n<div class=\"dialog-head\"><h2 id=\"personalBackupTitle\">Copia privada en Drive</h2><button id=\"personalBackupClose\" class=\"icon-btn\" aria-label=\"Cerrar\">✕</button></div>\n<p>Seleccione Google Drive desde el selector de archivos de Android. Mi Note accederá únicamente al archivo que usted autorice.</p>\n<div class=\"personal-backup-actions\"><button id=\"personalBackupNew\" type=\"button\">Crear copia nueva</button><button id=\"personalBackupExisting\" type=\"button\">Vincular copia existente</button></div>\n<label class=\"field\">Contraseña de cifrado (mínimo 12 caracteres)<input id=\"personalBackupPassword\" type=\"password\" autocomplete=\"new-password\" minlength=\"12\"></label>\n<label class=\"field\">Repita la contraseña si crea una copia nueva<input id=\"personalBackupConfirm\" type=\"password\" autocomplete=\"new-password\" minlength=\"12\"></label>\n<div class=\"personal-backup-actions\"><button id=\"personalBackupUnlock\" type=\"button\" class=\"primary\">Activar copia cifrada</button><button id=\"personalBackupSync\" type=\"button\">Sincronizar ahora</button></div>\n<div id=\"personalBackupStatus\" class=\"x10-details\" role=\"status\" aria-live=\"polite\">Sin configurar</div>\n<button id=\"personalBackupUnlink\" type=\"button\" class=\"subtle\">Desvincular archivo</button>\n<small>La contraseña no se envía a Google. La clave de cifrado se protege en Android Keystore. La copia es un archivo cifrado; sin la contraseña no se podrá recuperar tras reinstalar. La sincronización funciona mientras la app está activa y puede quedar pendiente hasta que Google Drive suba el archivo. No se eliminan sus cuadernos locales.</small>\n</dialog>";
-html=html.replace('</main>',menu+'\n'+replayDialog+'\n'+personalDialog+'\n</main>');
+html=html.replace('</main>',menu+'\n'+replayDialog+'\n'+personalDialog+'\n'+memoryDialog+'\n</main>');
 html=html.replace('</head>','<link rel="stylesheet" href="./mobile-ui.css">\n</head>');
-html=html.replace('</body>','<script type="module" src="./mobile-ui.js"></script>\n<script type="module" src="./replay.js"></script>\n<script type="module" src="./personal-backup.js"></script>\n</body>');
+html=html.replace('</body>','<script type="module" src="./mobile-ui.js"></script>\n<script type="module" src="./replay.js"></script>\n<script type="module" src="./personal-backup.js"></script>\n<script type="module" src="./memory-import.js"></script>\n</body>');
 await fs.writeFile(path.join(stage,'index.html'),html);
-for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','personal-backup.js'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
+for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','personal-backup.js','memory-import.js'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
 console.log('Mi Note Android V0.6 preparado: escritura principal y X10 directo');
 
 // Solo en el paquete Android: acceso seguro a una copia de la hoja actual.
