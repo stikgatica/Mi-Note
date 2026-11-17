@@ -19,6 +19,7 @@ jobs:
       run:
         working-directory: android-native
     steps:
+      - uses: actions/checkout@v4
       - name: Retirar inmediatamente artefacto antiguo que contenia clave de firma
         env:
           GH_TOKEN: ${{ github.token }}
@@ -27,7 +28,6 @@ jobs:
             echo "No se pudo confirmar la eliminacion de la clave antigua" >&2
             exit 1
           }
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
