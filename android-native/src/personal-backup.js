@@ -7,7 +7,10 @@ const el=id=>document.getElementById(id);
 const status=el('personalBackupStatus'),dialog=el('personalBackupDialog');
 let documentInfo=null;
 let key=null, salt=null, remoteSha=null, locked=false, working=Promise.resolve();
-let debounce=null, retry=false;
+let debounce=null;
+const shaKey=()=>documentInfo?.fingerprint?'minote_backup_sha_'+documentInfo.fingerprint:null;
+const savedSha=()=>shaKey()?localStorage.getItem(shaKey()):null;
+const storeSha=v=>{if(shaKey())localStorage.setItem(shaKey(),v);};
 const enc=new TextEncoder(),dec=new TextDecoder();
 const asBytes=b64=>Uint8Array.from(atob(b64),x=>x.charCodeAt(0));
 const asB64=bytes=>btoa(Array.from(bytes,x=>String.fromCharCode(x)).join(''));
@@ -58,7 +61,8 @@ async function sync(){
  const current=await native.read();
  if(current.empty&&remoteSha!==null&&remoteSha!==current.sha)throw Error('La copia remota fue vaciada. Revise el archivo antes de continuar.');
  let remote=null;
- if(!current.empty){
+ const changedRemotely=current.sha!==savedSha();
+ if(!current.empty&&changedRemotely){
   try{remote=await decryptEnvelope(JSON.parse(current.content),key);}
   catch(e){throw Error('La copia remota cambió o no pudo descifrarse: '+e.message);}
  }
@@ -73,6 +77,7 @@ async function sync(){
  const data=await encrypt(local);
  const result=await native.write({content:data,expectedSha:current.sha});
  remoteSha=result.sha;
+ storeSha(result.sha);
  locked=false;
  const when=new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
  setStatus('Copia cifrada actualizada · '+when+' · '+(documentInfo?.name??'Archivo de Drive'));
@@ -94,6 +99,7 @@ async function unlock(){
  const pass=password();
  if(raw.empty){
   if(pass.length<12)throw Error('La contraseña debe tener 12 caracteres como mínimo.');
+  if(pass!==el('personalBackupConfirm').value)throw Error('Las contraseñas no coinciden.');
   salt=crypto.getRandomValues(new Uint8Array(16));
   key=await derive(pass,salt);
  }else{
@@ -120,6 +126,7 @@ async function boot(){
   key=asBytes(saved.key);
   const r=await native.read();
   if(r.empty){locked=true;setStatus('El archivo está vacío. Abra la configuración e introduzca la contraseña.',true);return;}
+  remoteSha=savedSha();
   salt=asBytes(validateEnvelope(JSON.parse(r.content)).salt);
   await decryptEnvelope(JSON.parse(r.content),key);
   setStatus('Copia privada vinculada · comprobando actualizaciones…');
