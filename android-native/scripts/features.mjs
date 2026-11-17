@@ -39,10 +39,11 @@ async function x10ImportOfflinePage(result,destinationId){
  if(!result.strokes.length)throw Error('La hoja física '+result.page+' no contiene trazos decodificables. No se guardará una página vacía.');
  
  const imported=emptyPage(notebook.pages.length+1);
- imported.title='X10 · página física '+(result.page+1);
+ imported.title='X10 · página física '+(result.page+1)+(result.partial?' · MUESTRA PARCIAL':'');
  imported.template='plain';
  imported.huion={device:'Huion Note X10',physicalPage:result.page,digest:result.digest,
-   packetCount:result.packet_count,createdBy:'offline-read-only',readAt:now(),source:'internal-memory'};
+   packetCount:result.packet_count,partial:!!result.partial,partialReason:result.partialReason||null,sampleCount:result.sampleCount||null,
+   createdBy:'offline-read-only',readAt:now(),source:'internal-memory'};
  const limits={maxX:result.max_x,maxY:result.max_y,maxPressure:result.max_press};
  // El formato de la X10 entrega coordenadas absolutas de hoja A5.
  for(const source of result.strokes){
@@ -115,7 +116,7 @@ function setupX10PhysicalTools(){
      onProgress:notify,
      onPage:async result=>x10ImportOfflinePage(result,notebookId)
     });
-    notify('Importación terminada: '+result.imported+' páginas nuevas, '+result.duplicate+' repetidas y '+result.empty+' vacías. Sin borrado de memoria X10.');
+    notify('Importación terminada: '+result.imported+' páginas nuevas ('+(result.partialImported||0)+' muestras PARCIALES, no escritura reconstruida), '+result.duplicate+' repetidas y '+result.empty+' vacías. Sin borrado de memoria X10.');
     return result;
    }catch(err){
     notify('Importación interrumpida: '+err.message+'. Las páginas que sí se guardaron se conservan.');
