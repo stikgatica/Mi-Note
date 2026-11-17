@@ -1,0 +1,40 @@
+/* V0.19 — Menú más pequeño, sin mosaico de botones. */
+#tvBoardClose,#tvBoardToggle{display:none!important;}
+body.minote-android #mobileMoreDialog.mobile-actions-dialog{
+ width:min(460px,calc(100vw - 24px));max-height:calc(100dvh - 38px)!important;
+ padding:15px!important;border-radius:18px!important;overflow:auto!important;
+}
+body.minote-android #mobileMoreDialog .mobile-actions-list{
+ display:block!important;gap:0!important;
+}
+body.minote-android #mobileMoreDialog .minote-menu-group{
+ margin:7px 0;border:1px solid #d7e0e9;border-radius:12px;
+ overflow:hidden;background:#fff;
+}
+body.minote-android #mobileMoreDialog .minote-menu-group summary{
+ cursor:pointer;list-style:none;padding:14px 15px;
+ font-size:14px;font-weight:700;color:#20354d;
+ display:flex;justify-content:space-between;align-items:center;
+}
+body.minote-android #mobileMoreDialog .minote-menu-group summary::after{content:"⌄";font-size:19px;color:#637d96;}
+body.minote-android #mobileMoreDialog .minote-menu-group[open] summary::after{content:"⌃";}
+body.minote-android #mobileMoreDialog .minote-menu-group .minote-menu-rows{
+ display:flex!important;flex-direction:column!important;gap:0!important;padding:0 8px 7px!important;
+}
+body.minote-android #mobileMoreDialog .minote-menu-group button{
+ display:block!important;width:100%!important;min-height:43px!important;
+ padding:11px 13px!important;margin:0!important;
+ text-align:left!important;background:transparent!important;color:#29415d!important;
+ border:none!important;border-radius:8px!important;
+ font-size:13px!important;font-weight:500!important;
+}
+body.minote-android #mobileMoreDialog .minote-menu-group button+button{border-top:1px solid #edf1f5!important;}
+body.minote-android #mobileMoreDialog .minote-menu-group button:active{background:#e8f1ff!important;}
+body.minote-android #mobileMoreDialog #menuFullscreen{
+ display:block;width:100%;min-height:42px;margin-top:9px;
+ background:#243b57;color:white;border:none;border-radius:10px;font-size:13px;
+}
+body.minote-android #mobileMoreDialog .landscape-control{
+ padding:8px 12px!important;flex-wrap:wrap;
+}
+body.minote-android #mobileMoreDialog .floating-color-label{padding:8px 12px!important;}
