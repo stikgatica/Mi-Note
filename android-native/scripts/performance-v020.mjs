@@ -6,7 +6,7 @@ function replace(a,b,label){if(!app.includes(a))throw Error('V0.20 no encontró 
 const overlay=[
 "const liveCanvas=document.createElement('canvas');",
 "liveCanvas.id='minoteLiveInkCanvas';liveCanvas.setAttribute('aria-hidden','true');",
-"liveCanvas.style.cssText='position:absolute;inset:0;pointer-events:none;width:100%;height:100%;z-index:3';",
+"liveCanvas.style.cssText='position:absolute!important;inset:0!important;pointer-events:none!important;width:100%!important;height:100%!important;z-index:3!important;background:transparent!important;opacity:1!important;box-shadow:none!important;border:0!important;';",
 "canvas.parentElement.style.position='relative';canvas.after(liveCanvas);",
 "const liveCtx=liveCanvas.getContext('2d',{alpha:true});",
 "let liveQueue=[],liveFrame=0,livePageId=null,paintPending=0;",
