@@ -138,6 +138,37 @@ public class PrivateBackupPlugin extends Plugin {
     }catch(Exception e){call.reject("No se pudo guardar el diagnóstico: "+e.getMessage());}
   }
 
+  // Huion import: temporary, read-only Android SAF selection.
+  // Does not access encryption keys, Drive, or write back to the Huion source.
+  @PluginMethod public void openHuionArchive(PluginCall call){
+    Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+    intent.addCategory(Intent.CATEGORY_OPENABLE);
+    intent.setType("*/*");
+    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    startActivityForResult(call,intent,"huionArchiveChosen");
+  }
+  @ActivityCallback private void huionArchiveChosen(PluginCall call,ActivityResult response){
+    Intent data=response.getData();
+    if(response.getResultCode()!=Activity.RESULT_OK||data==null||data.getData()==null){
+      JSObject result=new JSObject();result.put("cancelled",true);call.resolve(result);return;
+    }
+    Uri uri=data.getData();String name=label(uri);
+    String suffix=name.toLowerCase(java.util.Locale.ROOT);
+    if(!suffix.endsWith(".ahn")&&!suffix.endsWith(".ahns")){
+      call.reject("Seleccione un archivo Huion .ahn o .ahns.");return;
+    }
+    try{
+      byte[] bytes=readBytes(uri);
+      if(bytes.length==0||bytes.length>16*1024*1024)
+        throw new IllegalStateException("Archivo Huion vacío o mayor a 16 MB.");
+      JSObject result=new JSObject();
+      result.put("cancelled",false);result.put("name",name);
+      result.put("base64",Base64.encodeToString(bytes,Base64.NO_WRAP));
+      result.put("bytes",bytes.length);
+      call.resolve(result);
+    }catch(Exception e){call.reject("No se pudo abrir el archivo Huion: "+e.getMessage());}
+  }
+
   @PluginMethod public void read(PluginCall call){
     Uri uri=linked();if(uri==null){call.reject("Debe seleccionar un respaldo.");return;}
     try{
