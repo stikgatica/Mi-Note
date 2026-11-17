@@ -1,0 +1,13 @@
+import fs from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const app=await fs.readFile('stage/app.js','utf8');
+const css=await fs.readFile('stage/floating-ui.css','utf8');
+assert(app.includes("liveCanvas.getContext('2d',{alpha:true})"),'La capa activa debe tener alpha');
+assert(app.includes('background:transparent!important'),'El overlay debe declarar transparencia explícita');
+assert(css.includes('canvas#minoteLiveInkCanvas'),'El selector de CSS debe distinguir el canvas de tinta');
+assert(css.includes('background:transparent!important'),'El CSS debe preservar transparencia');
+assert(css.includes('canvas#paper'),'La base debe ser el papel blanco');
+assert(app.includes('page().strokes.push(inStroke);inStroke=null;'),'El trazo terminado debe guardarse en la hoja');
+assert(app.includes('clearLive();paint();updatePage();'),'Al finalizar el trazo, pintar tinta persistida ANTES de guardar');
+assert(app.includes('pg.strokes.push(stroke);'),'La tinta X10 terminada debe guardarse');
+console.log('V0.22 OK: tinta visible sobre fondo transparente y persistencia de trazos.');
