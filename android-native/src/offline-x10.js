@@ -11,8 +11,8 @@
  const DEFAULT={maxX:28200,maxY:37400,maxPressure:8191};
  const pause=ms=>new Promise(r=>setTimeout(r,ms));
  function decodePacket(pkt){
-  if(pkt.length<12||pkt[0]!==0xcd||![0x87,0x88].includes(pkt[1])||pkt[2]!==0x7e)
-   throw Error('Paquete X10 de tinta no reconocido.');
+  if(pkt.length<6||pkt[0]!==0xcd||![0x87,0x88].includes(pkt[1])||pkt[2]!==pkt.length||((pkt.length-6)%6)!==0)
+   throw Error('Paquete X10 de tinta inválido o incompleto.');
   // Los puntos son bloques de 6 bytes por paquete; el último byte es checksum.
   const n=Math.floor((pkt.length-6)/6);
   const points=[];
@@ -133,9 +133,16 @@
     if(total===0){empty++;onProgress('Hoja física '+index+': vacía. Seguimos buscando…');continue;}
     if(total>15000)throw Error('La hoja física '+index+' declara '+total+' paquetes: límite seguro alcanzado.');
     const got=new Map();
-    const validPacket=p=>p.length>=12&&p[2]===0x7e&&u16(p,3)>=1&&u16(p,3)<=total;
+    const validPacket=p=>{
+     // El último paquete 0x87/0x88 suele ser más corto que los 126 bytes
+     // del stream. byte[2] declara la longitud REAL, no siempre 0x7E.
+     if(!p||p.length<6||p[0]!==0xcd||![0x87,0x88].includes(p[1]))return false;
+     if(p[2]!==p.length||((p.length-6)%6)!==0)return false;
+     const seq=u16(p,3);return seq>=1&&seq<=total;
+    };
     // Los paquetes pueden llegar fuera de orden, duplicados o con retraso.
     const deadline=Date.now()+Math.min(150000,16000+total*26);
+    let shortPacketCount=0;
     let lastSeen=false;
     while(got.size<total&&Date.now()<deadline){
      check(signal);
@@ -144,6 +151,7 @@
      catch{break;}
      const seq=u16(p,3);
      got.set(seq,p);
+     if(p.length<126)shortPacketCount++;
      if(seq===total){lastSeen=true;break;}
     }
     if(got.size<total){
@@ -157,7 +165,7 @@
       // Drenar paquetes 0x87 tardíos antes de retransmitir.
       for(const seq of missing){
        const late=inbox.buffer.findIndex(p=>p[1]===0x87&&validPacket(p)&&u16(p,3)===seq);
-       if(late>=0)got.set(seq,inbox.buffer.splice(late,1)[0]);
+       if(late>=0){const pkt=inbox.buffer.splice(late,1)[0];got.set(seq,pkt);if(pkt.length<126)shortPacketCount++;}
       }
       for(const seq of missing){
        if(got.has(seq))continue;
@@ -166,6 +174,7 @@
        try{
         const reply=await inbox.waitAny([0x87,0x88],2600,p=>validPacket(p)&&u16(p,3)===seq);
         got.set(seq,reply);
+        if(reply.length<126)shortPacketCount++;
        }catch{}
        // Pequeña pausa para no saturar BLE en páginas con muchos faltantes.
        if(!got.has(seq))await pause(80);
@@ -173,7 +182,16 @@
       if(got.size<total&&round<5)await pause(350+round*180);
      }
     }
-    if(got.size!==total)throw Error('Hoja física '+index+' incompleta ('+got.size+'/'+total+' paquetes). No se importó ni borró esa hoja.');
+    if(got.size!==total){
+     const missing=[];
+     for(let seq=1;seq<=total;seq++)if(!got.has(seq))missing.push(seq);
+     const nearby=inbox.buffer.filter(p=>(p[1]===0x87||p[1]===0x88)&&p.length>=5)
+      .slice(-8).map(p=>'#'+u16(p,3)+'('+p.length+'B)').join(', ');
+     throw Error('Hoja física '+index+' incompleta ('+got.size+'/'+total+' paquetes); faltan secuencias '
+      +missing.slice(0,16).join(', ')+(missing.length>16?'…':'')+
+      '. Paquetes cortos recibidos: '+shortPacketCount+'. Otros fragmentos: '+(nearby||'ninguno')+
+      '. No se importó ni borró esa hoja.');
+    }
     const ordered=Array.from({length:total},(_,k)=>got.get(k+1));
     const result=decodePage(ordered,index,limits);
     result.digest=await digestPackets(ordered,index);
