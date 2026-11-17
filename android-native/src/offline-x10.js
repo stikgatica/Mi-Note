@@ -48,7 +48,7 @@
    this.unsubscribe=conn.subscribeFrames(raw=>{
     const p=Uint8Array.from(raw);
     if(p.length<3||p[0]!==0xcd)return;
-    const i=this.waiters.findIndex(w=>w.op===p[1]&&(!w.test||w.test(p)));
+    const i=this.waiters.findIndex(w=>(w.op===null||w.op===p[1])&&(!w.test||w.test(p)));
     if(i>=0){const w=this.waiters.splice(i,1)[0];clearTimeout(w.timer);w.resolve(p);}
     else if([0x81,0x82,0x85,0x86,0x87,0x88,0x95].includes(p[1])){
      this.buffer.push(p);
@@ -57,14 +57,19 @@
    });
   }
   wait(op,timeout=5000,test=()=>true){
+   return this.waitAny([op],timeout,test);
+  }
+  waitAny(ops,timeout=5000,test=()=>true){
    if(this.closed)return Promise.reject(Error('Descarga cancelada.'));
-   const found=this.buffer.findIndex(p=>p[1]===op&&test(p));
+   const allowed=new Set(ops);
+   const matches=p=>allowed.has(p[1])&&test(p);
+   const found=this.buffer.findIndex(matches);
    if(found>=0)return Promise.resolve(this.buffer.splice(found,1)[0]);
    return new Promise((resolve,reject)=>{
-    const w={op,test,resolve,reject};
+    const w={op:null,test:matches,resolve,reject};
     w.timer=setTimeout(()=>{
      this.waiters=this.waiters.filter(x=>x!==w);
-     reject(Error('La Huion no respondió al comando '+op.toString(16).toUpperCase()+'.'));
+     reject(Error('La Huion no entregó el paquete solicitado dentro del plazo.'));
     },timeout);
     this.waiters.push(w);
    });
@@ -124,32 +129,45 @@
     const total=u16(countFrame,3);
     if(total===0){empty++;onProgress('Hoja física '+index+': vacía. Seguimos buscando…');continue;}
     if(total>15000)throw Error('La hoja física '+index+' declara '+total+' paquetes: límite seguro alcanzado.');
-    const got=new Map();let reachedLast=false;
-    const deadline=Date.now()+Math.min(90000,12000+total*14);
+    const got=new Map();
+    const validPacket=p=>p.length>=12&&p[2]===0x7e&&u16(p,3)>=1&&u16(p,3)<=total;
+    // Los paquetes pueden llegar fuera de orden, duplicados o con retraso.
+    const deadline=Date.now()+Math.min(150000,16000+total*26);
+    let lastSeen=false;
     while(got.size<total&&Date.now()<deadline){
      check(signal);
      let p;
-     try{p=await inbox.wait(0x87,Math.min(1600,Math.max(250,deadline-Date.now())),v=>v.length>=12&&v[2]===0x7e);}
+     try{p=await inbox.wait(0x87,Math.min(3500,Math.max(250,deadline-Date.now())),validPacket);}
      catch{break;}
      const seq=u16(p,3);
-     if(seq>=1&&seq<=total)got.set(seq,p);
-     if(seq===total){reachedLast=true;break;}
+     got.set(seq,p);
+     if(seq===total){lastSeen=true;break;}
     }
     if(got.size<total){
-     // No guardar páginas parciales: solicitar los faltantes por 0x88.
-     for(let round=0;round<3&&got.size<total;round++){
+     // GET_PAGE_PACKAGE 0x88: solicitar solo las secuencias faltantes.
+     // Esperar respuestas 0x88 y datos 0x87 tardíos, no descartar ninguna hoja parcial.
+     for(let round=0;round<6&&got.size<total;round++){
+      check(signal);
       const missing=[];
       for(let k=1;k<=total;k++)if(!got.has(k))missing.push(k);
-      onProgress('Hoja '+index+': recuperando '+missing.length+' paquetes faltantes…');
+      onProgress('Hoja '+index+': '+got.size+'/'+total+' paquetes. Reintentando '+missing.length+' pendientes ('+(round+1)+'/6)…');
+      // Drenar paquetes 0x87 tardíos antes de retransmitir.
       for(const seq of missing){
+       const late=inbox.buffer.findIndex(p=>p[1]===0x87&&validPacket(p)&&u16(p,3)===seq);
+       if(late>=0)got.set(seq,inbox.buffer.splice(late,1)[0]);
+      }
+      for(const seq of missing){
+       if(got.has(seq))continue;
        check(signal);
-       const old=got.get(seq);if(old)continue;
        await connection.send(cmd(0x88,index&255,index>>8,seq&255,seq>>8));
        try{
-        const frame=await inbox.wait(0x88,1300,p=>p.length>=12&&p[2]===0x7e&&u16(p,3)===seq);
-        got.set(seq,frame);
+        const reply=await inbox.waitAny([0x87,0x88],2600,p=>validPacket(p)&&u16(p,3)===seq);
+        got.set(seq,reply);
        }catch{}
+       // Pequeña pausa para no saturar BLE en páginas con muchos faltantes.
+       if(!got.has(seq))await pause(80);
       }
+      if(got.size<total&&round<5)await pause(350+round*180);
      }
     }
     if(got.size!==total)throw Error('Hoja física '+index+' incompleta ('+got.size+'/'+total+' paquetes). No se importó ni borró esa hoja.');
