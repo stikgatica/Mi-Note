@@ -216,3 +216,17 @@ body.minote-android.clean-notes dialog[open]{
  max-height:calc(100dvh - 24px)!important;
  overflow-y:auto!important;
 }
+
+/* V0.14: vista tipo proyección como interfaz PERMANENTE, no solamente al entrar TV. */
+body.minote-android.clean-notes,
+body.minote-android.clean-notes .layout,
+body.minote-android.clean-notes .main,
+body.minote-android.clean-notes:not(.tv-board) .workspace {
+ background:#101820!important;
+}
+body.minote-android.clean-notes:not(.tv-board) .paper-shell {
+ box-shadow:none!important;
+}
+body.minote-android.clean-notes #tvBoardToolbar.floating-bar:not([hidden]) {
+ display:flex!important;
+}
