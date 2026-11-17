@@ -144,7 +144,8 @@ function setupX10PhysicalTools(){
    pin:pin.value.trim(),
    onProgress:msg=>{status.textContent=msg;}
   }).catch(err=>{status.textContent='Importación interrumpida: '+err.message;});
- };}
+ };
+}
 `;
 js=js.replace(anchor,features+'\n'+anchor);
 const setupEnd='function setupX10(){';
