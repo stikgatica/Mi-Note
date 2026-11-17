@@ -46,7 +46,7 @@ test('importa páginas tras páginas vacías y nunca borra memoria X10',async()=
  const {connection,sent}=fake();
  const pages=[];
  const result=await download(connection,{onPage:async page=>{pages.push(page);return 'imported'}});
- assert.deepEqual([result.imported,result.empty,result.totalLogical],[1,2,3]);
+ assert.deepEqual([result.imported,result.empty,result.totalLogical,result.scanned],[1,15,3,16]);
  assert.equal(pages[0].page,1);
  assert.equal(pages[0].strokes.length,1);
  assert.match(pages[0].digest,/^[0-9a-f]{64}$/);
