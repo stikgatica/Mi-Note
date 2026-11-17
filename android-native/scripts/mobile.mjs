@@ -31,7 +31,7 @@ const menu=[
 // El botón auxiliar "Conectar directamente" era una solución temporal. Conservamos
 // su ID invisible para reutilizar el evento nativo Bluetooth del controlador principal,
 // pero nunca lo mostramos en horizontal, TV o pantallas grandes.
-html=html.replace(/<div id="x10DirectArea"[\\s\\S]*?<\\/div>/,
+html=html.replace(/<div id="x10DirectArea"[\s\S]*?<\/div>/,
   '<div id="x10DirectArea" hidden aria-hidden="true" style="display:none!important"><button id="x10DirectConnect" type="button" tabindex="-1">Conectar X10</button></div>');
 html=html.replace('aria-label="Opciones Huion Note X10"','aria-label="Conectar Huion X10"');
 html=html.replace('◌ X10</button><button id="settingsBtn"','◌ Conectar X10</button><button id="settingsBtn"');
