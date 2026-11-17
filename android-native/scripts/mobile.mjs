@@ -64,6 +64,32 @@ const memoryDialog=[
 const personalDialog="<dialog id=\"personalBackupDialog\" class=\"dialog personal-backup-dialog\" aria-labelledby=\"personalBackupTitle\">\n<div class=\"dialog-head\"><h2 id=\"personalBackupTitle\">Copia privada en Drive</h2><button id=\"personalBackupClose\" class=\"icon-btn\" aria-label=\"Cerrar\">✕</button></div>\n<p>Seleccione Google Drive desde el selector de archivos de Android. Mi Note accederá únicamente al archivo que usted autorice.</p>\n<div class=\"personal-backup-actions\"><button id=\"personalBackupNew\" type=\"button\">Crear copia nueva</button><button id=\"personalBackupExisting\" type=\"button\">Vincular copia existente</button></div>\n<label class=\"field\">Contraseña de cifrado (mínimo 12 caracteres)<input id=\"personalBackupPassword\" type=\"password\" autocomplete=\"new-password\" minlength=\"12\"></label>\n<label class=\"field\">Repita la contraseña si crea una copia nueva<input id=\"personalBackupConfirm\" type=\"password\" autocomplete=\"new-password\" minlength=\"12\"></label>\n<div class=\"personal-backup-actions\"><button id=\"personalBackupUnlock\" type=\"button\" class=\"primary\">Activar copia cifrada</button><button id=\"personalBackupSync\" type=\"button\">Sincronizar ahora</button></div>\n<div id=\"personalBackupStatus\" class=\"x10-details\" role=\"status\" aria-live=\"polite\">Sin configurar</div>\n<button id=\"personalBackupUnlink\" type=\"button\" class=\"subtle\">Desvincular archivo</button>\n<small>La contraseña no se envía a Google. La clave de cifrado se protege en Android Keystore. La copia es un archivo cifrado; sin la contraseña no se podrá recuperar tras reinstalar. La sincronización funciona mientras la app está activa y puede quedar pendiente hasta que Google Drive suba el archivo. No se eliminan sus cuadernos locales.</small>\n</dialog>";
 const projectionToolbar="<div id=\"tvBoardToolbar\" hidden aria-label=\"Controles de pizarra\">\n<button id=\"tvBoardPen\" type=\"button\" title=\"Lápiz\" aria-label=\"Lápiz\">✎</button>\n<button id=\"tvBoardErase\" type=\"button\" title=\"Borrador\" aria-label=\"Borrador\">⌫</button>\n<button id=\"tvBoardUndo\" type=\"button\" title=\"Deshacer\" aria-label=\"Deshacer\">↶</button>\n<button id=\"tvBoardPrev\" type=\"button\" title=\"Página anterior\" aria-label=\"Página anterior\">‹</button>\n<button id=\"tvBoardNext\" type=\"button\" title=\"Página siguiente\" aria-label=\"Página siguiente\">›</button>\n<button id=\"tvBoardOrientation\" type=\"button\" title=\"Girar hoja\" aria-label=\"Girar hoja\">⤾</button>\n<button id=\"tvBoardFullscreen\" type=\"button\" title=\"Pantalla completa\" aria-label=\"Pantalla completa\">⛶</button>\n<button id=\"tvBoardMore\" type=\"button\" title=\"Opciones\" aria-label=\"Opciones\">⋮</button>\n<button id=\"tvBoardClose\" type=\"button\" title=\"Salir de proyección\" aria-label=\"Salir de pizarra\">✕</button>\n</div>\n<div id=\"tvBoardHint\" hidden role=\"status\"></div>";
 html=html.replace('</main>',menu+'\n'+replayDialog+'\n'+personalDialog+'\n'+memoryDialog+'\n'+projectionToolbar+'\n</main>');
+// V0.15: controles esenciales visibles incluso antes de cargar módulos JS.
+const pageCounter='<button id="floatingPageNumber" class="floating-page-counter" type="button" title="Ver páginas o eliminar hoja" aria-label="Página 1 de 1. Administrar hoja">1 / 1</button>';
+if(!html.includes('<button id="tvBoardNext"'))throw Error('Barra flotante sin botón siguiente');
+html=html.replace('<button id="tvBoardNext"',pageCounter+'<button id="tvBoardNext"');
+const x10Quick='<button id="floatingX10Quick" class="floating-x10-button" type="button" title="Conectar o ver estado Huion X10" aria-label="X10 desconectada. Conectar"><span id="floatingX10QuickDot" class="x10-status-dot" aria-hidden="true"></span>X10</button>';
+html=html.replace('<button id="tvBoardMore"',x10Quick+'<button id="tvBoardMore"');
+const x10Panel=[
+ '<section id="floatingX10Panel" class="floating-x10-panel" aria-label="Huion X10">',
+ '<div id="floatingX10Indicator" class="floating-x10-indicator" role="status"><span id="floatingX10MenuDot" class="x10-status-dot" aria-hidden="true"></span><strong id="floatingX10Label">Huion X10 · Desconectada</strong></div>',
+ '<div class="floating-x10-controls">',
+ '<button type="button" id="floatingX10ConnectNow">Conectar X10</button>',
+ '<button type="button" id="floatingX10DisconnectNow" disabled>Desconectar</button>',
+ '<button type="button" id="floatingX10ViewStatus">Ver estado</button>',
+ '</div></section>'
+].join('\n');
+html=html.replace('<div class="mobile-actions-list">',x10Panel+'<div class="mobile-actions-list">');
+const pageDialog=[
+ '<dialog id="floatingPageDialog" class="dialog floating-page-dialog" aria-labelledby="floatingPageDialogTitle">',
+ '<div class="dialog-head"><h2 id="floatingPageDialogTitle">Página 1 de 1</h2><button type="button" id="floatingPageClose" class="icon-btn" aria-label="Cerrar">✕</button></div>',
+ '<p>Seleccione una acción para la hoja actual.</p>',
+ '<button type="button" id="floatingPageGo">▤ Ir a otra hoja…</button>',
+ '<button type="button" id="floatingPageDelete" class="delete-page">Eliminar hoja actual</button>',
+ '<small id="floatingPageHint">La eliminación necesita confirmación y no se puede deshacer.</small>',
+ '</dialog>'
+].join('\n');
+html=html.replace('</main>',pageDialog+'\n</main>');
 if(!html.includes('<body>'))throw Error('Falta la etiqueta body Android');
 html=html.replace('<body>','<body class="minote-android clean-notes">');
 // El botón flotante está visible desde el HTML (sin depender del módulo JS).
