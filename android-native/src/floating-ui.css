@@ -356,3 +356,25 @@ body.minote-android.clean-notes .floating-page-item{
 body.minote-android.clean-notes .floating-page-item[aria-current="page"]{
  border-color:#5c91d4;background:#e5efff;font-weight:650;
 }
+
+/* V0.22 REGRESIÓN TINTA: el canvas superior es TRANSPARENTE.
+   La regla general .paper-shell canvas{background:white} ocultaba el lienzo.
+   Se aplica por ID, al final de la cascada y con prioridad explícita. */
+body.minote-android.clean-notes .paper-shell canvas#minoteLiveInkCanvas,
+body.minote-android .paper-shell #minoteLiveInkCanvas {
+ background:transparent!important;
+ position:absolute!important;
+ inset:0!important;
+ width:100%!important;
+ height:100%!important;
+ pointer-events:none!important;
+ touch-action:none!important;
+ z-index:3!important;
+ border:0!important;
+ box-shadow:none!important;
+}
+body.minote-android.clean-notes .paper-shell canvas#paper {
+ background:#fff!important;
+ position:relative!important;
+ z-index:1!important;
+}
