@@ -66,6 +66,8 @@ const projectionToolbar="<div id=\"tvBoardToolbar\" hidden aria-label=\"Controle
 html=html.replace('</main>',menu+'\n'+replayDialog+'\n'+personalDialog+'\n'+memoryDialog+'\n'+projectionToolbar+'\n</main>');
 if(!html.includes('<body>'))throw Error('Falta la etiqueta body Android');
 html=html.replace('<body>','<body class="minote-android clean-notes">');
+// El botón flotante está visible desde el HTML (sin depender del módulo JS).
+html=html.replace('id="tvBoardToolbar" hidden','id="tvBoardToolbar" class="floating-bar"');
 html=html.replace('</head>','<link rel="stylesheet" href="./mobile-ui.css">\n<link rel="stylesheet" href="./landscape-ui.css">\n<link rel=\"stylesheet\" href=\"./floating-ui.css\">\n</head>');
 html=html.replace('</body>','<script type="module" src="./mobile-ui.js"></script>\n<script type="module" src="./replay.js"></script>\n<script type="module" src="./personal-backup.js"></script>\n<script type="module" src="./memory-import.js"></script>\n<script type="module" src="./landscape-ui.js"></script>\n<script type=\"module\" src=\"./floating-ui.js\"></script>\n</body>');
 await fs.writeFile(path.join(stage,'index.html'),html);
