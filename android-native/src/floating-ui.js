@@ -183,7 +183,6 @@ handle.addEventListener('pointercancel',stopMove);
 function syncMode(){
  toolbar.hidden=false;
  closeTv.hidden=!document.body.classList.contains('tv-board');
- if(!document.body.classList.contains('tv-board'))document.body.classList.remove('library-open');
  refresh();
  requestAnimationFrame(()=>place(true));
 }
