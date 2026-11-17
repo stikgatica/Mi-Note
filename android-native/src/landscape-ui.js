@@ -5,7 +5,8 @@ const toolbar=get('tvBoardToolbar');
 let tvMode=false;
 let previousOrientation=null;
 const pageLayout=()=>window.MiNotePageLayout;
-const toast=message=>{const note=get('tvBoardHint');if(note){note.textContent=message;note.hidden=false;}};
+let hintTimer=null;
+const toast=message=>{const note=get('tvBoardHint');if(note){note.textContent=message;note.hidden=false;clearTimeout(hintTimer);hintTimer=setTimeout(()=>{note.hidden=true;},5200);}};
 function updateSelection(){
  const layout=pageLayout();
  if(!layout||!orientation)return;
@@ -47,9 +48,12 @@ async function toggleTv(next){
  tvMode=next;
  if(tvMode){
   previousOrientation=pageLayout()?.get()?.orientation||'portrait';
-  if(previousOrientation==='portrait')await selectOrientation('landscape-cw');
+  // Pedir pantalla completa inmediatamente durante el gesto del usuario.
+  // Evitar await antes de requestFullscreen, o Android puede rechazarlo.
+  const entering=fullscreenStart();
   updateTvLabel();
-  await fullscreenStart();
+  if(previousOrientation==='portrait')await selectOrientation('landscape-cw');
+  await entering;
  }else{
   await fullscreenStop();
   updateTvLabel();
