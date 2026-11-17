@@ -4,6 +4,9 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
   const SERVICE = '0000ffe0-0000-1000-8000-00805f9b34fb';
   const DATA = '0000ffe1-0000-1000-8000-00805f9b34fb';
   const CMD = '0000ffe2-0000-1000-8000-00805f9b34fb';
+  const BATTERY_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb';
+  const BATTERY_LEVEL = '00002a19-0000-1000-8000-00805f9b34fb';
+  const normalizeUuid = uuid => {const s=String(uuid||'').toLowerCase().replace(/^0x/,'');return /^[a-f0-9]{4}$/.test(s)?`0000${s}-0000-1000-8000-00805f9b34fb`:s;};
   const devices = new Map();
   let initialization = null;
 
@@ -72,14 +75,15 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
       },
       async getPrimaryService(uuid) {
         if (!gatt.connected) throw Error('La Huion está desconectada.');
-        const resolved = serviceInfo.find(s => s.uuid?.toLowerCase() === uuid.toLowerCase());
-        if (serviceInfo.length && !resolved) throw Error('No se encontró el servicio X10 FFE0.');
+        const resolved = serviceInfo.find(s => normalizeUuid(s.uuid) === normalizeUuid(uuid));
+        if (serviceInfo.length && !resolved) throw Error('Servicio Bluetooth no disponible: '+uuid);
         return {
           async getCharacteristic(charUuid) {
-            const key = charUuid.toLowerCase();
+            const key = normalizeUuid(charUuid);
             if (chars.has(key)) return chars.get(key);
-            const entry = resolved?.characteristics?.find(c => c.uuid?.toLowerCase() === key);
+            const entry = resolved?.characteristics?.find(c => normalizeUuid(c.uuid) === key);
             const props = entry?.properties || (key === DATA ? { notify: true } :
+              key === BATTERY_LEVEL ? { read: true } :
               { write: true, writeWithoutResponse: true, indicate: true, notify: true });
             const ev = emitter();
             const characteristic = {
@@ -88,6 +92,10 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
               value: null,
               addEventListener: ev.addEventListener,
               removeEventListener: ev.removeEventListener,
+              async readValue() {
+                if(!gatt.connected) throw Error('La Huion X10 no está conectada.');
+                return view(await BleClient.read(id, uuid, charUuid));
+              },
               async startNotifications() {
                 await BleClient.startNotifications(id, uuid, charUuid, data => {
                   characteristic.value = view(data);
@@ -139,7 +147,7 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
       // No filtrar por nombre ni servicio: la X10 puede anunciarse de maneras
       // diferentes antes de establecer la conexión GATT.
       const options = {
-        optionalServices: [SERVICE],
+        optionalServices: [SERVICE, BATTERY_SERVICE],
         scanMode: 2, // Android SCAN_MODE_LOW_LATENCY
         allowExtendedAdvertising: true
       };
