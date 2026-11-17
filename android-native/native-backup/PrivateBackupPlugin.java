@@ -103,6 +103,41 @@ public class PrivateBackupPlugin extends Plugin {
       JSObject v=new JSObject();v.put("cancelled",false);v.put("name",label(uri));call.resolve(v);
     }catch(Exception e){call.reject("No se pudo conservar el permiso de archivo: "+e.getMessage());}
   }
+  // Diagnóstico local X10: el usuario selecciona un documento mediante Android SAF.
+  // No reutiliza ni modifica el respaldo cifrado de Mi Note.
+  @PluginMethod public void saveDiagnostic(PluginCall call) {
+    String content=call.getString("content");
+    if(content==null||content.isEmpty()||content.getBytes(StandardCharsets.UTF_8).length>2*1024*1024){
+      call.reject("El diagnóstico está vacío o supera el límite local de 2 MB.");return;
+    }
+    Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+    intent.addCategory(Intent.CATEGORY_OPENABLE);
+    intent.setType("application/json");
+    intent.putExtra(Intent.EXTRA_TITLE,"MiNote_X10_diagnostico_local.json");
+    intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+    startActivityForResult(call,intent,"diagnosticChosen");
+  }
+  @ActivityCallback private void diagnosticChosen(PluginCall call,ActivityResult response){
+    Intent data=response.getData();
+    if(response.getResultCode()!=Activity.RESULT_OK||data==null||data.getData()==null){
+      JSObject result=new JSObject();result.put("cancelled",true);call.resolve(result);return;
+    }
+    String content=call.getString("content");
+    if(content==null){call.reject("No están disponibles los datos de diagnóstico.");return;}
+    byte[] bytes=content.getBytes(StandardCharsets.UTF_8);
+    if(bytes.length>2*1024*1024){call.reject("Diagnóstico demasiado grande.");return;}
+    try(OutputStream out=getContext().getContentResolver().openOutputStream(data.getData(),"w")){
+      if(out==null)throw new IllegalStateException("Android no pudo abrir el destino para escritura.");
+      out.write(bytes);out.flush();
+      JSObject result=new JSObject();
+      result.put("cancelled",false);
+      result.put("saved",true);
+      result.put("name",label(data.getData()));
+      result.put("bytes",bytes.length);
+      call.resolve(result);
+    }catch(Exception e){call.reject("No se pudo guardar el diagnóstico: "+e.getMessage());}
+  }
+
   @PluginMethod public void read(PluginCall call){
     Uri uri=linked();if(uri==null){call.reject("Debe seleccionar un respaldo.");return;}
     try{
