@@ -16,7 +16,7 @@ function simulatedX10(){
    if(op===0x81){emit(frame(0x81,6,1,2,3));emit(frame(0x82,4,1));}
    if(op===0x95)emit(frame(0x95,11,40,110,0,24,146,0,255,31));
    if(op===0x85)emit(frame(0x85,5,0,0));
-   if(op===0x86){emit(frame(0x86,5,34,0));for(let i=1;i<=34;i++)if(i!==33)emit(point(0x87,i));}
+   if(op===0x86){const index=bytes[3]|bytes[4]<<8;emit(frame(0x86,5,index===0?34:0,0));if(index===0)for(let i=1;i<=34;i++)if(i!==33)emit(point(0x87,i));}
    if(op===0x88&&bytes[5]===33)emit(point(0x88,33));
   }
  };
@@ -44,7 +44,7 @@ test('acepta el último paquete 0x87 corto y lo cuenta como uno de 43',async()=>
    if(op===0x81){emit(frame(0x81,6,1,2,3));emit(frame(0x82,4,1));}
    if(op===0x95)emit(frame(0x95,11,40,110,0,24,146,0,255,31));
    if(op===0x85)emit(frame(0x85,5,0,0));
-   if(op===0x86){emit(frame(0x86,5,43,0));for(let seq=1;seq<=43;seq++)emit(point(0x87,seq));}
+   if(op===0x86){const index=bytes[3]|bytes[4]<<8;emit(frame(0x86,5,index===0?43:0,0));if(index===0)for(let seq=1;seq<=43;seq++)emit(point(0x87,seq));}
   }
  };
  const imported=[];
