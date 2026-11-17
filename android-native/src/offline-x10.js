@@ -10,6 +10,34 @@
  const u24=(v,i)=>v[i]|v[i+1]<<8|v[i+2]<<16;
  const DEFAULT={maxX:28200,maxY:37400,maxPressure:8191};
  const pause=ms=>new Promise(r=>setTimeout(r,ms));
+ let lastDiagnostic=null;
+ const hex=bytes=>Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('');
+ function getLastDiagnostic(includeRaw=false){
+  if(!lastDiagnostic)return null;
+  const snapshot=JSON.parse(JSON.stringify(lastDiagnostic));
+  if(!includeRaw)for(const p of snapshot.pages)delete p.rawSampleHex;
+  return snapshot;
+ }
+ function pointStatistics(packets,limits){
+  const statuses=Array(8).fill(0);let points=0,penDown=0,withPressure=0,validCoords=0;
+  let run=0,maxRun=0,visibleRuns=0,penDownWithPressure=0;
+  for(const packet of packets)for(const p of decodePacket(packet)){
+   points++;
+   if(p.pen_down){penDown++;run++;maxRun=Math.max(maxRun,run);}
+   else {if(run>1)visibleRuns++;run=0;}
+   if(p.press>0)withPressure++;
+   if(p.press>0&&p.pen_down)penDownWithPressure++;
+   if(p.x<=limits.maxX&&p.y<=limits.maxY)validCoords++;
+  }
+  if(run>1)visibleRuns++;
+  // Status is also summarized directly from the sixth byte of each record.
+  for(const packet of packets){
+   const n=Math.floor((packet.length-6)/6);
+   for(let k=0;k<n;k++)statuses[packet[10+k*6]>>5]++;
+  }
+  return {points,penDown,withPressure,penDownWithPressure,validCoords,maxConsecutiveActivePoints:maxRun,estimatedStrokes:visibleRuns,statuses};
+ }
+
  function decodePacket(pkt){
   if(pkt.length<6||pkt[0]!==0xcd||![0x87,0x88].includes(pkt[1])||pkt[2]!==pkt.length||((pkt.length-6)%6)!==0)
    throw Error('Paquete X10 de tinta inválido o incompleto.');
@@ -93,6 +121,8 @@
   if(connection.batteryTimer){clearInterval(connection.batteryTimer);connection.batteryTimer=null;}
   const inbox=new Inbox(connection);
   let imported=0,empty=0,duplicate=0,undecodable=0,noReply=0;
+  const diagnostic={format:'MiNoteX10OfflineDiagnostic',version:1,startedAt:new Date().toISOString(),cursor:null,scanEnd:null,limits:null,pages:[],result:null,error:null};
+  lastDiagnostic=diagnostic;
   try{
    onProgress('Iniciando modo agenda y lectura local, sin borrar páginas…');
    check(signal);
@@ -124,11 +154,14 @@
    // El firmware puede conservar páginas vacías iniciales y escribir en índices 7+.
    // Consultar un mínimo acotado de 16 índices si 0x85 informa un contador bajo.
    const scanEnd=Math.min(maxPages-1,Math.max(lastIndex,15));
+   diagnostic.cursor=lastIndex;diagnostic.scanEnd=scanEnd;diagnostic.limits=limits;
    await connection.send(cmd(0x96,1,3));await pause(60);
    await connection.send(cmd(0x96,3,2));await pause(60);
    onProgress('Indicador X10: '+lastIndex+'. Explorando índices físicos 0 a '+scanEnd+' (incluidos vacíos), sin eliminar datos…');
    for(let index=0;index<=scanEnd;index++){
     check(signal);
+    const entry={index,status:'checking'};
+    diagnostic.pages.push(entry);
     inbox.discard(0x86);inbox.discard(0x87);inbox.discard(0x88);
     await connection.send(cmd(0x86,index&255,index>>8,0,0));
     let countFrame;
@@ -136,12 +169,12 @@
      countFrame=await inbox.wait(0x86,index<=lastIndex?10000:2100,p=>p.length>=5&&p[2]===5);
     }catch(error){
      if(index<=lastIndex)throw error;
-     noReply++;
+     noReply++;entry.status='no-response';
      onProgress('Índice '+index+': sin respuesta adicional; continuamos sin modificar la X10.');
      continue;
     }
-    const total=u16(countFrame,3);
-    if(total===0){empty++;onProgress('Hoja física '+index+': vacía. Seguimos buscando…');continue;}
+    const total=u16(countFrame,3);entry.packetCount=total;
+    if(total===0){entry.status='empty';empty++;onProgress('Hoja física '+index+': vacía. Seguimos buscando…');continue;}
     if(total>15000)throw Error('La hoja física '+index+' declara '+total+' paquetes: límite seguro alcanzado.');
     const got=new Map();
     const validPacket=p=>{
@@ -194,6 +227,7 @@
      }
     }
     if(got.size!==total){
+     entry.status='incomplete';entry.receivedPackets=got.size;
      const missing=[];
      for(let seq=1;seq<=total;seq++)if(!got.has(seq))missing.push(seq);
      const nearby=inbox.buffer.filter(p=>(p[1]===0x87||p[1]===0x88)&&p.length>=5)
@@ -205,6 +239,16 @@
     }
     const ordered=Array.from({length:total},(_,k)=>got.get(k+1));
     const result=decodePage(ordered,index,limits);
+    entry.status=result.strokes.length?'decodable':'undecodable';
+    entry.strokes=result.strokes.length;
+    entry.receivedPackets=ordered.length;
+    entry.stats=pointStatistics(ordered,limits);
+    if(!result.strokes.length){
+     // La muestra cruda permanece solamente en memoria hasta que el usuario
+     // confirme su exportación explícita; puede contener escritura personal.
+     const sampled=[...ordered.slice(0,12),...ordered.slice(-2)];
+     entry.rawSampleHex=[...new Set(sampled.map(hex))];
+    } 
     if(!result.strokes.length){
      // Paquetes sin tinta decodificable no deben ocultar páginas posteriores.
      // Nunca guardar hojas vacías ni borrarlas de la memoria física.
@@ -218,19 +262,24 @@
     result.digest=await digestPackets(ordered,index);
     result.packet_count=total;
     const outcome=await onPage(result);
-    if(outcome==='duplicate')duplicate++;else imported++;
+    if(outcome==='duplicate'){duplicate++;entry.status='duplicate';}else {imported++;entry.status='imported';}
     onProgress('Hoja física '+index+': '+result.strokes.length+' trazos; '+(outcome==='duplicate'?'ya estaba guardada':'guardada localmente')+'.');
    }
    if(imported===0&&duplicate===0)
     throw Error('Se revisaron los índices 0 a '+scanEnd+' sin encontrar tinta importable: '+empty+' vacíos, '+undecodable+' con paquetes sin trazos y '+noReply+' sin respuesta. La memoria X10 NO se modificó. No borre las páginas con Huion Note.');
+   diagnostic.result={imported,duplicate,empty,undecodable,noReply};
    onProgress('Lectura terminada: '+imported+' hojas nuevas, '+duplicate+' repetidas, '+empty+' vacías, '+undecodable+' sin trazos y '+noReply+' sin respuesta. X10 intacta.');
    return {imported,duplicate,empty,undecodable,noReply,scanned:scanEnd+1,totalLogical:lastIndex+1};
+  }catch(error){
+   diagnostic.error=error?.message||String(error);
+   throw error;
   }finally{
+   diagnostic.endedAt=new Date().toISOString();
    inbox.close();connection.offlineReading=false;
    if(connection.connected){connection.startKeepalive();if(hadBatteryPolling)connection.startBatteryPolling?.();}
   }
  }
- const api={download,decodePacket,decodePage,cmd};
+ const api={download,decodePacket,decodePage,cmd,getLastDiagnostic};
  root.MiNoteX10Offline=api;
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
