@@ -299,6 +299,16 @@
      onProgress('Hoja '+index+': verificados '+selected.length+' paquetes con 0x88; '+checkResult.recovered+' se recibieron con más puntos de escritura. Sin borrar datos.');
     }
     const result=decodePage(ordered,index,limits);
+    // A richer retransmission can restore some strokes without repairing the
+    // other zero-padded packets. Preserve their authentic single-point marks;
+    // do not mislabel an incomplete page as fully reconstructed.
+    const residual=ordered.filter(p=>paddedFrame(p)).map(p=>decodePacket(p)[0]);
+    if(!result.partial&&residual.length>=8){
+     result.strokes.push(...residual.map(p=>[p]));
+     result.partial=true;
+     result.partialReason='mixed-retransmission-and-sparse';
+     result.sampleCount=residual.length;
+    }
     entry.status=result.partial?'partial':result.strokes.length?'decodable':'undecodable';
     entry.strokes=result.strokes.length;
     entry.partial=!!result.partial;
