@@ -1,0 +1,12 @@
+import fs from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const root='stage/';
+const [boot,html]=await Promise.all([fs.readFile(root+'android-ui-main.js','utf8'),fs.readFile(root+'index.html','utf8')]);
+assert(boot.includes("import './menu-v019.css'"));
+assert(boot.includes("import('./menu-v019.js')"));
+assert(html.includes('id="mobileMoreDialog"'));
+const js=await fs.readFile(root+'menu-v019.js','utf8');
+assert(js.includes("document.getElementById('tvBoardToggle')?.remove()"));
+assert(js.includes("document.getElementById('tvBoardClose')?.remove()"));
+assert(js.includes("minote-menu-group"));
+console.log('OK V0.19: modo de proyección oculto y menú simplificado.');
