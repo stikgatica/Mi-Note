@@ -162,3 +162,5 @@
 #x10MemoryProgress[data-warning="true"] {background:#fff1f1;border-color:#f2c5c5;color:#942f37;}
 .memory-import-dialog small {display:block;margin-top:13px;color:#607189;line-height:1.5;font-size:11px;}
 @media(max-width:700px) {.memory-import-dialog {max-height:calc(100dvh - max(54px,env(safe-area-inset-top,0px)) - max(40px,env(safe-area-inset-bottom,0px)));}}
+
+#x10MemoryNewNameWrap[hidden]{display:none!important;}
