@@ -3,12 +3,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'x10-ble.js'
-      - 'styles.css'
-      - 'app.js'
-      - 'index.html'
-      - 'android-native/**'
-      - '.github/workflows/android-release-v011.yml'
+      - '.github/workflows/android-release-v012.yml'
   workflow_dispatch:
 
 permissions:
