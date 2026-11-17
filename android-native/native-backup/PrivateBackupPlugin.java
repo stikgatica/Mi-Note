@@ -69,6 +69,7 @@ public class PrivateBackupPlugin extends Plugin {
     result.put("linked",uri!=null);
     if(uri!=null){
       result.put("name",label(uri));
+      try{result.put("fingerprint",digest(uri.toString().getBytes(StandardCharsets.UTF_8)));}catch(Exception ignored){}
       result.put("canRead",getContext().getContentResolver().getPersistedUriPermissions().stream().anyMatch(p->p.getUri().equals(uri)&&p.isReadPermission()));
       result.put("canWrite",getContext().getContentResolver().getPersistedUriPermissions().stream().anyMatch(p->p.getUri().equals(uri)&&p.isWritePermission()));
     }
