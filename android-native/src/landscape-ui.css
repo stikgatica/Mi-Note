@@ -259,3 +259,12 @@ body.minote-android.tv-board #tvBoardToolbar:not([hidden]) {
 body.minote-android.tv-board #mobileMoreDialog[open]{
  display:block!important;z-index:500!important;
 }
+
+/* V0.41: la orientación visible proviene del viewport, no de un selector manual.
+   Las coordenadas 1000×1400 de la agenda y el giro landscape-cw no cambian. */
+body.minote-android.clean-notes .paper-shell[data-orientation="portrait"]{
+ aspect-ratio:5/7!important;
+}
+body.minote-android.clean-notes .paper-shell[data-orientation="landscape-cw"]{
+ aspect-ratio:7/5!important;
+}
