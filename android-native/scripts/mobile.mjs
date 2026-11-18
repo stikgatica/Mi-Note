@@ -58,7 +58,7 @@ const memoryDialog=[
 '<label class="field">PIN de la agenda, solo si lo pide<input id="x10MemoryPin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Opcional"></label>',
 '<p class="x10-import-info">Se utilizará automáticamente el método de recuperación de la agenda que funciona con su Huion X10.</p>',
 '<div id="x10MemoryProgress" class="x10-details" role="status" aria-live="polite">Conecte la Huion antes de importar.</div>',
-'<div class="memory-import-actions"><button id="x10MemoryRun" type="button" class="primary">↓ Importar memoria</button><button id="x10MemoryCancel" type="button" disabled>Cancelar lectura</button></div>',
+'<div class="memory-import-actions"><button id="x10MemoryRun" type="button" class="primary">↓ Importar memoria</button><button id="x10MemoryCancel" type="button" disabled>Cancelar lectura</button><button id="x10MemoryResumeDrawing" type="button">✎ Continuar escribiendo</button></div>',
 
 '<small>Importación no destructiva. Se omiten páginas ya recuperadas. Las nuevas hojas se guardan localmente y entran en el respaldo cifrado de Drive si está configurado. La recuperación directa por Bluetooth se ha validado con la Huion X10.</small>',
 '</dialog>'
