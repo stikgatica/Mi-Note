@@ -173,7 +173,8 @@
   const hadBatteryPolling=!!connection.batteryTimer;
   if(connection.batteryTimer){clearInterval(connection.batteryTimer);connection.batteryTimer=null;}
   const inbox=new Inbox(connection);
-  let imported=0,partialImported=0,empty=0,duplicate=0,undecodable=0,noReply=0;
+  let imported=0,partialImported=0,empty=0,duplicate=0,undecodable=0,noReply=0,incomplete=0,revised=0;
+  const pendingIndices=[];
   const t0=Date.now();
   const diagnostic={
    format:'MiNoteX10OfflineDiagnostic',version:2,startedAt:new Date().toISOString(),
@@ -181,7 +182,7 @@
    tabletCommandsSentBeforeDownload:!!connection.tabletCommandsSent,
    officialHandshake:!!officialHandshake,
    mtu:null,deviceName:null,
-   cursor:null,scanEnd:null,limits:null,commandLog:[],pages:[],result:null,error:null
+   cursor:null,scanEnd:null,limits:null,phase:'initializing',pendingIndices,commandLog:[],pages:[],result:null,error:null
   };
   lastDiagnostic=diagnostic;
   const sendCmd=async bytes=>{
@@ -193,9 +194,11 @@
    if(typeof connection.getMtu==='function'){
     try{diagnostic.mtu=await connection.getMtu();}catch{}
    }
+   diagnostic.phase='challenge';
    onProgress('Iniciando modo agenda y lectura local, sin borrar páginas…');
    check(signal);
    await sendCmd(cmd(0x81));
+   diagnostic.phase='authorization';
    const challenge=await inbox.wait(0x81,8000,p=>p.length>=6);
    // El manejador de la conexión responde a 0x81 con 0x82.
    const auth=await inbox.wait(0x82,8000,p=>p.length>=4);
@@ -209,12 +212,14 @@
     if(second[3]!==1)throw Error('PIN rechazado por la Huion.');
    }else if(auth[3]!==1)throw Error('La X10 rechazó el acceso al modo agenda ('+auth[3]+').');
    check(signal);
+   diagnostic.phase='dimensions';
    inbox.discard(0x95);
    await sendCmd(cmd(0x95));
    const info=await inbox.wait(0x95,6000,p=>p.length>=11);
    const limits={maxX:u24(info,3),maxY:u24(info,6),maxPressure:u16(info,9)||8191};
    if(limits.maxX<2000||limits.maxY<2000||limits.maxX>100000||limits.maxY>100000)
     throw Error('Dimensiones físicas X10 inválidas.');
+   diagnostic.phase='page-count';
    inbox.discard(0x85);
    await sendCmd(cmd(0x85));
    const countReply=await inbox.wait(0x85,6000,p=>p.length>=5);
@@ -238,23 +243,43 @@
     await sendCmd(cmd(0x8d,1,0,0,0));
     await pause(80);
    }
+   diagnostic.phase='reading-pages';
    onProgress('Indicador X10: '+lastIndex+'. Explorando índices físicos 0 a '+scanEnd+' (incluidos vacíos), sin eliminar datos…');
    for(let index=0;index<=scanEnd;index++){
     check(signal);
     const entry={index,status:'checking'};
     diagnostic.pages.push(entry);
     inbox.discard(0x86);inbox.discard(0x87);inbox.discard(0x88);
+   let countFrame;
+   // Reintentar una sola vez la consulta de índices físicos informados por X10.
+   // No se reinicia la importación ni se modifican las páginas.
+   const attempts=index<=lastIndex?2:1;
+   for(let attempt=0;attempt<attempts;attempt++){
+    check(signal);
     await sendCmd(cmd(0x86,index&255,index>>8,0,0));
-    let countFrame;
     try{
      countFrame=await inbox.wait(0x86,index<=lastIndex?10000:2100,p=>p.length>=5&&p[2]===5);
+     break;
     }catch(error){
-     if(index<=lastIndex)throw error;
+     if(!connection.connected)throw Error('Se perdió la conexión Bluetooth con X10. Los datos guardados se conservan.');
+     check(signal);
+     if(attempt+1<attempts){
+      onProgress('Hoja física '+index+': aún sin respuesta. Reintentando consulta…');
+      await pause(350);
+     }
+    }
+   }
+   if(!countFrame){
+    if(index<=lastIndex){
+     incomplete++;pendingIndices.push(index);entry.status='pending-no-response';
+     onProgress('Hoja física '+index+': pendiente de lectura. Se continuarán las demás; podrá recuperarse después.');
+    }else{
      noReply++;entry.status='no-response';
      onProgress('Índice '+index+': sin respuesta adicional; continuamos sin modificar la X10.');
-     continue;
     }
-    const total=u16(countFrame,3);entry.packetCount=total;
+    continue;
+   }
+   const total=u16(countFrame,3);entry.packetCount=total;
     if(total===0){entry.status='empty';empty++;onProgress('Hoja física '+index+': vacía. Seguimos buscando…');continue;}
     if(total>15000)throw Error('La hoja física '+index+' declara '+total+' paquetes: límite seguro alcanzado.');
     const got=new Map();
@@ -313,10 +338,11 @@
      for(let seq=1;seq<=total;seq++)if(!got.has(seq))missing.push(seq);
      const nearby=inbox.buffer.filter(p=>(p[1]===0x87||p[1]===0x88)&&p.length>=5)
       .slice(-8).map(p=>'#'+u16(p,3)+'('+p.length+'B)').join(', ');
-     throw Error('Hoja física '+index+' incompleta ('+got.size+'/'+total+' paquetes); faltan secuencias '
-      +missing.slice(0,16).join(', ')+(missing.length>16?'…':'')+
-      '. Paquetes cortos recibidos: '+shortPacketCount+'. Otros fragmentos: '+(nearby||'ninguno')+
-      '. No se importó ni borró esa hoja.');
+     incomplete++;pendingIndices.push(index);
+     entry.missingCount=missing.length;entry.missingSequences=missing.slice(0,16);
+     onProgress('Hoja física '+index+' pendiente: '+got.size+'/'+total+' paquetes, '+missing.length+
+      ' faltantes. No se importó ni borró; continuamos con las otras hojas.');
+     continue;
     }
     const ordered=Array.from({length:total},(_,k)=>got.get(k+1));
     // Some X10 firmware responds to 0x87 with 1 ink point + zero padding.
@@ -410,16 +436,17 @@
     result.packet_count=total;
     const outcome=await onPage(result);
     if(outcome==='duplicate'){duplicate++;entry.status='duplicate';}
-    else {imported++;if(result.partial)partialImported++;entry.status=result.partial?'partial-imported':'imported';}
+    else {imported++;if(outcome==='version')revised++;if(result.partial)partialImported++;entry.status=result.partial?'partial-imported':'imported';}
     onProgress(result.partial
      ?'Hoja física '+index+': guardadas '+result.sampleCount+' MARCAS AISLADAS como muestra parcial. NO es la escritura completa; no se unieron puntos ni se borró la X10.'
-     :'Hoja física '+index+': '+result.strokes.length+' trazos; '+(outcome==='duplicate'?'ya estaba guardada':'guardada localmente')+'.');
+     :'Hoja física '+index+': '+result.strokes.length+' trazos; '+(outcome==='duplicate'?'ya estaba guardada':outcome==='version'?'nueva versión conservando la anterior':'guardada localmente')+'.');
    }
    if(imported===0&&duplicate===0)
-    throw Error('Se revisaron los índices 0 a '+scanEnd+' sin encontrar tinta importable: '+empty+' vacíos, '+undecodable+' con paquetes sin trazos y '+noReply+' sin respuesta. La memoria X10 NO se modificó. No borre las páginas con Huion Note.');
-   diagnostic.result={imported,partialImported,duplicate,empty,undecodable,noReply};
-   onProgress('Lectura terminada: '+imported+' hojas nuevas ('+partialImported+' con muestras PARCIALES), '+duplicate+' repetidas, '+empty+' vacías, '+undecodable+' sin trazos y '+noReply+' sin respuesta. X10 intacta.');
-   return {imported,partialImported,duplicate,empty,undecodable,noReply,scanned:scanEnd+1,totalLogical:lastIndex+1};
+    throw Error('Se revisaron los índices 0 a '+scanEnd+' sin encontrar tinta importable: '+empty+' vacíos, '+incomplete+' pendientes, '+undecodable+' sin trazos y '+noReply+' sin respuesta adicional. La memoria X10 NO se modificó. No borre las páginas con Huion Note.');
+   diagnostic.phase='completed';
+   diagnostic.result={imported,partialImported,duplicate,revised,empty,undecodable,noReply,incomplete,pendingIndices:[...pendingIndices]};
+   onProgress('Lectura terminada: '+imported+' hojas guardadas ('+revised+' versiones nuevas, '+partialImported+' parciales), '+duplicate+' repetidas, '+incomplete+' pendientes y '+empty+' vacías. X10 intacta.');
+   return {imported,partialImported,duplicate,revised,empty,undecodable,noReply,incomplete,pendingIndices:[...pendingIndices],scanned:scanEnd+1,totalLogical:lastIndex+1};
   }catch(error){
    diagnostic.error=error?.message||String(error);
    throw error;
