@@ -378,3 +378,15 @@ body.minote-android.clean-notes .paper-shell canvas#paper {
  position:relative!important;
  z-index:1!important;
 }
+
+
+/* V0.32: único control X10, texto completo legible en agenda y televisión. */
+body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick{
+ min-width:112px!important;max-width:none!important;padding:5px 9px!important;
+ font-size:12px!important;white-space:nowrap!important;
+}
+body.minote-android #tvBoardToolbar.floating-bar.floating-vertical #floatingX10Quick{
+ min-width:0!important;max-width:70px!important;white-space:normal!important;
+ font-size:11px!important;line-height:1.1!important;
+}
+body.minote-android #x10Dialog{max-width:min(440px,95vw);}
