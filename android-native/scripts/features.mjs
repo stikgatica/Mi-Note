@@ -78,6 +78,20 @@ async function x10ImportOfflinePage(result,destinationId){
  await persist();
  return hasPreviousVersion?'version':'imported';
 }
+async function x10ResumeCurrentPage(onProgress=()=>{}){
+ if(!x10Connection?.connected)throw Error('X10 desconectada. Pulse X10 para reconectar antes de escribir.');
+ if(x10Connection.offlineReading)throw Error('La importación todavía está utilizando la conexión X10.');
+ onProgress('Preparando escritura en la hoja actualmente abierta…');
+ if(x10Connection.sessionKind!=='tableta'||x10Connection.mode==='agenda'||x10Connection.mode==='agenda-pura'){
+  await x10Connection.reconnectTabletOnly();
+ }
+ // Se vincula después de reconectar, para no perder la selección cuando la
+ // aplicación acaba de agregar hojas importadas al cuaderno de destino.
+ x10BindCurrent();
+ const snapshot=window.MiNoteAndroidActions?.snapshot?.();
+ onProgress('Lápiz X10 activo en '+(snapshot?'hoja '+snapshot.index+' de '+snapshot.total:'la hoja abierta')+'. Puede seguir escribiendo en la agenda.');
+ return snapshot;
+}
 function setupX10PhysicalTools(){
  if(!window.MiNoteNativeBLE)return;
  const listen=$('x10ListenPage'),sync=$('x10OfflineDownload'),restore=$('x10RestorePen');
@@ -100,7 +114,7 @@ function setupX10PhysicalTools(){
    return nb.id;
   },
   cancel(){if(x10DownloadController)x10DownloadController.abort();},
-  restore:()=>{if(!x10Connection?.connected)throw Error('Conecte primero la Huion X10.');return x10Connection.probeTablet();},
+  restore:()=>x10ResumeCurrentPage(message=>{status.textContent=message;}),
   async start({notebookId,pin:pinCode='',onProgress=()=>{}}={}){
    if(!x10Connection?.connected)throw Error('Primero conecte la Huion X10 desde el botón superior.');
    if(!window.MiNoteX10Offline)throw Error('El lector de memoria física X10 no está disponible.');
@@ -155,7 +169,18 @@ function setupX10PhysicalTools(){
     notify('Importación interrumpida: '+err.message+'. Las páginas que sí se guardaron se conservan.');
     throw err;
    }finally{
+    // La lectura terminó (con éxito, parcial o cancelada). Evitar dejar la
+    // tableta en agenda-pura: reabrir Data Ink sobre la hoja digital visible.
     x10DownloadController=null;
+    if(x10Connection?.connected){
+     try{await x10ResumeCurrentPage(notify);}
+     catch(resumeError){
+      notify('Las páginas recuperadas están guardadas. Para seguir escribiendo, pulse X10 y reconecte: '+resumeError.message);
+      x10Log('No se pudo volver a Data Ink: '+resumeError.message);
+     }
+    }else{
+     notify('Importación cerrada. X10 desconectada: pulse X10 para volver a escribir.');
+    }
     sync.disabled=false;listen.disabled=false;restore.disabled=false;cancel.hidden=true;cancel.disabled=false;
     pin.value='';
     x10Details();
@@ -174,8 +199,7 @@ function setupX10PhysicalTools(){
   if(!x10Connection?.connected){status.textContent='Conecta primero la X10.';return;}
   try{
    if(x10DownloadController)throw Error('Termina la lectura antes de activar la escritura.');
-   await x10Connection.probeTablet();
-   status.textContent='Modo escritura en vivo solicitado. Haz un trazo sobre la agenda.';
+   await x10ResumeCurrentPage(message=>{status.textContent=message;});
   }catch(e){status.textContent='No se pudo restaurar la escritura: '+e.message;}
  };
  cancel.onclick=()=>{x10DownloadController?.abort();cancel.disabled=true;status.textContent='Cancelando después del paquete en curso…';};
