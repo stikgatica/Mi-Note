@@ -35,16 +35,18 @@ async function x10ImportOfflinePage(result,destinationId){
  if(!result?.digest||!Array.isArray(result.strokes))throw Error('La página X10 no tiene un formato válido.');
  const notebook=state.notebooks.find(n=>n.id===destinationId);
  if(!notebook)throw Error('El cuaderno de destino ya no existe. No se importó esta página.');
- if(state.notebooks.some(n=>n.pages.some(p=>p.huion?.digest===result.digest&&p.huion?.physicalPage===result.page)))
-  return 'duplicate';
+ const existingPages=state.notebooks.flatMap(n=>n.pages).filter(p=>p.huion?.source==='internal-memory'&&p.huion?.physicalPage===result.page);
+ if(existingPages.some(p=>p.huion?.digest===result.digest))return 'duplicate';
+ // Un mismo índice físico puede contener contenido nuevo. Preservar la versión previa.
+ const hasPreviousVersion=existingPages.length>0;
  if(!result.strokes.length)throw Error('La hoja física '+result.page+' no contiene trazos decodificables. No se guardará una página vacía.');
  
  const imported=emptyPage(notebook.pages.length+1);
- imported.title='X10 · página física '+(result.page+1)+(result.partial?' · MUESTRA PARCIAL':'');
+ imported.title='X10 · página física '+(result.page+1)+(hasPreviousVersion?' · nueva versión':'')+(result.partial?' · MUESTRA PARCIAL':'');
  imported.template='plain';
  imported.huion={device:'Huion Note X10',physicalPage:result.page,digest:result.digest,
    packetCount:result.packet_count,partial:!!result.partial,partialReason:result.partialReason||null,sampleCount:result.sampleCount||null,
-   createdBy:'offline-read-only',readAt:now(),source:'internal-memory'};
+   createdBy:'offline-read-only',readAt:now(),source:'internal-memory',previousVersions:existingPages.length};
  const limits={maxX:result.max_x,maxY:result.max_y,maxPressure:result.max_press};
  // El formato de la X10 entrega coordenadas absolutas de hoja A5.
  for(const source of result.strokes){
@@ -74,7 +76,7 @@ async function x10ImportOfflinePage(result,destinationId){
  render();
  // El guardado normal emitirá el evento de sincronización de Drive.
  await persist();
- return 'imported';
+ return hasPreviousVersion?'version':'imported';
 }
 function setupX10PhysicalTools(){
  if(!window.MiNoteNativeBLE)return;
@@ -138,7 +140,8 @@ function setupX10PhysicalTools(){
      // repetir una importación que ya ha podido guardar trazos.
      const diagnostic=MiNoteX10Offline.getLastDiagnostic?.(false);
      const startupTimeout=/La Huion no entregó el paquete solicitado dentro del plazo/i.test(firstError?.message||'')
-      && Array.isArray(diagnostic?.pages)&&diagnostic.pages.length===0;
+      && Array.isArray(diagnostic?.pages)&&diagnostic.pages.length===0
+      && ['challenge','authorization','dimensions','page-count'].includes(diagnostic?.phase);
      if(!startupTimeout||controller.signal.aborted||!x10Connection.connected)throw firstError;
      notify('La X10 aún está activando el modo agenda. Reintentando automáticamente en la misma conexión, sin borrar páginas…');
      await new Promise(resolve=>setTimeout(resolve,1100));
@@ -146,7 +149,7 @@ function setupX10PhysicalTools(){
      // Reenvía la secuencia oficial 81/82/95/85; NO desconecta ni manda 8B/8C.
      result=await MiNoteX10Offline.download(x10Connection,options);
     }
-    notify('Importación terminada: '+result.imported+' páginas nuevas ('+(result.partialImported||0)+' muestras PARCIALES, no escritura reconstruida), '+result.duplicate+' repetidas y '+result.empty+' vacías. Sin borrado de memoria X10.');
+    notify('Importación terminada: '+result.imported+' guardadas ('+result.revised+' versiones nuevas, '+result.partialImported+' parciales), '+result.duplicate+' repetidas, '+result.incomplete+' pendientes, '+result.empty+' vacías. Sin borrado de memoria X10.');
     return result;
    }catch(err){
     notify('Importación interrumpida: '+err.message+'. Las páginas que sí se guardaron se conservan.');
