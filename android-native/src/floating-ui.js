@@ -14,7 +14,7 @@ const getBool=(key,fallback=false)=>{
  const value=localStorage.getItem(storage+key);return value===null?fallback:value==='1';
 };
 const saveBool=(key,value)=>localStorage.setItem(storage+key,value?'1':'0');
-let axis=getBool('vertical')?'vertical':'horizontal';
+let axis=window.innerWidth>window.innerHeight?'vertical':'horizontal';
 let locked=getBool('locked');
 let minimized=getBool('minimized');
 let idleTimer=null,move=null;
@@ -46,13 +46,15 @@ const menuButton=(id,text,handler)=>{
  });return b;
 };
 menuButton('floatingLibraryMenu','▤ Biblioteca de cuadernos',()=>openLibrary());
-const axisButton=menuButton('floatingAxisMenu','↕ Barra vertical / horizontal',()=>setAxis(axis==='horizontal'?'vertical':'horizontal'));
 const lockButton=menuButton('floatingLockMenu','◌ Bloquear posición de la barra',()=>setLocked(!locked));
 const colorLabel=document.createElement('label');colorLabel.className='floating-color-label field';
 colorLabel.textContent='Color del lápiz';
 const color=document.createElement('input');color.type='color';color.id='floatingPenColor';
-color.value=$('penColor')?.value||'#153f82';
-color.setAttribute('aria-label','Color del lápiz');colorLabel.append(color);panel.append(colorLabel);
+color.value=$('penColor')?.value||'#000000';
+color.setAttribute('aria-label','Color del lápiz');colorLabel.append(color);
+// Ajuste visible justo debajo del grosor, fuera de cualquier sección del menú.
+const widthField=$('mobilePenWidth')?.closest('label');
+if(widthField)widthField.after(colorLabel);else panel.append(colorLabel);
 color.addEventListener('input',()=>{
  const original=$('penColor');if(!original)return;
  original.value=color.value;original.dispatchEvent(new Event('input',{bubbles:true}));
@@ -93,16 +95,19 @@ function refresh(){
  minimize.title=minimized?'Expandir herramientas':'Minimizar herramientas';
  minimize.setAttribute('aria-label',minimize.title);
  lockButton.textContent=locked?'◉ Desbloquear barra':'◌ Bloquear barra';
- axisButton.textContent=axis==='horizontal'?'↕ Usar barra vertical':'↔ Usar barra horizontal';
  closeTv.hidden=!document.body.classList.contains('tv-board');
  $('tvBoardFullscreen').hidden=!document.body.classList.contains('tv-board');
  $('tvBoardOrientation').hidden=!document.body.classList.contains('tv-board');
  wake();
 }
 function setLocked(value){locked=value;saveBool('locked',locked);refresh();}
-function setAxis(value){
- axis=value;saveBool('vertical',axis==='vertical');refresh();
- requestAnimationFrame(()=>place(true));
+function syncAutomaticAxis(){
+ // Se utiliza la orientación real del viewport; ambos giros horizontales
+ // comparten la misma barra vertical, sin preferencia manual persistida.
+ const desired=window.innerWidth>window.innerHeight?'vertical':'horizontal';
+ if(axis===desired)return false;
+ axis=desired;refresh();
+ return true;
 }
 minimize.addEventListener('click',()=>{
  minimized=!minimized;saveBool('minimized',minimized);refresh();
@@ -185,8 +190,13 @@ function syncMode(){
 const tvObserver=new MutationObserver(syncMode);
 tvObserver.observe(document.body,{attributes:true,attributeFilter:['class']});
 window.addEventListener('resize',()=>{
- requestAnimationFrame(()=>{place(true);window.MiNotePageLayout?.repaint();});
+ requestAnimationFrame(()=>{
+  const changed=syncAutomaticAxis();
+  place(!changed);window.MiNotePageLayout?.repaint();
+ });
 },{passive:true});
-window.addEventListener('orientationchange',()=>setTimeout(()=>place(false),120),{passive:true});
-refresh();
+window.addEventListener('orientationchange',()=>setTimeout(()=>{
+ syncAutomaticAxis();place(false);
+},160),{passive:true});
+syncAutomaticAxis();refresh();
 requestAnimationFrame(()=>place(false));
