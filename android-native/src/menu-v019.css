@@ -68,3 +68,18 @@ body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick {
   min-width:52px!important;max-width:86px!important;padding:5px 7px!important;
 }
 body.minote-android #floatingX10Quick .floating-x10-label {white-space:nowrap;}
+
+/* V0.41: importación directa y color fuera de la antigua sección Herramientas. */
+body.minote-android #mobileMoreDialog .mobile-actions-list>.minote-import-agenda{
+ width:100%!important;display:flex!important;align-items:center!important;
+ background:#eaf2ff!important;color:#154a9c!important;font-weight:700!important;
+ border:1px solid #b9d4fc!important;border-radius:11px!important;
+ margin:10px 0!important;padding:12px 14px!important;min-height:45px!important;
+}
+body.minote-android #mobileMoreDialog .floating-color-label{
+ display:flex!important;align-items:center!important;justify-content:space-between!important;
+ padding:9px 13px!important;gap:16px!important;
+}
+body.minote-android #mobileMoreDialog .floating-color-label input[type="color"]{
+ width:52px!important;height:38px!important;min-width:52px!important;
+}
