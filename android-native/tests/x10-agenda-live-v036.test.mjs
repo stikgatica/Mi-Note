@@ -22,6 +22,37 @@ test('0x8D acepta dos muestras en una notificación y conserva su orden',()=>{
  const points=parseNotePenFrames(bytes);
  assert.equal(points.length,2);assert.equal(points[0].touch,true);assert.equal(points[1].touch,false);
 });
+test('lector en vivo recompone tramas 8D separadas, múltiples y ACK',()=>{
+ const c=new Connection();
+ c.sessionKind='agenda-pura';
+ const frames=[];
+ c.handlers.onPen=p=>frames.push(p);
+ const packet=sample(2,1400,2600,350);
+ const part1=packet.slice(0,7),part2=packet.slice(7);
+ c._onData({target:{value:new DataView(part1.buffer)}});
+ assert.equal(frames.length,0);
+ c._onData({target:{value:new DataView(part2.buffer)}});
+ assert.equal(frames.length,1);
+ assert.equal(frames[0].x,1400);
+ const combined=new Uint8Array([...sample(2,100,200,400),...sample(0,100,200,0)]);
+ c._onData({target:{value:new DataView(combined.buffer)}});
+ assert.equal(frames.length,3);
+ assert.equal(frames[1].touch,true);
+ assert.equal(frames[2].touch,false);
+ assert.equal(c.liveDiagnostic().onlineSamples,3);
+ c._onData({target:{value:new DataView(Uint8Array.of(0xcd,0x8d,4,1).buffer)}});
+ assert.equal(c.liveDiagnostic().onlineAcks,1);
+ assert.equal(c.liveDiagnostic().liveSamples,3);
+});
+test('contadores distinguen notificaciones sin tinta de muestras aceptadas',()=>{
+ const c=new Connection();
+ c.sessionKind='agenda-pura';
+ c._onData({target:{value:new DataView(Uint8Array.of(0xcd,0x80,3).buffer)}});
+ assert.equal(c.liveDiagnostic().notifications,1);
+ assert.equal(c.liveDiagnostic().onlineSamples,0);
+ assert.equal(c.liveDiagnostic().otherPackets,1);
+ assert.equal(c.liveDiagnostic().writingConfirmed,false);
+});
 test('modo agenda nativo es único y traduce muestras reales 0x8D',async()=>{
  const sent=[];
  const mock={
