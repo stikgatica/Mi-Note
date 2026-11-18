@@ -10,7 +10,7 @@ const menu=[
 '<div class="dialog-head"><h2 id="mobileMoreTitle">Opciones del cuaderno</h2><button id="closeMobileMore" class="icon-btn" type="button" aria-label="Cerrar">✕</button></div>',
 '<div class="mobile-actions-list">',
 '<button type="button" id="replayOpen">▶ Reproducir escritura</button>',
-'<button type="button" id="x10MemoryOpen">▣ Importar memoria Huion X10</button>',
+'<button type="button" id="x10MemoryOpen">▣ Importar memoria agenda</button>',
 '<button type="button" id="personalBackupOpen">☁ Copia automática en Drive</button>',
 '<button type="button" id="tvBoardToggle">▣ Proyectar en TV</button>',
 '<button type="button" data-action="pageNumber">Todas las hojas</button>',
@@ -22,7 +22,6 @@ const menu=[
 '<button type="button" data-action="importBtn">Importar archivo</button>',
 '<button type="button" data-action="renameNotebookBtn">Renombrar cuaderno</button>',
 '</div>',
-'<label class="landscape-control">Orientación de la hoja<select id="landscapeOrientation"><option value="portrait">Vertical A5</option><option value="landscape-cw" selected>Horizontal · girar derecha ↻</option></select></label>',
 '<label class="field">Papel<select id="mobilePaperSelect"><option value="grid">Cuadrícula</option><option value="ruled">Rayas</option><option value="plain">Blanco</option></select></label>',
 '<label class="field">Grosor del lápiz <output id="mobileWidthValue">3</output><input id="mobilePenWidth" type="range" min="1" max="15" value="3"></label>',
 '</dialog>'
@@ -51,7 +50,7 @@ const replayDialog=[
 
 const memoryDialog=[
 '<dialog id="x10MemoryDialog" class="dialog memory-import-dialog" aria-labelledby="x10MemoryTitle">',
-'<div class="dialog-head"><h2 id="x10MemoryTitle">Importar memoria Huion X10</h2><button type="button" id="x10MemoryClose" class="icon-btn" aria-label="Cerrar">✕</button></div>',
+'<div class="dialog-head"><h2 id="x10MemoryTitle">Importar memoria agenda</h2><button type="button" id="x10MemoryClose" class="icon-btn" aria-label="Cerrar">✕</button></div>',
 '<p>Recupere las páginas que escribió con la Huion desconectada. No se eliminará ninguna hoja de la memoria física.</p>',
 '<label class="field">Guardar páginas en<select id="x10MemoryNotebook" aria-label="Cuaderno de destino"></select></label>',
 '<label id="x10MemoryNewNameWrap" class="field">Nombre del cuaderno nuevo<input id="x10MemoryName" type="text" maxlength="90" value="Huion X10 · Memoria"></label>',
@@ -70,7 +69,7 @@ html=html.replace('</main>',menu+'\n'+replayDialog+'\n'+personalDialog+'\n'+memo
 const pageCounter='<button id="floatingPageNumber" class="floating-page-counter" type="button" title="Ver páginas o eliminar hoja" aria-label="Página 1 de 1. Administrar hoja">1 / 1</button>';
 if(!html.includes('<button id="tvBoardNext"'))throw Error('Barra flotante sin botón siguiente');
 html=html.replace('<button id="tvBoardNext"',pageCounter+'<button id="tvBoardNext"');
-const x10Quick='<button id="floatingX10Quick" class="floating-x10-button" type="button" title="Conectar Huion Note X10" aria-label="Conectar X10"><span id="floatingX10QuickDot" class="x10-status-dot" aria-hidden="true"></span><span class="floating-x10-label">X10</span></button>';
+const x10Quick='<button id="floatingX10Quick" class="floating-x10-button" type="button" title="Conectar Huion Note X10" aria-label="Conectar X10"><span id="floatingX10QuickDot" class="x10-status-dot" aria-hidden="true"></span><svg class="floating-bluetooth-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10-5 4V3l5 4L7 17"/></svg></button>';
 html=html.replace('<button id="tvBoardMore"',x10Quick+'<button id="tvBoardMore"');
 const libraryDialog=[
  '<dialog id="floatingLibraryDialog" class="dialog floating-library-dialog" aria-labelledby="floatingLibraryTitle">',
