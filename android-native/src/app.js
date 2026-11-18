@@ -5,7 +5,7 @@ const W = 1000, H = 1400;
 const VERSION = 'mi-note-v1';
 const key = 'state';
 let db, state, tool = 'pen', inStroke = null, isErasing = false, undoState = new Map();
-let currentColor = '#153f82', currentWidth = 3, saveQueue = Promise.resolve();
+let currentColor = '#000000', currentWidth = 3, saveQueue = Promise.resolve();
 const canvas = $('paper'), ctx = canvas.getContext('2d', {alpha: false});
 const clone = v => JSON.parse(JSON.stringify(v));
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : Date.now()+'-'+Math.random().toString(36).slice(2);
