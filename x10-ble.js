@@ -134,6 +134,37 @@ class Connection{
   // Solo diagnóstico: Web Bluetooth no expone el MTU y devuelve null.
   try{return await this.device?.gatt?.getMtu?.()??null;}catch{return null;}
  }
+ async reconnectTabletOnly({settleMs=1500}={}){
+  // Tras importar páginas la sesión queda en modo agenda puro; el lápiz
+  // Data Ink necesita un enlace GATT nuevo y su handshake C9/C8/CA.
+  // No solicita un dispositivo nuevo ni envía comandos de borrado 8B/8C.
+  if(this.offlineReading)throw Error('Termine la lectura de memoria antes de dibujar.');
+  if(this.connected&&this.sessionKind==='tableta'&&this.mode!=='agenda'){
+   this.startKeepalive();
+   return;
+  }
+  const device=this.device;
+  if(!device?.gatt)throw Error('La Huion X10 no está conectada. Pulse X10 para volver a conectarla.');
+  this.intentionalDisconnect=true;
+  clearInterval(this.keepalive);this.keepalive=null;
+  if(this.batteryTimer){clearInterval(this.batteryTimer);this.batteryTimer=null;}
+  if(this.data)try{this.data.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
+  if(this.cmd)try{this.cmd.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
+  try{device.removeEventListener('gattserverdisconnected',this._onDisconnected);}catch{}
+  this.status('Reactivando lápiz X10 en la hoja actual…');
+  if(typeof device.gatt.disconnectAsync==='function')await device.gatt.disconnectAsync();
+  else try{device.gatt.disconnect();}catch{}
+  this.cmd=null;this.data=null;this.mode='desconectado';
+  this.handlers.onDisconnected?.({unexpected:false});
+  await pause(settleMs);
+  this.device=null;
+  try{await this._connectDevice(device);}
+  catch(first){
+   await pause(settleMs*1.5);
+   this.device=null;
+   await this._connectDevice(device);
+  }
+ }
  async reconnectAgendaOnly({settleMs=1500}={}){
   // V0.32 experimental: cerrar la conexión GATT actual (posiblemente en modo
   // tableta) y abrir otra que solo habla el protocolo de agenda. No borra nada.
