@@ -88,7 +88,7 @@ class Connection{
   return this._connectDevice(device,{agendaOnly:this.useAgendaByDefault(),startNoteLive:this.useAgendaByDefault()});
  }
  useAgendaByDefault(){
-  return !!root.MiNoteNativeBLE&&root.localStorage?.getItem?.('minote_x10_preferred_mode')!=='tableta';
+  return true; // Modo agenda siempre, incluso si versiones anteriores guardaron "tableta".
  }
  async connectSaved(device){
   // getDevices() devuelve únicamente equipos que ya autorizó el usuario para este origen.
@@ -148,8 +148,15 @@ class Connection{
   if(!this.connected)throw Error('Conecta primero la X10.');
   if(this.offlineReading)throw Error('Termine la importación antes de reactivar el lápiz.');
   this.sessionKind='agenda-pura';this.mode='agenda-pura';
-  await this.send(frame(0x81)); // App Huion Note: VERIFY_CONNECT (no borrado).
-  this.status('Modo agenda conectado. Esperando autorización y escritura X10…');
+  // Orden observado en Huion Note: capacidades, configuración, nombre y
+  // ONLINE_DATA antes del reto 0x81/0x82. No se envían comandos de tableta.
+  await this.send(frame(0x95));await pause(60);
+  await this.send(frame(0x96,1,3));await pause(60);
+  await this.send(frame(0x96,3,2));await pause(60);
+  await this.send(frame(0x91));await pause(60);
+  await this.send(frame(0x8d,1,0,0,0));await pause(60);
+  await this.send(frame(0x81));
+  this.status('Modo agenda solicitado; esperando autorización y datos de escritura 0x8D.');
  }
  async switchToAgendaLive(){
   if(this.offlineReading)throw Error('La importación todavía está en curso.');
@@ -251,12 +258,8 @@ class Connection{
  async _afterVerified(){
   if(this.offlineReading||!this.connected||this.sessionKind!=='agenda-pura')return;
   try{
-   await this.send(frame(0x95));
-   await this.send(frame(0x96,1,3));await pause(60);
-   await this.send(frame(0x96,3,2));await pause(60);
-   await this.send(frame(0x91));
-   // Activa ONLINE_DATA en el modo de toma de notas, manteniendo la memoria intacta.
-   await this.send(frame(0x8d,1,0,0,0));
+   await this.send(frame(0x8d,1,0,0,0)); // Solicitar ONLINE_DATA tras autorización.
+   this.status('Modo agenda autorizado; esperando trazos reales del lápiz 0x8D.');
   }catch(e){this.handlers.onDiagnostic?.('Activación de lápiz en modo agenda: '+e.message);}
  }
  _onData(e){
@@ -306,7 +309,7 @@ class Connection{
     if(b[3]!==1)return;
     this.mode='agenda';this.limits={...DEFAULT_NOTE};
     this.handlers.onMode?.('agenda',this.limits);
-    this.status('Modo agenda conectado. Esperando aviso de página.');
+    this.status('Modo agenda autorizado. Esperando recepción de trazos en vivo.');
     if(!this.offlineReading)this._afterVerified();return;
    }
    if(op===0x95&&b.length>=11){
