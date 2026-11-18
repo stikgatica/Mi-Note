@@ -76,6 +76,9 @@ test('reconnectAgendaOnly abre sesión limpia de agenda sin enviar comandos C9/C
  const bridge=createNativeBLE(mock,{getItem(){return null;},setItem(){}});
  globalThis.MiNoteNativeBLE=bridge;
  const device=await bridge.getSavedDevice('x10-agenda');
+ // V0.36 inicia en agenda por defecto: esta prueba requiere iniciar
+ // explícitamente en tableta para verificar el cambio posterior a agenda.
+ globalThis.localStorage={getItem:()=> 'tableta'};
  const conn=new globalThis.MiNoteX10Ble.Connection();
  await conn.connectSaved(device);
  assert.equal(conn.tabletCommandsSent,true);
@@ -91,4 +94,5 @@ test('reconnectAgendaOnly abre sesión limpia de agenda sin enviar comandos C9/C
  assert.equal(sent.length,0);
  assert.equal(await conn.getMtu(),141);
  conn.disconnect();
+ delete globalThis.localStorage;
 });
