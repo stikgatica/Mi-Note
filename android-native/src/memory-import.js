@@ -104,9 +104,7 @@ async function importMemory(){
  }catch(e){info('Lectura interrumpida: '+(e?.message||e)+'. Las páginas recuperadas se conservan en Mi Note.',true);}
  finally{
   busy(false);
-  if(false && api.connected()){ // No reactivar modo tableta tras importar; la sesión BLE oficial se conserva.
-   try{await api.restore();}catch(e){info(message.textContent+' · Para continuar escribiendo, vuelva a conectar la Huion si fuese necesario.',true);}
-  }
+  // Mantener el modo de agenda después de importar; la escritura en vivo se activa al reconectar.
  }
 }
 open?.addEventListener('click',()=>{
