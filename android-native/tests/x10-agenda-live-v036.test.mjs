@@ -22,8 +22,8 @@ test('0x8D acepta dos muestras en una notificación y conserva su orden',()=>{
  const points=parseNotePenFrames(bytes);
  assert.equal(points.length,2);assert.equal(points[0].touch,true);assert.equal(points[1].touch,false);
 });
-test('modo agenda nativo es predeterminado y el usuario puede elegir tableta',async()=>{
- const log=[];
+test('modo agenda nativo es único y traduce muestras reales 0x8D',async()=>{
+ const sent=[];
  const mock={
   async initialize(){},async isEnabled(){return true;},async isLocationEnabled(){return true;},
   async connect(){},async disconnect(){},
@@ -31,36 +31,27 @@ test('modo agenda nativo es predeterminado y el usuario puede elegir tableta',as
    {uuid:'0000ffe1-0000-1000-8000-00805f9b34fb',properties:{notify:true}},
    {uuid:'0000ffe2-0000-1000-8000-00805f9b34fb',properties:{writeWithoutResponse:true,indicate:true}}
   ]}]},
-  async startNotifications(){},
-  async writeWithoutResponse(id,s,c,bytes){log.push(bytes.getUint8(1));}
+  async startNotifications(){},async writeWithoutResponse(id,s,c,v){sent.push(v.getUint8(1));}
  };
- const storage={value:null,getItem(){return this.value},setItem(k,v){this.value=v}};
- globalThis.localStorage=storage;
  globalThis.MiNoteNativeBLE=createNativeBLE(mock,{getItem(){return null},setItem(){}});
- const device=await globalThis.MiNoteNativeBLE.getSavedDevice('agenda-mode-test');
+ const device=await globalThis.MiNoteNativeBLE.getSavedDevice('agenda-only-test');
  const conn=new Connection();
  await conn.connectSaved(device);
  assert.equal(conn.sessionKind,'agenda-pura');
- assert.deepEqual(log,[0x81]);
- assert.ok(!log.some(op=>[0xc9,0xc8,0xca,0x8b,0x8c].includes(op)));
- const got=[];conn.handlers.onPen=p=>got.push(p);
+ assert.deepEqual(sent,[0x95,0x96,0x96,0x91,0x8d,0x81]);
+ const points=[];conn.handlers.onPen=p=>points.push(p);
  conn._onData({target:{value:new DataView(sample().buffer)}});
- assert.equal(got.length,1);assert.equal(conn.mode,'agenda');
- conn.disconnect();
- storage.value='tableta';log.length=0;
- const fallback=new Connection();await fallback.connectSaved(device);
- assert.equal(fallback.sessionKind,'tableta');
- assert.deepEqual(log.slice(0,3),[0xc9,0xc8,0xca]);
- fallback.disconnect();
- delete globalThis.MiNoteNativeBLE;delete globalThis.localStorage;
+ assert.equal(points.length,1);
+ assert.equal(conn.mode,'agenda');
+ assert.equal(conn.noteLivePackets,1);
+ assert.ok(!sent.some(op=>[0xc9,0xc8,0xca,0xd1,0x8b,0x8c].includes(op)));
+ conn.disconnect();delete globalThis.MiNoteNativeBLE;
 });
-test('motor Android mantiene importador de memoria y expone cambio de modo reversible',()=>{
- const source=readFileSync(new URL('../scripts/features.mjs',import.meta.url),'utf8');
- assert.match(source,/officialHandshake:true/);
- assert.match(source,/useAgendaByDefault/);
- assert.match(source,/switchToAgendaLive/);
- assert.match(source,/reconnectTabletOnly/);
- assert.match(source,/minote_x10_preferred_mode/);
+test('el motor Android no ofrece cambiar a modo tableta',()=>{
+ const engine=readFileSync(new URL('../scripts/features.mjs',import.meta.url),'utf8');
+ assert.match(engine,/officialHandshake:true/);
+ assert.match(engine,/await x10Connection.enableNoteLive\(\)/);
+ assert.doesNotMatch(engine,/reconnectTabletOnly|switchMode\(next\)/);
  const ui=readFileSync(new URL('../scripts/mobile.mjs',import.meta.url),'utf8');
- assert.match(ui,/x10MemorySwitchMode/);
+ assert.doesNotMatch(ui,/x10MemorySwitchMode/);
 });
