@@ -37,6 +37,23 @@ function parseTabletPen(value){
  return {status:b[2],x:b[3]+256*b[4]+65536*b[9],
   y:b[5]+256*b[6]+65536*b[10],press:u16(b,7),touch:b[2]===0x81};
 }
+// Protocolo Huion Note: una notificación puede contener dos tramas
+// ONLINE_DATA CD 8D 0B (11 bytes cada una). No confundir con el ACK CD 8D 04 01.
+function parseNotePenFrames(value){
+ const b=value instanceof Uint8Array?value:new Uint8Array(value);
+ if(!b.length||b.length%11!==0)return null;
+ const out=[];
+ for(let offset=0;offset<b.length;offset+=11){
+  if(b[offset]!==0xcd||b[offset+1]!==0x8d||b[offset+2]!==11)return null;
+  const part=b.subarray(offset,offset+11);
+  const status=part[3],x=u16(part,4),y=u16(part,6),press=u16(part,8);
+  if(status>7||x>DEFAULT_NOTE.maxX||y>DEFAULT_NOTE.maxY||press>16383)return null;
+  // 0x02 indica lápiz en contacto, incluso cuando otra notificación
+  // todavía anuncia la última posición con presión cero.
+  out.push({status,x,y,press,touch:(status&2)!==0&&press>0});
+ }
+ return out;
+}
 function parseTabletInfo(b){
  // Data Ink V10: [length, C8, X(3 LE), Y(3 LE), pressure(2 LE), ...].
  if(b.length<10||b[0]!==b.length||b[1]!==0xc8)return null;
@@ -51,7 +68,7 @@ class Connection{
   this.keepalive=null;this.pageEventAt=0;this.unknownTypes=new Set();this.packetCount=0;
   this.frameListeners=new Set();this.offlineReading=false;
   // V0.32: registra si esta conexión GATT recibió comandos de tableta (C9/C8/CA).
-  this.tabletCommandsSent=false;this.sessionKind=null;
+  this.tabletCommandsSent=false;this.sessionKind=null;this.noteLivePackets=0;
   this._onData=this._onData.bind(this);this._onDisconnected=this._onDisconnected.bind(this);
  }
  get connected(){return !!this.device?.gatt?.connected;}
@@ -68,18 +85,21 @@ class Connection{
  }
  async connect(filtered=false){
   const device=await this.selectDevice(filtered);
-  return this._connectDevice(device);
+  return this._connectDevice(device,{agendaOnly:this.useAgendaByDefault(),startNoteLive:this.useAgendaByDefault()});
+ }
+ useAgendaByDefault(){
+  return !!root.MiNoteNativeBLE&&root.localStorage?.getItem?.('minote_x10_preferred_mode')!=='tableta';
  }
  async connectSaved(device){
   // getDevices() devuelve únicamente equipos que ya autorizó el usuario para este origen.
   if((!root.MiNoteNativeBLE&&(!navigator.bluetooth||!root.isSecureContext))||!device?.gatt)
    throw Error('Este dispositivo no permite recuperar la conexión autorizada.');
-  return this._connectDevice(device);
+  return this._connectDevice(device,{agendaOnly:this.useAgendaByDefault(),startNoteLive:this.useAgendaByDefault()});
  }
  async _connectDevice(device,options={}){
   if(this.connected)return;
   this.intentionalDisconnect=false;
-  this.tabletCommandsSent=false;this.sessionKind=null;
+  this.tabletCommandsSent=false;this.sessionKind=null;this.noteLivePackets=0;
   // Tras una desconexión, las características GATT deben obtenerse otra vez.
   if(this.data)try{this.data.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
   if(this.cmd)try{this.cmd.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
@@ -104,7 +124,8 @@ class Connection{
    if(options.agendaOnly){
     // Sesión limpia como la app oficial: sin C9/C8/CA ni keepalive D1.
     this.mode='agenda-pura';this.sessionKind='agenda-pura';
-    this.status('Conectada en modo agenda puro (sin comandos de tableta).');
+    this.status('Conectada en modo agenda. Preparando escritura en vivo…');
+    if(options.startNoteLive)await this.enableNoteLive();
     return;
    }
    this.sessionKind='tableta';
@@ -122,6 +143,19 @@ class Connection{
   else if(this.cmd.properties.write&&this.cmd.writeValueWithResponse)
    await this.cmd.writeValueWithResponse(d);
   else await this.cmd.writeValue(d);
+ }
+ async enableNoteLive(){
+  if(!this.connected)throw Error('Conecta primero la X10.');
+  if(this.offlineReading)throw Error('Termine la importación antes de reactivar el lápiz.');
+  this.sessionKind='agenda-pura';this.mode='agenda-pura';
+  await this.send(frame(0x81)); // App Huion Note: VERIFY_CONNECT (no borrado).
+  this.status('Modo agenda conectado. Esperando autorización y escritura X10…');
+ }
+ async switchToAgendaLive(){
+  if(this.offlineReading)throw Error('La importación todavía está en curso.');
+  if(!this.connected)throw Error('Conecta primero la X10.');
+  if(this.sessionKind!=='agenda-pura')await this.reconnectAgendaOnly();
+  await this.enableNoteLive();
  }
  async probeTablet(){
   if(!this.connected)throw Error('Conecta primero la X10.');
@@ -215,12 +249,28 @@ class Connection{
    this.send(tabletCommand(0xd1)).catch(e=>this.handlers.onDiagnostic?.('Keepalive: '+e.message));},5000);
  }
  async _afterVerified(){
-  try{await this.send(frame(0x95));await this.send(frame(0x85));}
-  catch(e){this.handlers.onDiagnostic?.('Consultas de agenda: '+e.message);}
+  if(this.offlineReading||!this.connected||this.sessionKind!=='agenda-pura')return;
+  try{
+   await this.send(frame(0x95));
+   await this.send(frame(0x96,1,3));await pause(60);
+   await this.send(frame(0x96,3,2));await pause(60);
+   await this.send(frame(0x91));
+   // Activa ONLINE_DATA en el modo de toma de notas, manteniendo la memoria intacta.
+   await this.send(frame(0x8d,1,0,0,0));
+  }catch(e){this.handlers.onDiagnostic?.('Activación de lápiz en modo agenda: '+e.message);}
  }
  _onData(e){
   const value=e.target?.value;if(!value)return;
   const b=new Uint8Array(value.buffer,value.byteOffset,value.byteLength);this.packetCount++;
+  if(!this.offlineReading&&this.sessionKind==='agenda-pura'){
+   const samples=parseNotePenFrames(b);
+   if(samples){
+    this.mode='agenda';
+    if(!this.noteLivePackets++)this.status('Recibiendo escritura en vivo en modo agenda X10.');
+    for(const sample of samples)this.handlers.onPen?.(sample,this.limits?.maxX===DEFAULT_TABLET.maxX?{...DEFAULT_NOTE}:this.limits,'agenda');
+    return;
+   }
+  }
   if(this.frameListeners.size&&b[0]===0xcd)for(const handler of this.frameListeners){try{handler(b);}catch(e){this.handlers.onDiagnostic?.('Receptor de datos X10: '+e.message);}}
   const limits=parseTabletInfo(b);
   if(limits){
@@ -295,7 +345,7 @@ class Connection{
   this.handlers.onDisconnected?.({unexpected:false});
  }
 }
-const api={Connection,mapPoint,parseTabletPen,parseTabletInfo,frame,DEFAULT_NOTE,DEFAULT_TABLET};
+const api={Connection,mapPoint,parseTabletPen,parseTabletInfo,parseNotePenFrames,frame,DEFAULT_NOTE,DEFAULT_TABLET};
 root.MiNoteX10Ble=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
