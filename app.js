@@ -102,7 +102,7 @@ function x10Details(){const mode=x10Connection?.mode||'desconectado',idx=note()?
 }
 function x10RotationValue(mode=x10Connection?.mode){
  const val=$('x10Rotation').value;
- return val==='auto'?(mode==='tableta'?270:0):Number(val);
+ return val==='auto'?0:Number(val); // Solo modo agenda.
 }
 function x10Flush(){
  if(!x10ActiveStroke)return;
@@ -398,10 +398,6 @@ function setupX10(){
    if(device.id)localStorage.setItem('minote_x10_device_id',device.id);
    x10SetStatus('X10 conectada.');x10Details();
   }).catch(e=>{if(x10ManualAttempt===attempt)x10SetStatus('Bluetooth: '+e.name+' · '+e.message);});
- };
- $('x10ProbeTablet').onclick=async()=>{
-  try{if(!x10Connection?.connected)throw Error('Primero conecta X10');await x10Connection.probeAgenda();}
-  catch(e){x10SetStatus('Diagnóstico: '+e.message);}
  };
  document.addEventListener('visibilitychange',()=>{
   if(document.hidden)x10Flush();
