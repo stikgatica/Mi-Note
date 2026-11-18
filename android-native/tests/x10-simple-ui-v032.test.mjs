@@ -6,7 +6,8 @@ test('La importación directa X10 usa siempre la secuencia oficial validada',()=
  const engine=read('../scripts/features.mjs');
  const ui=read('../src/memory-import.js');
  assert.match(engine,/officialHandshake:true/);
- assert.match(engine,/reconnectAgendaOnly/);
+ assert.match(engine,/officialHandshake:true/);
+ assert.doesNotMatch(engine,/reconnectAgendaOnly|reconnectTabletOnly/);
  assert.match(engine,/maxPages:64/);
  assert.doesNotMatch(engine,/sessionMode='agenda-clean'/);
  assert.doesNotMatch(ui,/x10MemorySessionMode/);
