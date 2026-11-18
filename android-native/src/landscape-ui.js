@@ -7,26 +7,40 @@ let previousOrientation=null;
 const pageLayout=()=>window.MiNotePageLayout;
 let hintTimer=null;
 const toast=message=>{const note=get('tvBoardHint');if(note){note.textContent=message;note.hidden=false;clearTimeout(hintTimer);hintTimer=setTimeout(()=>{note.hidden=true;},5200);}};
-function updateSelection(){
- const layout=pageLayout();
- if(!layout||!orientation)return;
- const current=layout.get().orientation;
- if(current==='landscape-ccw'){void selectOrientation('landscape-cw');return;}
- orientation.value=current;
- document.body.dataset.pageOrientation=orientation.value;
- layout.repaint();
-}
-async function selectOrientation(value){
+// Android cambia el viewport al girar físicamente el celular (autorrotación).
+// Ambas orientaciones apaisadas mantienen landscape-cw, la misma rotación
+// utilizada por Mi Note, sin espejar ni alterar coordenadas de tinta Huion.
+const viewportOrientation=()=>window.innerWidth>window.innerHeight?'landscape-cw':'portrait';
+let orienting=false,orientationQueued=false;
+async function updateSelection(){
  const layout=pageLayout();if(!layout)return;
- try{
-  await layout.set(value);
-  updateSelection();
- }catch(e){toast('No fue posible cambiar la hoja: '+e.message);}
+ const wanted=viewportOrientation();
+ document.body.dataset.pageOrientation=wanted;
+ if(orientation)orientation.value=wanted;
+ if(layout.get()?.orientation===wanted){layout.repaint();return;}
+ if(orienting){orientationQueued=true;return;}
+ orienting=true;
+ try{await layout.set(wanted);}
+ catch(e){
+  if(/trazo/i.test(e.message||'')){orientationQueued=true;}
+  else toast('No fue posible adaptar la hoja al giro: '+e.message);
+ }finally{
+  orienting=false;
+  if(orientationQueued){
+   orientationQueued=false;
+   setTimeout(()=>void updateSelection(),160);
+  }
+ }
 }
-orientation?.addEventListener('change',()=>{void selectOrientation(orientation.value);});
-document.addEventListener('minote:page-rendered',()=>{
- const layout=pageLayout();if(layout&&orientation){const value=layout.get().orientation;if(value==='landscape-ccw')void selectOrientation('landscape-cw');else orientation.value=value;}
-});
+const scheduleOrientation=()=>{
+ clearTimeout(scheduleOrientation.timer);
+ scheduleOrientation.timer=setTimeout(()=>void updateSelection(),85);
+};
+orientation?.remove(); // La selección manual se reemplaza por el giro de Android.
+document.addEventListener('minote:page-rendered',scheduleOrientation);
+window.addEventListener('resize',scheduleOrientation,{passive:true});
+window.addEventListener('orientationchange',()=>setTimeout(scheduleOrientation,120),{passive:true});
+screen.orientation?.addEventListener?.('change',scheduleOrientation);
 async function fullscreenStart(){
  if(!document.fullscreenElement&&document.documentElement.requestFullscreen){
   try{await document.documentElement.requestFullscreen({navigationUI:'hide'});}catch(e){toast('Pantalla completa no disponible; se usa la vista ampliada.');}
@@ -54,7 +68,7 @@ async function toggleTv(next){
   // Evitar await antes de requestFullscreen, o Android puede rechazarlo.
   const entering=fullscreenStart();
   updateTvLabel();
-  if(previousOrientation==='portrait')await selectOrientation('landscape-cw');
+  if(previousOrientation==='portrait')await updateSelection();
   await entering;
  }else{
   await fullscreenStop();
@@ -70,13 +84,8 @@ get('tvBoardPen')?.addEventListener('click',()=>get('penBtn')?.click());
 get('tvBoardErase')?.addEventListener('click',()=>get('eraserBtn')?.click());
 get('tvBoardUndo')?.addEventListener('click',()=>get('undoBtn')?.click());
 get('tvBoardMore')?.addEventListener('click',()=>get('mobileMoreBtn')?.click());
-get('tvBoardOrientation')?.addEventListener('click',()=>{
- const cur=pageLayout()?.get()?.orientation||'landscape-cw';
- void selectOrientation(cur==='landscape-cw'?'portrait':'landscape-cw');
-});
+// La hoja sigue siempre la orientación física: no hay giro manual.
 get('tvBoardFullscreen')?.addEventListener('click',()=>void fullscreenStart());
 document.addEventListener('fullscreenchange',()=>{if(tvMode&&document.fullscreenElement===null)toast('La vista de pizarra sigue activa. Para ocultar barras, toque pantalla completa.');});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&tvMode&&!document.fullscreenElement)void toggleTv(false);});
-window.addEventListener('resize',()=>pageLayout()?.repaint());
-window.addEventListener('orientationchange',()=>pageLayout()?.repaint());
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',updateSelection,{once:true});else updateSelection();
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scheduleOrientation,{once:true});else scheduleOrientation();
