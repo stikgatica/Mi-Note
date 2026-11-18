@@ -70,7 +70,7 @@ function busy(flag){
 async function importMemory(){
  const api=engine();
  if(!api){info('La lectura X10 no está disponible.',true);return;}
- if(!api.connected()){info('Conecte la Huion X10 usando Conectar X10.',true);return;}
+ if(!api.connected()){info('Conecte primero la Huion X10 pulsando X10.',true);return;}
  if(api.busy()||active){info('Ya existe una importación en curso.',true);return;}
  const enteredPin=$('x10MemoryPin').value.trim();
  if(enteredPin && !/^\d{6}$/.test(enteredPin)){info('El PIN opcional debe tener exactamente seis cifras.',true);return;}
@@ -90,7 +90,10 @@ async function importMemory(){
    notebookId:destination,pin:enteredPin,
    onProgress:message=>info(message)
   });
-  info('Lectura finalizada: '+result.imported+' páginas nuevas ('+(result.partialImported||0)+' MUESTRAS PARCIALES: puntos aislados, no escritura completa), '+result.duplicate+' repetidas y '+result.empty+' vacías. Datos guardados en Mi Note; X10 intacta.');
+  const pending=result.pendingIndices?.length
+   ?' Pendientes de recuperar: páginas físicas '+result.pendingIndices.map(i=>i+1).join(', ')+'.'
+   :'';
+  info('Lectura finalizada: '+result.imported+' páginas guardadas ('+(result.revised||0)+' versiones nuevas, '+result.partialImported+' MUESTRAS PARCIALES), '+result.duplicate+' repetidas, '+(result.incomplete||0)+' pendientes, '+result.empty+' vacías.'+pending+' Datos guardados en Mi Note; memoria X10 intacta.',!!result.incomplete);
   $('x10MemoryPin').value='';
   // Refrescar la lista de cuadernos sin ocultar el mensaje.
   const list=api.notebooks();
