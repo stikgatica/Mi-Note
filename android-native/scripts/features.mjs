@@ -82,19 +82,13 @@ async function x10ResumeCurrentPage(onProgress=()=>{}){
  if(!x10Connection?.connected)throw Error('X10 desconectada. Pulse X10 para reconectar antes de escribir.');
  if(x10Connection.offlineReading)throw Error('La importación todavía está utilizando la conexión X10.');
  onProgress('Preparando escritura en la hoja actualmente abierta…');
- const notePreferred=x10Connection.useAgendaByDefault?.();
- if(notePreferred){
-  // En modo agenda la misma sesión GATT sirve para sincronizar y dibujar.
-  // Tras una lectura solo restablecer ONLINE_DATA; nunca mandar C9/C8/CA.
-  await x10Connection.switchToAgendaLive();
- }else if(x10Connection.sessionKind!=='tableta'||x10Connection.mode==='agenda'||x10Connection.mode==='agenda-pura'){
-  await x10Connection.reconnectTabletOnly();
- }
+ // Únicamente agenda: reactivar ONLINE_DATA sin cambiar a modo tableta.
+ await x10Connection.enableNoteLive();
  // Se vincula después de reconectar, para no perder la selección cuando la
  // aplicación acaba de agregar hojas importadas al cuaderno de destino.
  x10BindCurrent();
  const snapshot=window.MiNoteAndroidActions?.snapshot?.();
- onProgress('Lápiz X10 activo en '+(snapshot?'hoja '+snapshot.index+' de '+snapshot.total:'la hoja abierta')+'. Puede seguir escribiendo en la agenda.');
+ onProgress('Modo agenda solicitado en '+(snapshot?'hoja '+snapshot.index+' de '+snapshot.total:'la hoja abierta')+'. Escriba para comprobar la recepción de tinta.');
  return snapshot;
 }
 function setupX10PhysicalTools(){
@@ -120,17 +114,6 @@ function setupX10PhysicalTools(){
   },
   cancel(){if(x10DownloadController)x10DownloadController.abort();},
   restore:()=>x10ResumeCurrentPage(message=>{status.textContent=message;}),
-  preferredMode:()=>x10Connection?.useAgendaByDefault?.()?'agenda':'tableta',
-  async switchMode(next){
-   if(x10DownloadController||x10Connection?.offlineReading)throw Error('Espere a que termine la importación.');
-   if(!x10Connection?.connected)throw Error('Conecte la X10 antes de cambiar de modo.');
-   if(!['agenda','tableta'].includes(next))throw Error('Modo X10 desconocido.');
-   if(next==='agenda')await x10Connection.switchToAgendaLive();
-   else await x10Connection.reconnectTabletOnly();
-   localStorage.setItem('minote_x10_preferred_mode',next);
-   x10BindCurrent();
-   return next;
-  },
   async start({notebookId,pin:pinCode='',onProgress=()=>{}}={}){
    if(!x10Connection?.connected)throw Error('Primero conecte la Huion X10 desde el botón superior.');
    if(!window.MiNoteX10Offline)throw Error('El lector de memoria física X10 no está disponible.');
@@ -143,15 +126,8 @@ function setupX10PhysicalTools(){
    sync.disabled=true;listen.disabled=true;restore.disabled=true;cancel.hidden=false;cancel.disabled=false;
    const notify=message=>{onProgress(message);status.textContent=message;};
    try{
-    if(typeof x10Connection.reconnectAgendaOnly==='function'&&
-       (x10Connection.tabletCommandsSent||x10Connection.sessionKind!=='agenda-pura')){
-     notify('Abriendo sesión GATT en modo agenda puro (sin comandos C9/C8/CA de tableta)…');
-     x10CancelRetry();x10Connecting=true;
-     try{await x10Connection.reconnectAgendaOnly();}
-     finally{x10Connecting=false;}
-     // La X10 puede tardar en activar agenda tras cerrar el canal de lápiz.
-     await new Promise(resolve=>setTimeout(resolve,650));
-    }
+    // La misma sesión de agenda sirve para importar; el lector gestiona su
+    // autenticación y no envía comandos de tableta.
     if(controller.signal.aborted)throw Error('Descarga cancelada por el usuario.');
     notify('Comprobando memoria interna; no se borrará ningún dato físico…');
     const options={
@@ -186,7 +162,7 @@ function setupX10PhysicalTools(){
     throw err;
    }finally{
     // La lectura terminó: en modo agenda solo reactivar ONLINE_DATA sin
-    // desconectar; conservar la opción manual de tableta para compatibilidad.
+    // desconectar ni cambiar al protocolo de tableta.
     x10DownloadController=null;
     if(x10Connection?.connected){
      try{await x10ResumeCurrentPage(notify);}
