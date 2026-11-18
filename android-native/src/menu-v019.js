@@ -8,9 +8,8 @@ if(list){
  const groups=[
   ['Cuadernos',[ 'floatingLibraryOpenMenu','floatingNewNotebookMenu','action:renameNotebookBtn' ]],
   ['Hojas',[ 'action:pageNumber','action:renamePageBtn' ]],
-  ['Huion X10',[ 'x10MemoryOpen','floatingX10Menu' ]],
   ['Exportar y respaldar',[ 'action:exportPng','action:exportSvg','action:printPdf','action:backupBtn','action:importBtn','personalBackupOpen' ]],
-  ['Herramientas',[ 'floatingAxisMenu','floatingLockMenu','floatingLibraryMenu' ]]
+  ['Más opciones de barra',[ 'floatingLockMenu' ]]
  ];
  for(const [label,ids] of groups){
   const details=document.createElement('details');details.className='minote-menu-group';
@@ -20,14 +19,17 @@ if(list){
   for(const id of ids){const node=find(id);if(node)holder.append(node);}
   details.append(holder);list.append(details);
  }
- const stray=Array.from(list.children).filter(n=>n.tagName==='BUTTON');
+ // Importación como acción única y directa, sin acordeón Huion X10.
+ const importButton=find('x10MemoryOpen');
+ if(importButton){
+  importButton.textContent='Importar memoria agenda';
+  importButton.classList.add('minote-import-agenda');
+  list.append(importButton);
+ }
+ const stray=Array.from(list.children).filter(n=>n.tagName==='BUTTON'&&n!==importButton);
  if(stray.length){const details=document.createElement('details');details.className='minote-menu-group';
   const summary=document.createElement('summary');summary.textContent='Más opciones';details.append(summary);
   const rows=document.createElement('div');rows.className='minote-menu-rows';
   stray.forEach(el=>rows.append(el));details.append(rows);list.append(details);
  }
- const control=document.querySelector('.landscape-control');
- if(control){const tools=Array.from(list.querySelectorAll('details')).find(e=>e.querySelector('summary')?.textContent==='Herramientas');tools?.append(control);}
- const color=menu.querySelector('.floating-color-label');
- if(color){const tools=Array.from(list.querySelectorAll('details')).find(e=>e.querySelector('summary')?.textContent==='Herramientas');tools?.append(color);}
 }
