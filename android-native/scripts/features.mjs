@@ -13,7 +13,6 @@ html=html.replace(target, `<section id="x10PhysicalTools" style="margin:12px 0;p
   <strong>Agenda física X10</strong>
   <div class="x10-row">
     <button type="button" id="x10ListenPage" class="subtle">Activar botón físico de nueva página</button>
-    <button type="button" id="x10RestorePen" class="subtle">Volver a escritura en vivo</button>
     <button type="button" id="x10OfflineDownload" class="primary">Extraer páginas guardadas</button>
   </div>
   <label class="field">PIN de la X10 (solo si la agenda lo pide)
@@ -78,22 +77,9 @@ async function x10ImportOfflinePage(result,destinationId){
  await persist();
  return hasPreviousVersion?'version':'imported';
 }
-async function x10ResumeCurrentPage(onProgress=()=>{}){
- if(!x10Connection?.connected)throw Error('X10 desconectada. Pulse X10 para reconectar antes de escribir.');
- if(x10Connection.offlineReading)throw Error('La importación todavía está utilizando la conexión X10.');
- onProgress('Preparando escritura en la hoja actualmente abierta…');
- // Únicamente agenda: reactivar ONLINE_DATA sin cambiar a modo tableta.
- await x10Connection.enableNoteLive();
- // Se vincula después de reconectar, para no perder la selección cuando la
- // aplicación acaba de agregar hojas importadas al cuaderno de destino.
- x10BindCurrent();
- const snapshot=window.MiNoteAndroidActions?.snapshot?.();
- onProgress('Modo agenda solicitado en '+(snapshot?'hoja '+snapshot.index+' de '+snapshot.total:'la hoja abierta')+'. Escriba para comprobar la recepción de tinta.');
- return snapshot;
-}
 function setupX10PhysicalTools(){
  if(!window.MiNoteNativeBLE)return;
- const listen=$('x10ListenPage'),sync=$('x10OfflineDownload'),restore=$('x10RestorePen');
+ const listen=$('x10ListenPage'),sync=$('x10OfflineDownload');
  const status=$('x10OfflineStatus'),cancel=$('x10CancelDownload'),pin=$('x10OfflinePin');
  if(!listen||!sync)return;
 
@@ -113,7 +99,6 @@ function setupX10PhysicalTools(){
    return nb.id;
   },
   cancel(){if(x10DownloadController)x10DownloadController.abort();},
-  restore:()=>x10ResumeCurrentPage(message=>{status.textContent=message;}),
   async start({notebookId,pin:pinCode='',onProgress=()=>{}}={}){
    if(!x10Connection?.connected)throw Error('Primero conecte la Huion X10 desde el botón superior.');
    if(!window.MiNoteX10Offline)throw Error('El lector de memoria física X10 no está disponible.');
@@ -123,7 +108,7 @@ function setupX10PhysicalTools(){
    x10Flush();
    const controller=new AbortController();
    x10DownloadController=controller;
-   sync.disabled=true;listen.disabled=true;restore.disabled=true;cancel.hidden=false;cancel.disabled=false;
+   sync.disabled=true;listen.disabled=true;cancel.hidden=false;cancel.disabled=false;
    const notify=message=>{onProgress(message);status.textContent=message;};
    try{
     // La misma sesión de agenda sirve para importar; el lector gestiona su
@@ -140,10 +125,8 @@ function setupX10PhysicalTools(){
     try{
      result=await MiNoteX10Offline.download(x10Connection,options);
     }catch(firstError){
-     // Caso comprobado en el dispositivo: la primera autenticación se pierde
-     // tras cambiar de tableta a agenda y la segunda funciona en el MISMO GATT.
-     // Reintentar solo antes de explorar la primera página; nunca duplicar ni
-     // repetir una importación que ya ha podido guardar trazos.
+     // Si no se recibió respuesta inicial, reintentar en la MISMA conexión
+     // de agenda. No repetir páginas que ya comenzaron a importarse.
      const diagnostic=MiNoteX10Offline.getLastDiagnostic?.(false);
      const startupTimeout=/La Huion no entregó el paquete solicitado dentro del plazo/i.test(firstError?.message||'')
       && Array.isArray(diagnostic?.pages)&&diagnostic.pages.length===0
@@ -161,19 +144,11 @@ function setupX10PhysicalTools(){
     notify('Importación interrumpida: '+err.message+'. Las páginas que sí se guardaron se conservan.');
     throw err;
    }finally{
-    // La lectura terminó: en modo agenda solo reactivar ONLINE_DATA sin
-    // desconectar ni cambiar al protocolo de tableta.
+    // La X10 permanece en el mismo modo agenda: no reiniciar el lápiz,
+    // no reenviar comandos ONLINE_DATA y no reconectar tras la importación.
     x10DownloadController=null;
-    if(x10Connection?.connected){
-     try{await x10ResumeCurrentPage(notify);}
-     catch(resumeError){
-      notify('Las páginas recuperadas están guardadas. Para seguir escribiendo, pulse X10 y reconecte: '+resumeError.message);
-      x10Log('No se pudo volver a Data Ink: '+resumeError.message);
-     }
-    }else{
-     notify('Importación cerrada. X10 desconectada: pulse X10 para volver a escribir.');
-    }
-    sync.disabled=false;listen.disabled=false;restore.disabled=false;cancel.hidden=true;cancel.disabled=false;
+    if(x10Connection?.connected)x10BindCurrent(); // Solo vincula la hoja visible, sin BLE.
+    sync.disabled=false;listen.disabled=false;cancel.hidden=true;cancel.disabled=false;
     pin.value='';
     x10Details();
    }
@@ -186,13 +161,6 @@ function setupX10PhysicalTools(){
    await x10Connection.enablePhysicalPageButton();
    status.textContent='Modo agenda solicitado. Pulsa el botón físico de nueva página y comprueba si aparece una hoja digital.';
   }catch(e){status.textContent='No se pudo activar: '+e.message;}
- };
- restore.onclick=async()=>{
-  if(!x10Connection?.connected){status.textContent='Conecta primero la X10.';return;}
-  try{
-   if(x10DownloadController)throw Error('Termina la lectura antes de activar la escritura.');
-   await x10ResumeCurrentPage(message=>{status.textContent=message;});
-  }catch(e){status.textContent='No se pudo restaurar la escritura: '+e.message;}
  };
  cancel.onclick=()=>{x10DownloadController?.abort();cancel.disabled=true;status.textContent='Cancelando después del paquete en curso…';};
  sync.onclick=()=>{
