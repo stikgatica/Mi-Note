@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import '../../x10-ble.js';
+import '../src/x10-ble.js';
 
 test('0x8A avisa al cuaderno cuando la Huion pulsa nueva página',()=>{
  const notified=[];

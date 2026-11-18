@@ -1,19 +1,20 @@
-# Arquitectura actual: Mi Note Android (V0.4 experimental)
+# Arquitectura — Mi Note X10 Android (V0.40)
 
-La APK Android es el producto principal. La PWA anterior es **legado** y la UI HTML, JS y CSS raíz se mantiene como fuente compartida de la compilación Capacitor.
+Mi Note es una **aplicación Android Capacitor**, no un sitio PWA. La interfaz HTML/CSS/JS se integra en un **WebView local**; los cuadernos se guardan en IndexedDB de la aplicación.
 
-## Componentes
-1. UI A5, IndexedDB local y trazos vectoriales: `index.html`, `app.js`, `styles.css`.
-2. Paquete Android: `android-native/`; ensambla y endurece el contenido web, sin permiso de internet.
-3. BLE: `android-native/src/ble-adapter.js` usa el plugin Capacitor; `x10-ble.js` decodifica trazos en directo, escucha 0x8A cuando el equipo emite avisos del modo agenda y almacena puntos originales.
-4. Extracción: `android-native/src/offline-x10.js` consulta 0x85, solicita 0x86, interpreta 0x87, repone paquetes faltantes con 0x88 e importa solo páginas completas con SHA-256 a IndexedDB. No envía 0x8B ni 0x8C.
-5. Seguridad: `android-native/scripts/harden.mjs` modifica manifest y normas de backup. No hay sincronización de red en APK.
-6. Compilación: GitHub Actions crea APK release firmada y publica exclusivamente APK y hashes en GitHub Releases.
+## Capas
 
-## Estado / límites
-- Selección y reconexión BLE Android V0.3 confirmadas por el usuario.
-- Botón de página y extracción offline V0.4 integrados como primera versión experimental; por validar con hardware real.
-- Cada compilación efímera cambia de firma; respaldar JSON antes de reinstalar.
-- Aún no se ha implementado cifrado local opcional ni sincronización de equipos.
+1. **Interfaz y dibujo:** `android-native/src/index.html`, `app.js`, `styles.css`, overlays y menús de `android-native/src/`. Escritura vectorial asociada a cuaderno y página.
+2. **BLE Huion X10:** `src/ble-adapter.js` usa `@capacitor-community/bluetooth-le`; `src/x10-ble.js` mantiene **modo agenda únicamente** y decodifica escritura online `0x8D`, botón físico `0x8A` y autenticación.
+3. **Importación de memoria:** `src/offline-x10.js` lee índices y paquetes usando `0x85`, `0x86`, `0x87` y recuperación `0x88`; evita borrado `0x8B/0x8C`, conserva duplicados/versiones y marca pendientes.
+4. **Almacenamiento y copia:** IndexedDB local; respaldo JSON y complemento Android `native-backup/` con selector de documentos SAF para la copia privada.
+5. **Compilación:** `scripts/prepare.mjs` crea `stage/` únicamente desde `android-native/src/`; otras transformaciones específicas Android agregan paneles, orientación, batería y respaldo. Vite empaqueta y Capacitor sincroniza el APK.
+6. **Privacidad:** `scripts/harden.mjs` retira `INTERNET` y limita backup automático. El APK no depende de GitHub Pages ni registra service workers.
 
-Ver `README.md` para uso, pruebas y recuperación no destructiva. Documentación histórica: `docs/README_PWA_LEGACY.md`.
+## Validación y límites
+
+La V0.38 fue comprobada por el usuario con X10 real: LED azul, escritura, importación y resumen de trazos. V0.40 reorganiza rutas y retira dependencias de PWA sin cambiar el códec BLE ni el lector offline; requiere prueba física posterior. No hay modo tableta ni «Continuar escribiendo».
+
+La firma de la APK de prueba es efímera. Conservar respaldo antes de desinstalar o cambiar de versión.
+
+Consulte `README.md` para uso y `android-native/README.md` para compilar.

@@ -6,8 +6,6 @@ const VERSION = 'mi-note-v1';
 const key = 'state';
 let db, state, tool = 'pen', inStroke = null, isErasing = false, undoState = new Map();
 let currentColor = '#153f82', currentWidth = 3, saveQueue = Promise.resolve();
-let authToken = null, authExpiry = 0, oauthClient = null, oauthClientId = '';
-let deferredInstall = null;
 const canvas = $('paper'), ctx = canvas.getContext('2d', {alpha: false});
 const clone = v => JSON.parse(JSON.stringify(v));
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : Date.now()+'-'+Math.random().toString(36).slice(2);
@@ -75,15 +73,10 @@ function setupEvents(){setupX10();canvas.addEventListener('pointerdown',drawStar
  $('printPdf').onclick=()=>{const blob=new Blob([svgFor(page())],{type:'image/svg+xml'});const url=URL.createObjectURL(blob);const win=window.open('','_blank');if(!win){URL.revokeObjectURL(url);notice('El navegador bloqueó la ventana de impresión.',true);return;}win.document.write('<!doctype html><html><head><title>Imprimir Mi Note</title><style>body{margin:0}img{display:block;width:100%;max-height:100vh;object-fit:contain}@page{size:A4;margin:8mm}</style></head><body><img id="doc" alt="Hoja"/></body></html>');win.document.close();const img=win.document.getElementById('doc');img.onload=()=>{win.focus();win.print();setTimeout(()=>URL.revokeObjectURL(url),4000);};img.src=url;};
  $('backupBtn').onclick=exportBackup;
  $('importBtn').onclick=()=>$('importInput').click();$('importInput').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;if(f.size>15*1024*1024){notice('Archivo demasiado grande para este importador (máximo 15 MB).',true);return;}try{const obj=JSON.parse(await f.text());if(validBackup(obj)){const result=mergeBackup(obj);notice(`Combinación completa: ${result.added} hojas añadidas; ${result.conflicts} conflictos preservados.`);}else if(Array.isArray(obj.strokes)&&('max_x'in obj||'maxX'in obj))importHuion(obj);else throw Error('No reconozco el formato JSON. Usa un respaldo Mi Note o el formato de extracción Huion X10.');}catch(err){notice('Importación fallida: '+err.message,true);}};
- $('settingsBtn').onclick=()=>$('driveDialog').showModal();$('toggleSidebar').onclick=()=>$('sidebar').classList.toggle('open');$('fullscreenBtn').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen?.();};$('installBtn').onclick=async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;$('installBtn').hidden=true;};
- window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;$('installBtn').hidden=false;});
+ $('toggleSidebar').onclick=()=>$('sidebar').classList.toggle('open');$('fullscreenBtn').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen?.();};
  document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){if(e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}}});
- $('clientId').value=localStorage.getItem('minote_client_id')||'';$('clientId').addEventListener('change',e=>{localStorage.setItem('minote_client_id',e.target.value.trim());authToken=null;oauthClient=null;});
- $('connectDrive').onclick=async()=>{try{await authorizeDrive();setDriveStatus('Google conectado. Puedes crear o combinar respaldos.');}catch(e){setDriveStatus('No se pudo conectar: '+e.message);}};
- $('uploadDrive').onclick=async()=>{try{setDriveStatus('Autorizando y preparando copia…');await authorizeDrive();await persist();const folder=await getDriveFolder();const result=await uploadSnapshot(folder);setDriveStatus('Copia subida a tu Drive: '+result.name+' (ID '+result.id+').');notice('Respaldo creado en tu Google Drive.');}catch(e){setDriveStatus('Error al respaldar: '+e.message);}};
- $('pullDrive').onclick=async()=>{if(!confirm('Se incorporarán hojas del respaldo más reciente de Drive. Las distintas se conservarán como copias de conflicto. ¿Continuar?'))return;try{setDriveStatus('Buscando respaldos en tu Drive…');await authorizeDrive();const folder=await getDriveFolder(false);if(!folder){setDriveStatus('Todavía no existe la carpeta de Mi Note en tu Drive.');return;}const remote=await loadLatestSnapshot(folder);if(!remote){setDriveStatus('No hay respaldos disponibles.');return;}const merged=mergeBackup(remote);setDriveStatus(`Respaldo combinado: ${merged.added} hojas incorporadas; ${merged.conflicts} conflictos protegidos.`);notice('Se combinaron los datos de Drive con tus notas locales.');}catch(e){setDriveStatus('Error al combinar: '+e.message);}};
+
 }
-function setDriveStatus(message){$('driveStatus').textContent=message;}
 
 /* Integración Huion Note X10: solo escritura confirmada y asociación de páginas.
    Las notas existentes y formato IndexedDB V0.2 no se alteran. */
@@ -188,7 +181,7 @@ function x10MakeConnection(){
   onConnected:name=>{
    if(x10Connection!==connection)return;
    // Mantener la referencia BLE incluso tras perder GATT: permite reabrirla
-   // sin selector mientras Chrome Android no destruya esta pestaña/PWA.
+   // Reutilizar el permiso BLE autorizado mientras Android conserve la actividad.
    x10InMemoryDevice=connection.device;
    if(!x10ActiveNoteId||!x10ActivePageId||!state.notebooks.some(n=>n.id===x10ActiveNoteId&&n.pages.some(p=>p.id===x10ActivePageId))){
     x10BindCurrent();
@@ -260,17 +253,7 @@ async function x10TryAutomatic(reason='inicio'){
 }
 function x10RefreshCapability(){
  const el=$('x10ReconnectHint');
- if(!el)return;
- const onAndroid=/Android/i.test(navigator.userAgent||'');
- if(!navigator.bluetooth){
-  el.textContent='Bluetooth web no está disponible. Abre Mi Note en Chrome para Android mediante HTTPS.';
- }else if(typeof navigator.bluetooth.getDevices==='function'){
-  el.textContent='Este Chrome permite recuperar equipos autorizados entre aperturas. Mantén Bluetooth encendido y el permiso de la X10 activo.';
- }else if(onAndroid){
-  el.textContent='Android: Mi Note puede reconectar sin preguntar mientras siga abierta en memoria. Si Android cierra totalmente la PWA, Chrome puede exigir pulsar «Conectar X10» nuevamente.';
- }else{
-  el.textContent='Reconexión automática mientras la página siga abierta. Si este navegador no dispone de getDevices(), tras cerrarla habrá que autorizar la conexión de nuevo.';
- }
+ if(el)el.textContent='Android puede reconectar la X10 autorizada cuando Bluetooth esté disponible. Mantenga la app abierta para conservar la sesión.';
 }
 function setupX10(){
  if(!window.MiNoteX10Ble){$('x10OpenBtn').disabled=true;return;}
@@ -408,12 +391,5 @@ function setupX10(){
  Promise.resolve().then(()=>x10TryAutomatic('inicio'));
 }
 
-function loadGoogleScript(){if(window.google?.accounts?.oauth2)return Promise.resolve();return new Promise((resolve,reject)=>{if(!navigator.onLine)return reject(Error('Necesitas conexión a internet.'));const existing=document.querySelector('script[data-gis]');if(existing){existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',()=>reject(Error('No se pudo cargar el servicio de Google.')),{once:true});return;}const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;s.dataset.gis='true';s.onload=resolve;s.onerror=()=>reject(Error('No se pudo cargar el servicio de Google.'));document.head.append(s);});}
-async function authorizeDrive(){if(authToken&&Date.now()<authExpiry)return authToken;const id=$('clientId').value.trim();if(!/^[\w-]+\.apps\.googleusercontent\.com$/.test(id))throw Error('Configura primero el OAuth Client ID de tipo Web en Google Cloud.');await loadGoogleScript();if(!window.google?.accounts?.oauth2)throw Error('Google Identity Services no está disponible.');if(!oauthClient||oauthClientId!==id){oauthClientId=id;oauthClient=window.google.accounts.oauth2.initTokenClient({client_id:id,scope:'https://www.googleapis.com/auth/drive.file',callback:()=>{}});}return new Promise((resolve,reject)=>{oauthClient.callback=(response)=>{if(response.error)return reject(Error(response.error_description||response.error));authToken=response.access_token;authExpiry=Date.now()+Math.max(120,(response.expires_in||3600)-120)*1000;resolve(authToken);};oauthClient.requestAccessToken({prompt:authToken?'':'consent'});});}
-async function driveFetch(path,options={}){if(!authToken||Date.now()>=authExpiry)throw Error('La sesión Google expiró. Vuelve a conectar.');const response=await fetch('https://www.googleapis.com'+path,{...options,headers:{Authorization:'Bearer '+authToken,...options.headers}});if(!response.ok){let reason=String(response.status);try{const j=await response.json();reason=j.error?.message||reason;}catch{}throw Error('Google Drive: '+reason);}return response;}
-async function driveList(q,fields='nextPageToken,files(id,name,createdTime,mimeType)',options=''){const u=new URLSearchParams({q,fields,pageSize:'100',...options&&{orderBy:'createdTime desc'}});const r=await driveFetch('/drive/v3/files?'+u);return r.json();}
-async function getDriveFolder(create=true){const q="name = 'Mi Note - Privado' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";const result=await driveList(q);if(result.files?.length)return result.files[0].id;if(!create)return null;const r=await driveFetch('/drive/v3/files?fields=id,name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Mi Note - Privado',mimeType:'application/vnd.google-apps.folder'})});const obj=await r.json();return obj.id;}
-async function uploadSnapshot(folderId){const data=JSON.stringify(backupObject());const filename=`MiNote_${stamp()}_${state.deviceId.slice(0,8)}.json`;const metadata={name:filename,parents:[folderId],mimeType:'application/json'};const boundary='minote_'+uid().replaceAll('-','');const body=new Blob([`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${data}\r\n--${boundary}--\r\n`],{type:'multipart/related; boundary='+boundary});const r=await driveFetch('/upload/drive/v3/files?uploadType=multipart&fields=id,name',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+boundary},body});return r.json();}
-async function loadLatestSnapshot(folderId){const q=`'${folderId}' in parents and mimeType = 'application/json' and trashed = false`;const result=await driveList(q,undefined,'sort');const files=(result.files||[]).filter(f=>f.name?.startsWith('MiNote_')).sort((a,b)=>String(b.createdTime).localeCompare(String(a.createdTime)));if(!files.length)return null;const r=await driveFetch(`/drive/v3/files/${encodeURIComponent(files[0].id)}?alt=media`);const obj=await r.json();if(!validBackup(obj))throw Error('El respaldo de Drive tiene un formato inválido.');return obj;}
-async function start(){try{db=await openDb();state=await getSaved();if(!state||state.schema!==VERSION||!Array.isArray(state.notebooks))state=starter();syncActive();setupEvents();render();await persist();if(!window.MiNoteNativeBLE&&'serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{});}catch(err){console.error(err);document.body.innerHTML='<main style="padding:25px"><h1>No se pudo iniciar Mi Note</h1><p>El navegador debe permitir IndexedDB. Prueba Chrome o Edge en HTTPS o localhost.</p><pre>'+esc(err.message)+'</pre></main>';}}
+async function start(){try{db=await openDb();state=await getSaved();if(!state||state.schema!==VERSION||!Array.isArray(state.notebooks))state=starter();syncActive();setupEvents();render();await persist();}catch(err){console.error(err);document.body.innerHTML='<main style="padding:25px"><h1>No se pudo iniciar Mi Note</h1><p>El navegador debe permitir IndexedDB. Prueba Chrome o Edge en HTTPS o localhost.</p><pre>'+esc(err.message)+'</pre></main>';}}
 start();

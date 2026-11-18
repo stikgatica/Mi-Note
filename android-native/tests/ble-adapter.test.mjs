@@ -57,7 +57,7 @@ test('muestra ayuda si ubicacion del sistema apagada',async()=>{
 });
 
 test('la conexión X10 siempre usa el protocolo de agenda y nunca inicia modo tableta',async()=>{
- await import('../../x10-ble.js');
+ await import('../src/x10-ble.js');
  const sent=[];
  const mock={
   async initialize(){},async isEnabled(){return true;},async isLocationEnabled(){return true;},

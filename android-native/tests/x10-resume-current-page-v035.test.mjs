@@ -14,8 +14,8 @@ test('la importación X10 permanece en agenda sin reactivar el lápiz al termina
 test('la interfaz omite continuar escribiendo, modo alternativo y prueba de tableta',()=>{
  const mobile=readFileSync(new URL('../scripts/mobile.mjs',import.meta.url),'utf8');
  const memory=readFileSync(new URL('../src/memory-import.js',import.meta.url),'utf8');
- const html=readFileSync(new URL('../../index.html',import.meta.url),'utf8');
- const app=readFileSync(new URL('../../app.js',import.meta.url),'utf8');
+ const html=readFileSync(new URL('../src/index.html',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../src/app.js',import.meta.url),'utf8');
  for(const value of [mobile,memory,html,app]){
   assert.doesNotMatch(value,/x10MemoryResumeDrawing|x10MemorySwitchMode|x10ProbeTablet/);
  }

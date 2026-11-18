@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import '../../x10-ble.js';
+import '../src/x10-ble.js';
 import {createNativeBLE} from '../src/ble-adapter.js';
 
 const {Connection,parseNotePenFrames}=globalThis.MiNoteX10Ble;

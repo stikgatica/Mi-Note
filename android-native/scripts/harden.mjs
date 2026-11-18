@@ -1,5 +1,5 @@
 // Endurecimiento del APK Android: se aplica después de "cap sync".
-// No modifica la PWA ni solicita permisos nuevos de los usuarios.
+// No solicita permisos de red y conserva el almacenamiento aislado de Android.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 const file=path.join('android','app','src','main','AndroidManifest.xml');

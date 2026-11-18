@@ -1,4 +1,4 @@
-// Carga el puente BLE antes del código de Mi Note; el navegador web no cambia.
+// Entrada de la aplicación Capacitor Android; la interfaz se ejecuta en un WebView local.
 import { BleClient } from '@capacitor-community/bluetooth-le';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { createNativeBLE } from './ble-adapter.js';
@@ -9,9 +9,7 @@ if (Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform()) {
 } else {
   console.warn('Este paquete Android necesita ejecutarse con Capacitor nativo.');
 }
-// Se importan en orden: el protocolo X10 precede a la interfaz y al diagnóstico.
-// La aplicación web del repositorio sigue utilizando sus scripts originales.
+// Importar el protocolo Huion y los cuadernos locales en el WebView Android.
 await import('./x10-ble.js');
 await import('./offline-x10.js');
 await import('./app.js');
-await import('./x10-android-help.js');

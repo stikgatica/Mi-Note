@@ -1,9 +1,10 @@
-name: Mi Note X10 Android v0.25 - corregir último paquete offline X10
+name: Mi Note X10 Android v0.40 - fuentes nativas independientes
 on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/android-release-v025.yml'
+      - '.github/workflows/android-release.yml'
+      - 'android-native/**'
   workflow_dispatch:
 
 permissions:
@@ -47,6 +48,8 @@ jobs:
           node scripts/enable-v022.mjs
           node --check stage/app.js
           node --check stage/memory-import.js
+          node --check stage/huion-archive.js
+          node --check stage/floating-page-x10.js
           node --check stage/landscape-ui.js
           node --check stage/floating-ui.js
           node --check stage/library-page-ui.js
@@ -69,14 +72,14 @@ jobs:
           # Revision final de mejoras en trazos, guardado e interfaz.
           # Validar selector sin expresiones regulares ambiguas en Node 22.
           npx vite build
-          sed -i 's/Mi Note X10 Android V0.4/Mi Note X10 Android V0.25/g' dist/index.html
+          sed -i 's/Mi Note X10 Android V0.4/Mi Note X10 Android V0.40/g' dist/index.html
       - name: Crear Android y configurar privacidad
         run: |
           npx cap add android
           npx cap sync android
           node scripts/harden.mjs
           node native-backup/setup.mjs
-          sed -i -E 's/versionCode [0-9]+/versionCode 25/; s/versionName "[^"]+"/versionName "0.25.0"/' android/app/build.gradle
+          sed -i -E 's/versionCode [0-9]+/versionCode 40/; s/versionName "[^"]+"/versionName "0.40.0"/' android/app/build.gradle
       - name: Generar APK release sin depuracion
         run: |
           cd android
@@ -111,39 +114,39 @@ jobs:
           "$TOOLS/zipalign" -p -f 4 "$UNSIGNED" signed/unsigned-aligned.apk
           "$TOOLS/apksigner" sign --ks "$RUNNER_TEMP/minote-v02-release.jks" \
             --ks-key-alias minote-x10 --ks-pass "pass:$PASSWORD" \
-            --key-pass "pass:$PASSWORD" --out signed/Mi-Note-X10-Android-v0.25.apk \
+            --key-pass "pass:$PASSWORD" --out signed/Mi-Note-X10-Android-v0.40.apk \
             signed/unsigned-aligned.apk
-          "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.25.apk
-          sha256sum signed/Mi-Note-X10-Android-v0.25.apk | tee signed/SHA256SUMS.txt
+          "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.40.apk
+          sha256sum signed/Mi-Note-X10-Android-v0.40.apk | tee signed/SHA256SUMS.txt
       - name: Verificar permisos del APK
         shell: bash
         run: |
           set -euo pipefail
           TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.25.apk | tee signed/PERMISOS.txt
+          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.40.apk | tee signed/PERMISOS.txt
           if grep -Fq 'android.permission.INTERNET' signed/PERMISOS.txt; then
             echo 'ERROR: permiso INTERNET incluido' >&2; exit 1
           fi
       - name: Guardar APK para respaldo
         uses: actions/upload-artifact@v4
         with:
-          name: Mi-Note-X10-v0.25-APK
+          name: Mi-Note-X10-v0.40-APK
           path: |
-            android-native/signed/Mi-Note-X10-Android-v0.25.apk
+            android-native/signed/Mi-Note-X10-Android-v0.40.apk
             android-native/signed/SHA256SUMS.txt
             android-native/signed/PERMISOS.txt
           if-no-files-found: error
-      - name: Publicar Mi Note X10 Android v0.25
+      - name: Publicar Mi Note X10 Android v0.40
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           # La publicación final reemplaza artefactos de compilaciones previas de prueba.
-          if gh release view android-v0.25 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete android-v0.25 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          if gh release view android-v0.40 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete android-v0.40 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
           fi
-          gh release create android-v0.25 signed/Mi-Note-X10-Android-v0.25.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
+          gh release create android-v0.40 signed/Mi-Note-X10-Android-v0.40.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title 'Mi Note X10 Android V0.25 — paquete final de longitud variable' \
-            --notes 'V0.25 corrige patrón 42/43 y 33/34 de la memoria X10: el filtro exigía longitud fija 0x7E y rechazaba el último paquete corto. Ahora valida la longitud declarada contra la real y los bloques de seis bytes, acepta tramas 0x87/0x88 cortas y reporta secuencias faltantes si persiste una anomalía. Conserva reintentos, no importa hojas parciales, no envía borrar 0x8B ni limpiar 0x8C. Prueba de regresión con 43 paquetes y último corto. Mantiene batería real, tinta optimizada y biblioteca. Requiere validación con X10 física. Respaldo JSON antes de reinstalar.' \
+            --title 'Mi Note X10 Android V0.40 — proyecto Android sin PWA' \
+            --notes 'V0.40: migra las fuentes usadas por la APK a android-native/src, retira sitio PWA, OAuth web, service worker, documentación de Pages y workflows de versiones previas. Conserva los protocolos Huion BLE de V0.38/V0.39 para escritura e importación en modo agenda. Requiere validación física tras la migración; haga respaldo previo a instalar.' \
             --prerelease --latest=false

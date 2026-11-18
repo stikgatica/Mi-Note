@@ -1,9 +1,9 @@
 {
   "name": "mi-note-x10-android",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.40.0",
   "type": "module",
-  "description": "Mi Note X10: app Android con Bluetooth LE nativo basada en la interfaz V0.2",
+  "description": "Mi Note X10: aplicación Android Capacitor con BLE Huion modo agenda, cuadernos locales y respaldo privado",
   "scripts": {
     "prepare:android": "node scripts/prepare.mjs",
     "build:web": "node scripts/prepare.mjs && node scripts/features.mjs && vite build",
