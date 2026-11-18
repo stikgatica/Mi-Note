@@ -10,12 +10,12 @@ Aplicación **Android nativa con Capacitor y Bluetooth LE** para la **Huion Note
 - **Cuadernos:** hojas A5, trazos vectoriales, navegación, guardado local, exportación y copias de seguridad.
 - **La X10 física no se borra:** el lector no utiliza los comandos 0x8B ni 0x8C.
 
-La **V0.40** reorganiza el repositorio y elimina el código de la antigua PWA. Aunque incorpora pruebas automatizadas, debe comprobarse nuevamente con la X10 para confirmar que la escritura y la importación conservan el comportamiento validado en V0.38.
+La **V0.41** adapta menú, icono Bluetooth, lápiz negro y orientación automática sin tocar la decodificación del lápiz. La V0.40 reorganizó el repositorio y elimina el código de la antigua PWA. Aunque incorpora pruebas automatizadas, debe comprobarse nuevamente con la X10 para confirmar que la escritura y la importación conservan el comportamiento validado en V0.38.
 
 ## Descargar e instalar
 
 - [Releases de Android](https://github.com/stikgatica/Mi-Note/releases)
-- [Versión V0.40](https://github.com/stikgatica/Mi-Note/releases/tag/android-v0.40) cuando finalice su compilación
+- [Versión V0.41](https://github.com/stikgatica/Mi-Note/releases/tag/android-v0.41) cuando finalice su compilación
 - [Versión V0.38 de referencia](https://github.com/stikgatica/Mi-Note/releases/tag/android-v0.38)
 
 **Antes de cambiar de APK:** exporte «Respaldo JSON» o confirme una copia privada accesible desde Android. Las compilaciones de prueba usan claves de firma temporales: puede ser necesario desinstalar para instalar otra versión, lo que elimina el almacenamiento local de la app. Nunca desinstale sin verificar su respaldo.
@@ -82,3 +82,13 @@ Para instalar una compilación release sin firmar, firme el APK con una clave pr
 - Protocolo documentado en [Reginleif86/huion-note-x10-ble](https://github.com/Reginleif86/huion-note-x10-ble) (MIT).
 
 Para detalles técnicos consulte [ARQUITECTURA.md](ARQUITECTURA.md) y [android-native/README.md](android-native/README.md).
+
+## Interfaz V0.41
+
+- **Importar memoria agenda** es una acción directa del menú, sin grupo «Huion X10».
+- Indicador Bluetooth con luz azul al conectarse en modo agenda; no se muestra «X10» junto al icono. Se conserva el estado de batería.
+- Los trazos nuevos usan negro por defecto; los apuntes existentes mantienen sus colores.
+- **Pantalla vertical:** hoja A5 vertical y barra de herramientas horizontal. **Pantalla horizontal (en ambos sentidos):** hoja apaisada con el giro `landscape-cw` validado y barra vertical.
+- El selector «Color del lápiz» aparece directamente debajo de «Grosor del lápiz» en el menú; se retira la sección «Herramientas».
+- El cambio sigue la autorrotación del sistema Android; si el teléfono tiene bloqueado el giro automático, habilítelo en ajustes rápidos.
+
