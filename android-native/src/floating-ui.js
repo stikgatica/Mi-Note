@@ -46,7 +46,6 @@ const menuButton=(id,text,handler)=>{
  });return b;
 };
 menuButton('floatingLibraryMenu','▤ Biblioteca de cuadernos',()=>openLibrary());
-menuButton('floatingX10Menu','● X10 · Conexión y estado',()=>{const dlg=$('x10Dialog');if(dlg&&!dlg.open)dlg.showModal();});
 const axisButton=menuButton('floatingAxisMenu','↕ Barra vertical / horizontal',()=>setAxis(axis==='horizontal'?'vertical':'horizontal'));
 const lockButton=menuButton('floatingLockMenu','◌ Bloquear posición de la barra',()=>setLocked(!locked));
 const colorLabel=document.createElement('label');colorLabel.className='floating-color-label field';
