@@ -1,4 +1,5 @@
 // Patch exclusivamente para el paquete Android: la PWA clásica sigue disponible.
+// V0.33: conservar el reintento seguro de autenticación inicial en modo agenda.
 // Inserta controles para escuchar 0x8A y leer páginas almacenadas sin borrarlas.
 import fs from 'node:fs/promises';
 import path from 'node:path';
