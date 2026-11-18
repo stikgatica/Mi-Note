@@ -30,12 +30,4 @@ if(list){
  if(control){const tools=Array.from(list.querySelectorAll('details')).find(e=>e.querySelector('summary')?.textContent==='Herramientas');tools?.append(control);}
  const color=menu.querySelector('.floating-color-label');
  if(color){const tools=Array.from(list.querySelectorAll('details')).find(e=>e.querySelector('summary')?.textContent==='Herramientas');tools?.append(color);}
- const full=document.createElement('button');full.type='button';full.id='menuFullscreen';
- full.className='minote-fullscreen-action';full.textContent='⛶ Pantalla completa';
- full.addEventListener('click',()=>{
-  menu.close();
-  if(document.fullscreenElement){void document.exitFullscreen?.().catch(()=>{});}
-  else if(document.documentElement.requestFullscreen){void document.documentElement.requestFullscreen().catch(()=>{});}
- });
- list.append(full);
 }
