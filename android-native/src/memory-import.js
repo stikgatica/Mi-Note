@@ -2,6 +2,7 @@
 const $=id=>document.getElementById(id);
 const modal=$('x10MemoryDialog'),open=$('x10MemoryOpen'),select=$('x10MemoryNotebook');
 const message=$('x10MemoryProgress'),run=$('x10MemoryRun'),cancel=$('x10MemoryCancel');
+const resume=$('x10MemoryResumeDrawing');
 const exportDiagnostic=$('x10MemoryDiagnosticExport');
 function diagnostic(){
  return window.MiNoteX10Offline?.getLastDiagnostic?.(false)||null;
@@ -64,6 +65,7 @@ function busy(flag){
  $('x10MemoryName').disabled=flag;
  $('x10MemoryPin').disabled=flag;
  cancel.disabled=!flag;
+ if(resume)resume.disabled=flag;
  if(exportDiagnostic)exportDiagnostic.disabled=flag||exportingDiagnostic;
  $('x10MemoryClose').disabled=flag;
 }
@@ -117,6 +119,17 @@ open?.addEventListener('click',()=>{
 });
 select?.addEventListener('change',updateNewField);
 run?.addEventListener('click',()=>void importMemory());
+resume?.addEventListener('click',async()=>{
+ const api=engine();if(active||api?.busy())return;
+ if(!api?.connected()){info('La X10 no está conectada. Pulse X10 para conectarla.',true);return;}
+ resume.disabled=true;
+ try{
+  info('Activando lápiz X10 en la hoja abierta…');
+  await api.restore();
+  modal?.close();
+ }catch(error){info('No fue posible activar la escritura: '+error.message,true);}
+ finally{resume.disabled=false;}
+});
 cancel?.addEventListener('click',()=>{
  if(!active)return;
  engine()?.cancel();
