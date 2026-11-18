@@ -116,14 +116,35 @@ function setupX10PhysicalTools(){
      x10CancelRetry();x10Connecting=true;
      try{await x10Connection.reconnectAgendaOnly();}
      finally{x10Connecting=false;}
+     // La X10 puede tardar en activar agenda tras cerrar el canal de lápiz.
+     await new Promise(resolve=>setTimeout(resolve,650));
     }
+    if(controller.signal.aborted)throw Error('Descarga cancelada por el usuario.');
     notify('Comprobando memoria interna; no se borrará ningún dato físico…');
-    const result=await MiNoteX10Offline.download(x10Connection,{
+    const options={
      pin:pinCode,signal:controller.signal,maxPages:64,
      officialHandshake:true, // Único método validado: agenda oficial completa
      onProgress:notify,
      onPage:async result=>x10ImportOfflinePage(result,notebookId)
-    });
+    };
+    let result;
+    try{
+     result=await MiNoteX10Offline.download(x10Connection,options);
+    }catch(firstError){
+     // Caso comprobado en el dispositivo: la primera autenticación se pierde
+     // tras cambiar de tableta a agenda y la segunda funciona en el MISMO GATT.
+     // Reintentar solo antes de explorar la primera página; nunca duplicar ni
+     // repetir una importación que ya ha podido guardar trazos.
+     const diagnostic=MiNoteX10Offline.getLastDiagnostic?.(false);
+     const startupTimeout=/La Huion no entregó el paquete solicitado dentro del plazo/i.test(firstError?.message||'')
+      && Array.isArray(diagnostic?.pages)&&diagnostic.pages.length===0;
+     if(!startupTimeout||controller.signal.aborted||!x10Connection.connected)throw firstError;
+     notify('La X10 aún está activando el modo agenda. Reintentando automáticamente en la misma conexión, sin borrar páginas…');
+     await new Promise(resolve=>setTimeout(resolve,1100));
+     if(controller.signal.aborted)throw Error('Descarga cancelada por el usuario.');
+     // Reenvía la secuencia oficial 81/82/95/85; NO desconecta ni manda 8B/8C.
+     result=await MiNoteX10Offline.download(x10Connection,options);
+    }
     notify('Importación terminada: '+result.imported+' páginas nuevas ('+(result.partialImported||0)+' muestras PARCIALES, no escritura reconstruida), '+result.duplicate+' repetidas y '+result.empty+' vacías. Sin borrado de memoria X10.');
     return result;
    }catch(err){
