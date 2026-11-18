@@ -153,14 +153,19 @@ public class PrivateBackupPlugin extends Plugin {
       JSObject result=new JSObject();result.put("cancelled",true);call.resolve(result);return;
     }
     Uri uri=data.getData();String name=label(uri);
-    String suffix=name.toLowerCase(java.util.Locale.ROOT);
-    if(!suffix.endsWith(".ahn")&&!suffix.endsWith(".ahns")){
-      call.reject("Seleccione un archivo Huion .ahn o .ahns.");return;
-    }
     try{
+      // Algunos proveedores Android devuelven "documento", un UUID o un
+      // nombre sin extension. Validar los bytes, NO la etiqueta del selector.
       byte[] bytes=readBytes(uri);
       if(bytes.length==0||bytes.length>16*1024*1024)
         throw new IllegalStateException("Archivo Huion vacío o mayor a 16 MB.");
+      // .ahn y .ahns son ZIP, a veces ZIP anidado. Comprobar el encabezado
+      // es solo una validacion inicial: JavaScript verifica el contenido Huion.
+      boolean zip=bytes.length>=4&&bytes[0]==0x50&&bytes[1]==0x4b&&
+        bytes[2]==0x03&&bytes[3]==0x04;
+      if(!zip)
+        throw new IllegalArgumentException("El archivo seleccionado ("+name+
+          ") no es un documento Huion .ahn/.ahns. Si es JSON, use Importar archivo de Mi Note; si es ZIP, seleccione el .ahns original.");
       JSObject result=new JSObject();
       result.put("cancelled",false);result.put("name",name);
       result.put("base64",Base64.encodeToString(bytes,Base64.NO_WRAP));
