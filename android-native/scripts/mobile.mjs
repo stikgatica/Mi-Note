@@ -56,12 +56,11 @@ const memoryDialog=[
 '<label class="field">Guardar páginas en<select id="x10MemoryNotebook" aria-label="Cuaderno de destino"></select></label>',
 '<label id="x10MemoryNewNameWrap" class="field">Nombre del cuaderno nuevo<input id="x10MemoryName" type="text" maxlength="90" value="Huion X10 · Memoria"></label>',
 '<label class="field">PIN de la agenda, solo si lo pide<input id="x10MemoryPin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Opcional"></label>',
-'<label class="field">Modo de sesión Bluetooth<select id="x10MemorySessionMode"><option value="agenda-clean" selected>Agenda pura (sin comandos de tableta C9/C8/CA)</option><option value="agenda-official">Agenda oficial completa (sin tableta + 0x91/0x8D)</option><option value="reuse-current">Reutilizar sesión actual (modo V0.31)</option></select></label>',
+'<p class="x10-import-info">Se utilizará automáticamente el método de recuperación de la agenda que funciona con su Huion X10.</p>',
 '<div id="x10MemoryProgress" class="x10-details" role="status" aria-live="polite">Conecte la Huion antes de importar.</div>',
 '<div class="memory-import-actions"><button id="x10MemoryRun" type="button" class="primary">↓ Importar memoria</button><button id="x10MemoryCancel" type="button" disabled>Cancelar lectura</button></div>',
-'<button type="button" id="x10MemoryDiagnosticExport">Guardar diagnóstico X10 (JSON) en Android</button>',
-'<div style="margin-top:12px;border-top:1px solid #b9c5d1;padding-top:12px"><strong>Importar archivo original Huion</strong><label class="field">Páginas del archivo .ahn/.ahns<select id="x10ArchiveSelection"><option value="last-two" selected>Solo las dos últimas páginas</option><option value="all">Todas las páginas con escritura</option></select></label><button type="button" id="x10ImportArchive">Importar archivo .ahn / .ahns</button><p id="x10ArchiveStatus" role="status">Archivo local, sin Bluetooth ni envío a Huion.</p></div>',
-'<small>Importación no destructiva. Se omiten páginas ya recuperadas. Las nuevas hojas se guardan localmente y entran en el respaldo cifrado de Drive si está configurado. La lectura del protocolo Bluetooth requiere validación con su Huion física.</small>',
+
+'<small>Importación no destructiva. Se omiten páginas ya recuperadas. Las nuevas hojas se guardan localmente y entran en el respaldo cifrado de Drive si está configurado. La recuperación directa por Bluetooth se ha validado con la Huion X10.</small>',
 '</dialog>'
 ].join('\n');
 const personalDialog="<dialog id=\"personalBackupDialog\" class=\"dialog personal-backup-dialog\" aria-labelledby=\"personalBackupTitle\">\n<div class=\"dialog-head\"><h2 id=\"personalBackupTitle\">Copia privada en Drive</h2><button id=\"personalBackupClose\" class=\"icon-btn\" aria-label=\"Cerrar\">✕</button></div>\n<p>Seleccione Google Drive desde el selector de archivos de Android. Mi Note accederá únicamente al archivo que usted autorice.</p>\n<div class=\"personal-backup-actions\"><button id=\"personalBackupNew\" type=\"button\">Crear copia nueva</button><button id=\"personalBackupExisting\" type=\"button\">Vincular copia existente</button></div>\n<label class=\"field\">Contraseña de cifrado (mínimo 12 caracteres)<input id=\"personalBackupPassword\" type=\"password\" autocomplete=\"new-password\" minlength=\"12\"></label>\n<label class=\"field\">Repita la contraseña si crea una copia nueva<input id=\"personalBackupConfirm\" type=\"password\" autocomplete=\"new-password\" minlength=\"12\"></label>\n<div class=\"personal-backup-actions\"><button id=\"personalBackupUnlock\" type=\"button\" class=\"primary\">Activar copia cifrada</button><button id=\"personalBackupSync\" type=\"button\">Sincronizar ahora</button></div>\n<div id=\"personalBackupStatus\" class=\"x10-details\" role=\"status\" aria-live=\"polite\">Sin configurar</div>\n<button id=\"personalBackupUnlink\" type=\"button\" class=\"subtle\">Desvincular archivo</button>\n<small>La contraseña no se envía a Google. La clave de cifrado se protege en Android Keystore. La copia es un archivo cifrado; sin la contraseña no se podrá recuperar tras reinstalar. La sincronización funciona mientras la app está activa y puede quedar pendiente hasta que Google Drive suba el archivo. No se eliminan sus cuadernos locales.</small>\n</dialog>";
@@ -71,18 +70,8 @@ html=html.replace('</main>',menu+'\n'+replayDialog+'\n'+personalDialog+'\n'+memo
 const pageCounter='<button id="floatingPageNumber" class="floating-page-counter" type="button" title="Ver páginas o eliminar hoja" aria-label="Página 1 de 1. Administrar hoja">1 / 1</button>';
 if(!html.includes('<button id="tvBoardNext"'))throw Error('Barra flotante sin botón siguiente');
 html=html.replace('<button id="tvBoardNext"',pageCounter+'<button id="tvBoardNext"');
-const x10Quick='<button id="floatingX10Quick" class="floating-x10-button" type="button" title="Conectar o ver estado Huion X10" aria-label="X10 desconectada. Conectar"><span id="floatingX10QuickDot" class="x10-status-dot" aria-hidden="true"></span>X10</button>';
+const x10Quick='<button id="floatingX10Quick" class="floating-x10-button" type="button" title="Conectar Huion Note X10" aria-label="Conectar X10"><span id="floatingX10QuickDot" class="x10-status-dot" aria-hidden="true"></span>Conectar X10</button>';
 html=html.replace('<button id="tvBoardMore"',x10Quick+'<button id="tvBoardMore"');
-const x10Panel=[
- '<section id="floatingX10Panel" class="floating-x10-panel" aria-label="Huion X10">',
- '<div id="floatingX10Indicator" class="floating-x10-indicator" role="status"><span id="floatingX10MenuDot" class="x10-status-dot" aria-hidden="true"></span><strong id="floatingX10Label">Huion X10 · Desconectada</strong></div>',
- '<div class="floating-x10-controls">',
- '<button type="button" id="floatingX10ConnectNow">Conectar X10</button>',
- '<button type="button" id="floatingX10DisconnectNow" disabled>Desconectar</button>',
- '<button type="button" id="floatingX10ViewStatus">Ver estado</button>',
- '</div></section>'
-].join('\n');
-html=html.replace('<div class="mobile-actions-list">',x10Panel+'<div class="mobile-actions-list">');
 const libraryDialog=[
  '<dialog id="floatingLibraryDialog" class="dialog floating-library-dialog" aria-labelledby="floatingLibraryTitle">',
  '<div class="dialog-head"><h2 id="floatingLibraryTitle">Mis cuadernos</h2><button type="button" id="floatingLibraryClose" class="icon-btn" aria-label="Cerrar biblioteca">✕</button></div>',
