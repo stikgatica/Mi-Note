@@ -54,6 +54,8 @@ class Connection{
   this.frameListeners=new Set();this.offlineReading=false;
   // V0.32: registra si esta conexión GATT recibió comandos de tableta (C9/C8/CA).
   this.tabletCommandsSent=false;this.sessionKind=null;this.noteLivePackets=0;
+  this.noteRx={notifications:0,onlineFrames:0,onlineSamples:0,invalidOnline:0,onlineAcks:0,otherPackets:0};
+  this.noteBuffer=new Uint8Array(0);
   this._onData=this._onData.bind(this);this._onDisconnected=this._onDisconnected.bind(this);
  }
  get connected(){return !!this.device?.gatt?.connected;}
@@ -81,6 +83,8 @@ class Connection{
   if(this.connected)return;
   this.intentionalDisconnect=false;
   this.tabletCommandsSent=false;this.sessionKind=null;this.noteLivePackets=0;
+  this.noteRx={notifications:0,onlineFrames:0,onlineSamples:0,invalidOnline:0,onlineAcks:0,otherPackets:0};
+  this.noteBuffer=new Uint8Array(0);
   if(this.data)try{this.data.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
   if(this.cmd)try{this.cmd.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
   if(this.device)try{this.device.removeEventListener('gattserverdisconnected',this._onDisconnected);}catch{}
@@ -149,6 +153,55 @@ class Connection{
    this.status(this.noteLivePackets?'Trazos X10 recibidos en agenda.':'Modo agenda autorizado; esperando escritura en vivo.');
   }catch(e){this.handlers.onDiagnostic?.('Error al activar escritura agenda: '+e.message);}
  }
+ // Normaliza las notificaciones GATT del modo agenda. El firmware puede
+ // enviar dos muestras ONLINE_DATA juntas o fragmentar una entre eventos.
+ // Conserva como máximo 10 bytes incompletos y nunca altera la tinta.
+ _consumeNoteFrames(bytes){
+  if(!bytes?.length)return [];
+  const pending=this.noteBuffer;
+  this.noteBuffer=new Uint8Array(0);
+  if(!pending.length&&!(bytes[0]===0xcd&&bytes[1]===0x8d)){
+   this.noteRx.otherPackets++;return [];
+  }
+  if(pending.length&&bytes[0]===0xcd&&bytes[1]!==0x8d){
+   // El periférico cambió a otra respuesta; descartar una muestra truncada.
+   this.noteRx.invalidOnline++;
+   this.noteRx.otherPackets++;return [];
+  }
+  const data=new Uint8Array(pending.length+bytes.length);
+  data.set(pending);data.set(bytes,pending.length);
+  const samples=[];let cursor=0;
+  while(cursor<data.length){
+   const remaining=data.length-cursor;
+   if(remaining<3){
+    // Solo reservar cabecera parcial cuando comienza por el marcador CD.
+    if(data[cursor]===0xcd)this.noteBuffer=data.slice(cursor);
+    break;
+   }
+   if(data[cursor]!==0xcd||data[cursor+1]!==0x8d){
+    cursor++;continue;
+   }
+   const length=data[cursor+2];
+   if(length!==11&&length!==4){
+    this.noteRx.invalidOnline++;cursor++;continue;
+   }
+   if(remaining<length){this.noteBuffer=data.slice(cursor);break;}
+   if(length===4){
+    this.noteRx.onlineAcks++;cursor+=4;continue;
+   }
+   this.noteRx.onlineFrames++;
+   const parsed=parseNotePenFrames(data.subarray(cursor,cursor+11));
+   if(parsed?.length)samples.push(...parsed);
+   else this.noteRx.invalidOnline++;
+   cursor+=11;
+  }
+  this.noteRx.onlineSamples+=samples.length;
+  return samples;
+ }
+ liveDiagnostic(){
+  return {...this.noteRx,liveSamples:this.noteLivePackets,
+   writingConfirmed:this.noteLivePackets>0,session:this.sessionKind,connected:this.connected};
+ }
  _onData(e){
   const value=e.target?.value;if(!value)return;
   const b=new Uint8Array(value.buffer,value.byteOffset,value.byteLength);this.packetCount++;
@@ -156,13 +209,18 @@ class Connection{
    for(const fn of this.frameListeners){try{fn(b);}catch(e){this.handlers.onDiagnostic?.('Lector de memoria: '+e.message);}}
   }
   if(!this.offlineReading&&this.sessionKind==='agenda-pura'){
-   const samples=parseNotePenFrames(b);
-   if(samples?.length){
+   this.noteRx.notifications++;
+   const samples=this._consumeNoteFrames(b);
+   if(samples.length){
     this.mode='agenda';this.noteLivePackets+=samples.length;
     if(this.noteLivePackets===samples.length)this.status('Se reciben trazos en vivo del modo agenda.');
     for(const p of samples)this.handlers.onPen?.(p,this.limits,'agenda');
     return;
    }
+   // Las muestras 0x8D inválidas no se descartan silenciosamente: se registran
+   // sin guardar coordenadas ni contenido manuscrito.
+   if((this.noteRx.invalidOnline===1||this.noteRx.invalidOnline%25===0)&&this.noteRx.invalidOnline>0)
+    this.handlers.onDiagnostic?.('X10 ONLINE_DATA sin interpretar: '+this.noteRx.invalidOnline+' paquetes; longitudes y datos privados no guardados.');
   }
   if(b.length<3||b[0]!==0xcd)return;
   const op=b[1];
@@ -195,7 +253,7 @@ class Connection{
   }
  }
  _onDisconnected(){
-  this.mode='desconectado';clearInterval(this.keepalive);this.keepalive=null;
+  this.mode='desconectado';this.noteBuffer=new Uint8Array(0);clearInterval(this.keepalive);this.keepalive=null;
   this.handlers.onDisconnected?.({unexpected:!this.intentionalDisconnect});
   this.status('X10 desconectada. Las notas locales permanecen guardadas.');
  }
