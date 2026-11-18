@@ -63,7 +63,6 @@ function busy(flag){
  run.disabled=flag;select.disabled=flag;
  $('x10MemoryName').disabled=flag;
  $('x10MemoryPin').disabled=flag;
- if($('x10MemorySessionMode'))$('x10MemorySessionMode').disabled=flag;
  cancel.disabled=!flag;
  if(exportDiagnostic)exportDiagnostic.disabled=flag||exportingDiagnostic;
  $('x10MemoryClose').disabled=flag;
@@ -75,7 +74,7 @@ async function importMemory(){
  if(api.busy()||active){info('Ya existe una importación en curso.',true);return;}
  const enteredPin=$('x10MemoryPin').value.trim();
  if(enteredPin && !/^\d{6}$/.test(enteredPin)){info('El PIN opcional debe tener exactamente seis cifras.',true);return;}
- const sessionMode=$('x10MemorySessionMode')?.value||'agenda-clean';
+ // La lectura utiliza siempre la sesión de agenda oficial completa, validada con la X10.
  busy(true);
  let destination=select.value;
  try{
@@ -88,7 +87,7 @@ async function importMemory(){
    info('Cuaderno creado. Iniciando lectura física…');
   }
   const result=await api.start({
-   notebookId:destination,pin:enteredPin,sessionMode,
+   notebookId:destination,pin:enteredPin,
    onProgress:message=>info(message)
   });
   info('Lectura finalizada: '+result.imported+' páginas nuevas ('+(result.partialImported||0)+' MUESTRAS PARCIALES: puntos aislados, no escritura completa), '+result.duplicate+' repetidas y '+result.empty+' vacías. Datos guardados en Mi Note; X10 intacta.');
@@ -105,7 +104,7 @@ async function importMemory(){
  }catch(e){info('Lectura interrumpida: '+(e?.message||e)+'. Las páginas recuperadas se conservan en Mi Note.',true);}
  finally{
   busy(false);
-  if(api.connected()&&sessionMode==='reuse-current'){
+  if(false && api.connected()){ // No reactivar modo tableta tras importar; la sesión BLE oficial se conserva.
    try{await api.restore();}catch(e){info(message.textContent+' · Para continuar escribiendo, vuelva a conectar la Huion si fuese necesario.',true);}
   }
  }
