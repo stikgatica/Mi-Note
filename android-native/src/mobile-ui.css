@@ -1,4 +1,4 @@
-/* APK Mi Note X10 v0.6: diseño de escritura compacto, sin afectar PWA. */
+/* Mi Note X10 Android: UI compacta. */
 @media (max-width:700px) {
  html,body {height:100%;overflow:hidden;}
  .layout {height:100dvh;min-height:0;overflow:hidden;}
