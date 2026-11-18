@@ -120,6 +120,17 @@ function setupX10PhysicalTools(){
   },
   cancel(){if(x10DownloadController)x10DownloadController.abort();},
   restore:()=>x10ResumeCurrentPage(message=>{status.textContent=message;}),
+  preferredMode:()=>x10Connection?.useAgendaByDefault?.()?'agenda':'tableta',
+  async switchMode(next){
+   if(x10DownloadController||x10Connection?.offlineReading)throw Error('Espere a que termine la importación.');
+   if(!x10Connection?.connected)throw Error('Conecte la X10 antes de cambiar de modo.');
+   if(!['agenda','tableta'].includes(next))throw Error('Modo X10 desconocido.');
+   if(next==='agenda')await x10Connection.switchToAgendaLive();
+   else await x10Connection.reconnectTabletOnly();
+   localStorage.setItem('minote_x10_preferred_mode',next);
+   x10BindCurrent();
+   return next;
+  },
   async start({notebookId,pin:pinCode='',onProgress=()=>{}}={}){
    if(!x10Connection?.connected)throw Error('Primero conecte la Huion X10 desde el botón superior.');
    if(!window.MiNoteX10Offline)throw Error('El lector de memoria física X10 no está disponible.');
