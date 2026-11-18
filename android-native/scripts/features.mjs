@@ -82,7 +82,12 @@ async function x10ResumeCurrentPage(onProgress=()=>{}){
  if(!x10Connection?.connected)throw Error('X10 desconectada. Pulse X10 para reconectar antes de escribir.');
  if(x10Connection.offlineReading)throw Error('La importación todavía está utilizando la conexión X10.');
  onProgress('Preparando escritura en la hoja actualmente abierta…');
- if(x10Connection.sessionKind!=='tableta'||x10Connection.mode==='agenda'||x10Connection.mode==='agenda-pura'){
+ const notePreferred=x10Connection.useAgendaByDefault?.();
+ if(notePreferred){
+  // En modo agenda la misma sesión GATT sirve para sincronizar y dibujar.
+  // Tras una lectura solo restablecer ONLINE_DATA; nunca mandar C9/C8/CA.
+  await x10Connection.switchToAgendaLive();
+ }else if(x10Connection.sessionKind!=='tableta'||x10Connection.mode==='agenda'||x10Connection.mode==='agenda-pura'){
   await x10Connection.reconnectTabletOnly();
  }
  // Se vincula después de reconectar, para no perder la selección cuando la
@@ -169,8 +174,8 @@ function setupX10PhysicalTools(){
     notify('Importación interrumpida: '+err.message+'. Las páginas que sí se guardaron se conservan.');
     throw err;
    }finally{
-    // La lectura terminó (con éxito, parcial o cancelada). Evitar dejar la
-    // tableta en agenda-pura: reabrir Data Ink sobre la hoja digital visible.
+    // La lectura terminó: en modo agenda solo reactivar ONLINE_DATA sin
+    // desconectar; conservar la opción manual de tableta para compatibilidad.
     x10DownloadController=null;
     if(x10Connection?.connected){
      try{await x10ResumeCurrentPage(notify);}
