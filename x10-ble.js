@@ -211,6 +211,8 @@ class Connection{
   if(!this.offlineReading&&this.sessionKind==='agenda-pura'){
    this.noteRx.notifications++;
    const samples=this._consumeNoteFrames(b);
+   if(this.noteRx.notifications===1||this.noteRx.notifications%20===0||samples.length&&this.noteRx.onlineSamples===samples.length)
+    this.handlers.onLiveDiagnostic?.(this.liveDiagnostic());
    if(samples.length){
     this.mode='agenda';this.noteLivePackets+=samples.length;
     if(this.noteLivePackets===samples.length)this.status('Se reciben trazos en vivo del modo agenda.');
