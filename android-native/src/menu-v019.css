@@ -30,11 +30,41 @@ body.minote-android #mobileMoreDialog .minote-menu-group button{
 }
 body.minote-android #mobileMoreDialog .minote-menu-group button+button{border-top:1px solid #edf1f5!important;}
 body.minote-android #mobileMoreDialog .minote-menu-group button:active{background:#e8f1ff!important;}
-body.minote-android #mobileMoreDialog #menuFullscreen{
- display:block;width:100%;min-height:42px;margin-top:9px;
- background:#243b57;color:white;border:none;border-radius:10px;font-size:13px;
-}
 body.minote-android #mobileMoreDialog .landscape-control{
  padding:8px 12px!important;flex-wrap:wrap;
 }
 body.minote-android #mobileMoreDialog .floating-color-label{padding:8px 12px!important;}
+
+/* Android: mantener todos los diálogos dentro de la zona visible entre las barras
+   del sistema. En WebView el safe-area puede ser 0 incluso con edge-to-edge. */
+body.minote-android {
+  --minote-dialog-safe-top:max(40px,env(safe-area-inset-top,0px));
+  --minote-dialog-safe-bottom:max(40px,env(safe-area-inset-bottom,0px));
+}
+body.minote-android.clean-notes dialog[open] {
+  position:fixed!important;
+  top:var(--minote-dialog-safe-top)!important;
+  bottom:var(--minote-dialog-safe-bottom)!important;
+  left:0!important;right:0!important;
+  margin:auto!important;
+  height:fit-content;
+  max-height:calc(100dvh - var(--minote-dialog-safe-top) - var(--minote-dialog-safe-bottom) - 10px)!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+}
+body.minote-android.clean-notes #mobileMoreDialog.mobile-actions-dialog[open] {
+  max-height:calc(100dvh - var(--minote-dialog-safe-top) - var(--minote-dialog-safe-bottom) - 10px)!important;
+}
+body.minote-android.clean-notes #floatingLibraryDialog.huion-library[open] {
+  inset:var(--minote-dialog-safe-top) max(8px,env(safe-area-inset-right,0px)) var(--minote-dialog-safe-bottom) max(8px,env(safe-area-inset-left,0px))!important;
+  max-height:calc(100dvh - var(--minote-dialog-safe-top) - var(--minote-dialog-safe-bottom) - 10px)!important;
+}
+/* La aplicación ya dibuja a pantalla completa: quitar accesos duplicados. */
+body.minote-android #fullscreenBtn,
+body.minote-android #tvBoardFullscreen,
+body.minote-android #menuFullscreen {display:none!important;}
+/* Estado y batería permanecen como indicadores; el nombre visible es solo X10. */
+body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick {
+  min-width:52px!important;max-width:86px!important;padding:5px 7px!important;
+}
+body.minote-android #floatingX10Quick .floating-x10-label {white-space:nowrap;}
