@@ -50,13 +50,15 @@ class Connection{
   this.mode='desconectado';this.limits={...DEFAULT_TABLET};
   this.keepalive=null;this.pageEventAt=0;this.unknownTypes=new Set();this.packetCount=0;
   this.frameListeners=new Set();this.offlineReading=false;
+  // V0.32: registra si esta conexión GATT recibió comandos de tableta (C9/C8/CA).
+  this.tabletCommandsSent=false;this.sessionKind=null;
   this._onData=this._onData.bind(this);this._onDisconnected=this._onDisconnected.bind(this);
  }
  get connected(){return !!this.device?.gatt?.connected;}
  status(s){this.handlers.onStatus?.(s);}
  selectDevice(filtered=false){
-  if(window.MiNoteNativeBLE)return window.MiNoteNativeBLE.selectDevice(filtered);
-  if(!navigator.bluetooth||!window.isSecureContext)
+  if(root.MiNoteNativeBLE)return root.MiNoteNativeBLE.selectDevice(filtered);
+  if(!navigator.bluetooth||!root.isSecureContext)
    throw Error('Web Bluetooth no está disponible. Usa Chrome o Edge en HTTPS con Bluetooth activo.');
   // Debe ejecutarse sin await previo, dentro del evento táctil del usuario.
   const options=filtered
@@ -70,13 +72,14 @@ class Connection{
  }
  async connectSaved(device){
   // getDevices() devuelve únicamente equipos que ya autorizó el usuario para este origen.
-  if((!window.MiNoteNativeBLE&&(!navigator.bluetooth||!window.isSecureContext))||!device?.gatt)
+  if((!root.MiNoteNativeBLE&&(!navigator.bluetooth||!root.isSecureContext))||!device?.gatt)
    throw Error('Este dispositivo no permite recuperar la conexión autorizada.');
   return this._connectDevice(device);
  }
- async _connectDevice(device){
+ async _connectDevice(device,options={}){
   if(this.connected)return;
   this.intentionalDisconnect=false;
+  this.tabletCommandsSent=false;this.sessionKind=null;
   // Tras una desconexión, las características GATT deben obtenerse otra vez.
   if(this.data)try{this.data.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
   if(this.cmd)try{this.cmd.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
@@ -98,6 +101,13 @@ class Connection{
    }
    this.mode='detectando';
    this.handlers.onConnected?.(device.name||'Huion X10');
+   if(options.agendaOnly){
+    // Sesión limpia como la app oficial: sin C9/C8/CA ni keepalive D1.
+    this.mode='agenda-pura';this.sessionKind='agenda-pura';
+    this.status('Conectada en modo agenda puro (sin comandos de tableta).');
+    return;
+   }
+   this.sessionKind='tableta';
    // Mismo orden y pausa de Data Ink V10, comprobado por el usuario.
    await this.probeTablet();
    this.startKeepalive();
@@ -115,9 +125,41 @@ class Connection{
  }
  async probeTablet(){
   if(!this.connected)throw Error('Conecta primero la X10.');
+  this.tabletCommandsSent=true;this.sessionKind='tableta';
   for(const op of [0xc9,0xc8,0xca]){await this.send(tabletCommand(op));await pause(150);}
   this.handlers.onDiagnostic?.('Comandos Data Ink C9, C8 y CA enviados.');
   this.status('Lápiz X10 activado. Esperando paquetes de escritura…');
+ }
+ async getMtu(){
+  // Solo diagnóstico: Web Bluetooth no expone el MTU y devuelve null.
+  try{return await this.device?.gatt?.getMtu?.()??null;}catch{return null;}
+ }
+ async reconnectAgendaOnly({settleMs=1500}={}){
+  // V0.32 experimental: cerrar la conexión GATT actual (posiblemente en modo
+  // tableta) y abrir otra que solo habla el protocolo de agenda. No borra nada.
+  const device=this.device;
+  if(!device?.gatt)throw Error('Conecta primero la X10.');
+  if(this.offlineReading)throw Error('Ya hay una descarga de páginas en curso.');
+  this.intentionalDisconnect=true;
+  clearInterval(this.keepalive);this.keepalive=null;
+  if(this.batteryTimer){clearInterval(this.batteryTimer);this.batteryTimer=null;}
+  if(this.data)try{this.data.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
+  if(this.cmd)try{this.cmd.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
+  try{device.removeEventListener('gattserverdisconnected',this._onDisconnected);}catch{}
+  this.status('Cerrando la conexión actual para abrir una sesión de agenda limpia…');
+  if(typeof device.gatt.disconnectAsync==='function')await device.gatt.disconnectAsync();
+  else try{device.gatt.disconnect();}catch{}
+  this.cmd=null;this.data=null;this.mode='desconectado';
+  this.handlers.onDisconnected?.({unexpected:false});
+  await pause(settleMs);
+  this.device=null;
+  try{await this._connectDevice(device,{agendaOnly:true});}
+  catch(first){
+   // Android puede tardar en liberar la conexión anterior: un único reintento.
+   await pause(settleMs*1.5);
+   this.device=null;
+   await this._connectDevice(device,{agendaOnly:true});
+  }
  }
  subscribeFrames(listener){
   if(typeof listener!=='function')throw Error('Se requiere un receptor BLE.');
@@ -138,7 +180,7 @@ class Connection{
  startKeepalive(){
   if(this.keepalive)clearInterval(this.keepalive);
   // Igual que Data Ink: D1 cada 5 segundos (modo lápiz/tableta).
-  this.keepalive=setInterval(()=>{if(this.connected&&this.mode!=='agenda')
+  this.keepalive=setInterval(()=>{if(this.connected&&this.mode!=='agenda'&&this.mode!=='agenda-pura'&&this.sessionKind!=='agenda-pura')
    this.send(tabletCommand(0xd1)).catch(e=>this.handlers.onDiagnostic?.('Keepalive: '+e.message));},5000);
  }
  async _afterVerified(){

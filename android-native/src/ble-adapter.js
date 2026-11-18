@@ -128,6 +128,20 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
         gatt.connected = false;
         // Intencionadamente no se espera esta Promise: Web Bluetooth hace lo mismo.
         void BleClient.disconnect(id).catch(() => {});
+      },
+      // V0.32: desconexión que SÍ espera a Android. Se usa antes de reabrir una
+      // sesión limpia de agenda, para que el aviso tardío de la conexión anterior
+      // no marque como desconectada la conexión nueva.
+      async disconnectAsync() {
+        gatt.connected = false;
+        serviceInfo = [];
+        chars.clear();
+        try { await BleClient.disconnect(id); } catch (_) { /* ya desconectada */ }
+      },
+      // MTU ATT negociado (solo diagnóstico). La X10 necesita >= 129 para 126 bytes.
+      async getMtu() {
+        if (!gatt.connected || typeof BleClient.getMtu !== 'function') return null;
+        try { return await BleClient.getMtu(id); } catch (_) { return null; }
       }
     };
     device.gatt = gatt;

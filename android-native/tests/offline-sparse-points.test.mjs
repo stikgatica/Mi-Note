@@ -30,3 +30,47 @@ test('paquete de escritura continua conserva la decodificación normal',()=>{
  assert.equal(result.strokes.length,1);
  assert.equal(result.strokes[0].length,2);
 });
+
+test('sonda 0x88 descarta duplicados 0x87 rezagados y recupera trazos si 0x88 trae más puntos',async()=>{
+ const {download}=globalThis.MiNoteX10Offline;
+ const frame=(op,...body)=>Uint8Array.of(0xcd,op,...body);
+ function fullPacket(op,seq){
+  const pkt=new Uint8Array(126);
+  pkt.set([0xcd,op,0x7e,seq&255,seq>>8]);
+  for(let k=0;k<20;k++){
+   const o=5+k*6,x=2000+seq*20+k,y=3000+seq*20+k;
+   pkt.set([x&255,x>>8,y&255,y>>8,120,0x20],o);
+  }
+  return pkt;
+ }
+ const listeners=new Set();
+ const emit=p=>queueMicrotask(()=>{for(const f of listeners)f(p);});
+ const conn={
+  connected:true,offlineReading:false,keepalive:null,batteryTimer:null,startKeepalive(){},
+  subscribeFrames(f){listeners.add(f);return()=>listeners.delete(f);},
+  async send(data){
+   const op=data[1],index=data[3]|(data[4]<<8);
+   if(op===0x81){emit(frame(0x81,6,2,3,4));emit(frame(0x82,4,1));}
+   if(op===0x95)emit(frame(0x95,11,40,110,0,24,146,0,255,31));
+   if(op===0x85)emit(frame(0x85,5,0,0));
+   if(op===0x86){
+    const count=index===0?10:0;
+    emit(frame(0x86,5,count,0));
+    for(let seq=1;seq<=count;seq++)emit(sparsePacket(seq,2000+seq*40,3000+seq*60));
+    // Duplicado 0x87 rezagado en el buffer antes de la sonda 0x88:
+    if(count)emit(sparsePacket(1,2040,3060));
+   }
+   if(op===0x88){
+    const seq=data[5]|(data[6]<<8);
+    emit(fullPacket(0x88,seq));
+   }
+  }
+ };
+ const pages=[];
+ const res=await download(conn,{onPage:async p=>{pages.push(p);return 'imported';}});
+ assert.equal(res.imported,1);
+ assert.equal(res.partialImported,0);
+ assert.equal(pages[0].partial,false);
+ assert.equal(pages[0].strokes.length,1);
+ assert.equal(pages[0].strokes[0].length,200);
+});

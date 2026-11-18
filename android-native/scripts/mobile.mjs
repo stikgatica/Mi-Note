@@ -56,6 +56,7 @@ const memoryDialog=[
 '<label class="field">Guardar páginas en<select id="x10MemoryNotebook" aria-label="Cuaderno de destino"></select></label>',
 '<label id="x10MemoryNewNameWrap" class="field">Nombre del cuaderno nuevo<input id="x10MemoryName" type="text" maxlength="90" value="Huion X10 · Memoria"></label>',
 '<label class="field">PIN de la agenda, solo si lo pide<input id="x10MemoryPin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Opcional"></label>',
+'<label class="field">Modo de sesión Bluetooth<select id="x10MemorySessionMode"><option value="agenda-clean" selected>Agenda pura (sin comandos de tableta C9/C8/CA)</option><option value="agenda-official">Agenda oficial completa (sin tableta + 0x91/0x8D)</option><option value="reuse-current">Reutilizar sesión actual (modo V0.31)</option></select></label>',
 '<div id="x10MemoryProgress" class="x10-details" role="status" aria-live="polite">Conecte la Huion antes de importar.</div>',
 '<div class="memory-import-actions"><button id="x10MemoryRun" type="button" class="primary">↓ Importar memoria</button><button id="x10MemoryCancel" type="button" disabled>Cancelar lectura</button></div>',
 '<button type="button" id="x10MemoryDiagnosticExport">Guardar diagnóstico X10 (JSON) en Android</button>',

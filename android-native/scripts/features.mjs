@@ -98,7 +98,7 @@ function setupX10PhysicalTools(){
   },
   cancel(){if(x10DownloadController)x10DownloadController.abort();},
   restore:()=>{if(!x10Connection?.connected)throw Error('Conecte primero la Huion X10.');return x10Connection.probeTablet();},
-  async start({notebookId,pin:pinCode='',onProgress=()=>{}}={}){
+  async start({notebookId,pin:pinCode='',sessionMode='agenda-clean',onProgress=()=>{}}={}){
    if(!x10Connection?.connected)throw Error('Primero conecte la Huion X10 desde el botón superior.');
    if(!window.MiNoteX10Offline)throw Error('El lector de memoria física X10 no está disponible.');
    if(x10DownloadController)throw Error('Ya hay una importación en curso.');
@@ -110,9 +110,18 @@ function setupX10PhysicalTools(){
    sync.disabled=true;listen.disabled=true;restore.disabled=true;cancel.hidden=false;cancel.disabled=false;
    const notify=message=>{onProgress(message);status.textContent=message;};
    try{
+    if((sessionMode==='agenda-clean'||sessionMode==='agenda-official')&&
+       typeof x10Connection.reconnectAgendaOnly==='function'&&
+       (x10Connection.tabletCommandsSent||x10Connection.sessionKind!=='agenda-pura')){
+     notify('Abriendo sesión GATT en modo agenda puro (sin comandos C9/C8/CA de tableta)…');
+     x10CancelRetry();x10Connecting=true;
+     try{await x10Connection.reconnectAgendaOnly();}
+     finally{x10Connecting=false;}
+    }
     notify('Comprobando memoria interna; no se borrará ningún dato físico…');
     const result=await MiNoteX10Offline.download(x10Connection,{
      pin:pinCode,signal:controller.signal,maxPages:64,
+     officialHandshake:sessionMode==='agenda-official',
      onProgress:notify,
      onPage:async result=>x10ImportOfflinePage(result,notebookId)
     });

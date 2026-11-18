@@ -15,19 +15,49 @@
  function getLastDiagnostic(includeRaw=false){
   if(!lastDiagnostic)return null;
   const snapshot=JSON.parse(JSON.stringify(lastDiagnostic));
-  if(!includeRaw)for(const p of snapshot.pages)delete p.rawSampleHex;
+  if(!includeRaw)for(const p of snapshot.pages){
+   delete p.rawSampleHex;
+   delete p.rawAllPacketsHex;
+   delete p.firstActivePoints;
+  }
   return snapshot;
+ }
+ function verifyPacketChecksum(pkt){
+  if(!pkt||pkt.length<6)return {valid:false,expected:null,actual:null};
+  let sum=0;
+  for(let i=0;i<pkt.length-1;i++)sum=(sum+pkt[i])&255;
+  const actual=pkt[pkt.length-1];
+  return {valid:sum===actual,expected:sum,actual};
  }
  function pointStatistics(packets,limits){
   const statuses=Array(8).fill(0);let points=0,penDown=0,withPressure=0,validCoords=0;
   let run=0,maxRun=0,visibleRuns=0,penDownWithPressure=0;
-  for(const packet of packets)for(const p of decodePacket(packet)){
-   points++;
-   if(p.pen_down){penDown++;run++;maxRun=Math.max(maxRun,run);}
-   else {if(run>1)visibleRuns++;run=0;}
-   if(p.press>0)withPressure++;
-   if(p.press>0&&p.pen_down)penDownWithPressure++;
-   if(p.x<=limits.maxX&&p.y<=limits.maxY)validCoords++;
+  let checksumValidPackets=0,checksumMismatchPackets=0;
+  let zeroPaddedPackets=0,trailingRecordsWithNonZeroBytes=0;
+  for(const packet of packets){
+   if(verifyPacketChecksum(packet).valid)checksumValidPackets++;
+   else checksumMismatchPackets++;
+   const decoded=decodePacket(packet);
+   const n=decoded.length;
+   let trailingAllZero=n>1&&decoded[0].pen_down;
+   for(let k=0;k<n;k++){
+    const p=decoded[k];
+    points++;
+    if(p.pen_down){penDown++;run++;maxRun=Math.max(maxRun,run);if(k>0)trailingAllZero=false;}
+    else {
+     if(run>1)visibleRuns++;run=0;
+     if(k>0){
+      const base=5+k*6;
+      let anyNonZero=false;
+      for(let b=0;b<6;b++)if(packet[base+b]!==0){anyNonZero=true;break;}
+      if(anyNonZero){trailingRecordsWithNonZeroBytes++;trailingAllZero=false;}
+     }
+    }
+    if(p.press>0)withPressure++;
+    if(p.press>0&&p.pen_down)penDownWithPressure++;
+    if(p.x<=limits.maxX&&p.y<=limits.maxY)validCoords++;
+   }
+   if(packet.length===126&&trailingAllZero)zeroPaddedPackets++;
   }
   if(run>1)visibleRuns++;
   // Status is also summarized directly from the sixth byte of each record.
@@ -35,7 +65,11 @@
    const n=Math.floor((packet.length-6)/6);
    for(let k=0;k<n;k++)statuses[packet[10+k*6]>>5]++;
   }
-  return {points,penDown,withPressure,penDownWithPressure,validCoords,maxConsecutiveActivePoints:maxRun,estimatedStrokes:visibleRuns,statuses};
+  return {
+   points,penDown,withPressure,penDownWithPressure,validCoords,
+   maxConsecutiveActivePoints:maxRun,estimatedStrokes:visibleRuns,statuses,
+   checksumValidPackets,checksumMismatchPackets,zeroPaddedPackets,trailingRecordsWithNonZeroBytes
+  };
  }
 
  function decodePacket(pkt){
@@ -97,7 +131,7 @@
     if(p.length<3||p[0]!==0xcd)return;
     const i=this.waiters.findIndex(w=>(w.op===null||w.op===p[1])&&(!w.test||w.test(p)));
     if(i>=0){const w=this.waiters.splice(i,1)[0];clearTimeout(w.timer);w.resolve(p);}
-    else if([0x81,0x82,0x85,0x86,0x87,0x88,0x95].includes(p[1])){
+    else if([0x81,0x82,0x85,0x86,0x87,0x88,0x8d,0x91,0x95,0x96,0xc9].includes(p[1])){
      this.buffer.push(p);
      if(this.buffer.length>24000)this.buffer.shift();
     }
@@ -129,7 +163,7 @@
   }
  }
  const check=signal=>{if(signal?.aborted)throw Error('Descarga cancelada por el usuario.');};
- async function download(connection,{onPage=async()=>{},onProgress=()=>{},pin='',signal,maxPages=64}={}){
+ async function download(connection,{onPage=async()=>{},onProgress=()=>{},pin='',signal,maxPages=64,officialHandshake=false}={}){
   if(!connection?.connected||typeof connection.subscribeFrames!=='function')
    throw Error('Conecta primero tu Huion X10 por Bluetooth.');
   if(connection.offlineReading)throw Error('Ya hay una descarga de páginas en curso.');
@@ -140,12 +174,28 @@
   if(connection.batteryTimer){clearInterval(connection.batteryTimer);connection.batteryTimer=null;}
   const inbox=new Inbox(connection);
   let imported=0,partialImported=0,empty=0,duplicate=0,undecodable=0,noReply=0;
-  const diagnostic={format:'MiNoteX10OfflineDiagnostic',version:1,startedAt:new Date().toISOString(),cursor:null,scanEnd:null,limits:null,pages:[],result:null,error:null};
+  const t0=Date.now();
+  const diagnostic={
+   format:'MiNoteX10OfflineDiagnostic',version:2,startedAt:new Date().toISOString(),
+   sessionMode:connection.sessionKind||connection.mode||'desconocido',
+   tabletCommandsSentBeforeDownload:!!connection.tabletCommandsSent,
+   officialHandshake:!!officialHandshake,
+   mtu:null,deviceName:null,
+   cursor:null,scanEnd:null,limits:null,commandLog:[],pages:[],result:null,error:null
+  };
   lastDiagnostic=diagnostic;
+  const sendCmd=async bytes=>{
+   if(diagnostic.commandLog.length<250)
+    diagnostic.commandLog.push({tMs:Date.now()-t0,op:'0x'+(bytes[1]||0).toString(16),hex:hex(bytes)});
+   return connection.send(bytes);
+  };
   try{
+   if(typeof connection.getMtu==='function'){
+    try{diagnostic.mtu=await connection.getMtu();}catch{}
+   }
    onProgress('Iniciando modo agenda y lectura local, sin borrar páginas…');
    check(signal);
-   await connection.send(cmd(0x81));
+   await sendCmd(cmd(0x81));
    const challenge=await inbox.wait(0x81,8000,p=>p.length>=6);
    // El manejador de la conexión responde a 0x81 con 0x82.
    const auth=await inbox.wait(0x82,8000,p=>p.length>=4);
@@ -153,20 +203,20 @@
     if(!/^\d{6}$/.test(pin))throw Error('La X10 pide un PIN de 6 dígitos. Escríbelo en Mi Note e inténtalo nuevamente.');
     const offsets=[104,117,105,111,110,35];
     const coded=[...pin].map((digit,i)=>(digit.charCodeAt(0)+offsets[i])&255);
-    await connection.send(cmd(0x83,1,coded[0],coded[1],coded[2]));
-    await connection.send(cmd(0x83,2,coded[3],coded[4],coded[5]));
+    await sendCmd(cmd(0x83,1,coded[0],coded[1],coded[2]));
+    await sendCmd(cmd(0x83,2,coded[3],coded[4],coded[5]));
     const second=await inbox.wait(0x82,7000,p=>p.length>=4);
     if(second[3]!==1)throw Error('PIN rechazado por la Huion.');
    }else if(auth[3]!==1)throw Error('La X10 rechazó el acceso al modo agenda ('+auth[3]+').');
    check(signal);
    inbox.discard(0x95);
-   await connection.send(cmd(0x95));
+   await sendCmd(cmd(0x95));
    const info=await inbox.wait(0x95,6000,p=>p.length>=11);
    const limits={maxX:u24(info,3),maxY:u24(info,6),maxPressure:u16(info,9)||8191};
    if(limits.maxX<2000||limits.maxY<2000||limits.maxX>100000||limits.maxY>100000)
     throw Error('Dimensiones físicas X10 inválidas.');
    inbox.discard(0x85);
-   await connection.send(cmd(0x85));
+   await sendCmd(cmd(0x85));
    const countReply=await inbox.wait(0x85,6000,p=>p.length>=5);
    const lastIndex=u16(countReply,3);
    if(lastIndex>=maxPages)throw Error('La X10 informa '+lastIndex+' páginas; el límite seguro de índices es '+(maxPages-1)+'. No se borró nada.');
@@ -174,15 +224,27 @@
    // Consultar un mínimo acotado de 16 índices si 0x85 informa un contador bajo.
    const scanEnd=Math.min(maxPages-1,Math.max(lastIndex,15));
    diagnostic.cursor=lastIndex;diagnostic.scanEnd=scanEnd;diagnostic.limits=limits;
-   await connection.send(cmd(0x96,1,3));await pause(60);
-   await connection.send(cmd(0x96,3,2));await pause(60);
+   await sendCmd(cmd(0x96,1,3));await pause(60);
+   await sendCmd(cmd(0x96,3,2));await pause(60);
+   if(officialHandshake){
+    // Secuencia de captura Android de Huion Note: consulta 0x91 (nombre) y 0x8D 01.
+    inbox.discard(0x91);
+    await sendCmd(cmd(0x91));
+    try{
+     const namePkt=await inbox.wait(0x91,600,p=>p.length>=5);
+     diagnostic.deviceName=String.fromCharCode(...namePkt.slice(3,namePkt.length-1)).replace(/\0+/g,'').trim()||null;
+    }catch{}
+    inbox.discard(0x8d);
+    await sendCmd(cmd(0x8d,1,0,0,0));
+    await pause(80);
+   }
    onProgress('Indicador X10: '+lastIndex+'. Explorando índices físicos 0 a '+scanEnd+' (incluidos vacíos), sin eliminar datos…');
    for(let index=0;index<=scanEnd;index++){
     check(signal);
     const entry={index,status:'checking'};
     diagnostic.pages.push(entry);
     inbox.discard(0x86);inbox.discard(0x87);inbox.discard(0x88);
-    await connection.send(cmd(0x86,index&255,index>>8,0,0));
+    await sendCmd(cmd(0x86,index&255,index>>8,0,0));
     let countFrame;
     try{
      countFrame=await inbox.wait(0x86,index<=lastIndex?10000:2100,p=>p.length>=5&&p[2]===5);
@@ -233,7 +295,7 @@
       for(const seq of missing){
        if(got.has(seq))continue;
        check(signal);
-       await connection.send(cmd(0x88,index&255,index>>8,seq&255,seq>>8));
+       await sendCmd(cmd(0x88,index&255,index>>8,seq&255,seq>>8));
        try{
         const reply=await inbox.waitAny([0x87,0x88],2600,p=>validPacket(p)&&u16(p,3)===seq);
         got.set(seq,reply);
@@ -269,14 +331,20 @@
       ordered.filter(p=>paddedFrame(p)).length>=Math.ceil(ordered.length*.8);
     if(sparseFrame){
      const selected=[...new Set([1,Math.max(1,Math.floor(total/2)),total])];
-     const checkResult={tested:0,moreComplete:0,lateResponses:0,recovered:0};
+     const checkResult={tested:0,moreComplete:0,lateResponses:0,recovered:0,replyOpcodes:[],identicalPayloadCount:0};
+     // Descartar tanto 0x87 tardíos/duplicados como 0x88 previos para que la sonda
+     // mida únicamente la respuesta real de retransmisión de la X10.
+     inbox.discard(0x87);inbox.discard(0x88);
      for(const seq of selected){
       check(signal);
-      inbox.discard(0x88);
-      await connection.send(cmd(0x88,index&255,index>>8,seq&255,seq>>8));
+      await sendCmd(cmd(0x88,index&255,index>>8,seq&255,seq>>8));
       try{
-       const answer=await inbox.waitAny([0x87,0x88],1000,p=>validPacket(p)&&u16(p,3)===seq);
+       const answer=await inbox.waitAny([0x88,0x87],1800,p=>validPacket(p)&&u16(p,3)===seq);
        checkResult.tested++;
+       checkResult.replyOpcodes.push('0x'+answer[1].toString(16));
+       const prev=ordered[seq-1];
+       if(prev&&answer.length===prev.length&&answer.slice(2,-1).every((b,idx)=>b===prev[idx+2]))
+        checkResult.identicalPayloadCount++;
        if(liveCount(answer)>liveCount(ordered[seq-1])){
         ordered[seq-1]=answer;checkResult.moreComplete++;checkResult.recovered++;
        }
@@ -286,9 +354,10 @@
       for(let seq=1;seq<=total&&seq<=1000;seq++){
        if(selected.includes(seq))continue;
        check(signal);
-       await connection.send(cmd(0x88,index&255,index>>8,seq&255,seq>>8));
+       inbox.discard(0x87);inbox.discard(0x88);
+       await sendCmd(cmd(0x88,index&255,index>>8,seq&255,seq>>8));
        try{
-        const answer=await inbox.waitAny([0x87,0x88],650,p=>validPacket(p)&&u16(p,3)===seq);
+        const answer=await inbox.waitAny([0x88,0x87],900,p=>validPacket(p)&&u16(p,3)===seq);
         if(liveCount(answer)>liveCount(ordered[seq-1])){
          ordered[seq-1]=answer;checkResult.recovered++;
         }
@@ -315,12 +384,18 @@
     entry.partialSamples=result.partial?result.sampleCount:0;
     entry.receivedPackets=ordered.length;
     entry.stats=pointStatistics(ordered,limits);
-    if(!result.strokes.length){
+    if(!result.strokes.length||result.partial){
      // La muestra cruda permanece solamente en memoria hasta que el usuario
      // confirme su exportación explícita; puede contener escritura personal.
      const sampled=[...ordered.slice(0,12),...ordered.slice(-2)];
      entry.rawSampleHex=[...new Set(sampled.map(hex))];
-    } 
+     if(ordered.length<=500)entry.rawAllPacketsHex=ordered.map(hex);
+     entry.firstActivePoints=ordered.slice(0,16).map(pkt=>{
+      const pts=decodePacket(pkt);
+      const active=pts.find(p=>p.pen_down)||pts[0]||null;
+      return {seq:u16(pkt,3),len:pkt.length,activeCount:pts.filter(p=>p.pen_down).length,firstPoint:active,checksumOk:verifyPacketChecksum(pkt).valid};
+     });
+    }
     if(!result.strokes.length){
      // Paquetes sin tinta decodificable no deben ocultar páginas posteriores.
      // Nunca guardar hojas vacías ni borrarlas de la memoria física.
@@ -351,10 +426,13 @@
   }finally{
    diagnostic.endedAt=new Date().toISOString();
    inbox.close();connection.offlineReading=false;
-   if(connection.connected){connection.startKeepalive();if(hadBatteryPolling)connection.startBatteryPolling?.();}
+   if(connection.connected){
+    if(connection.sessionKind!=='agenda-pura')connection.startKeepalive();
+    if(hadBatteryPolling)connection.startBatteryPolling?.();
+   }
   }
  }
- const api={download,decodePacket,decodePage,cmd,getLastDiagnostic};
+ const api={download,decodePacket,decodePage,verifyPacketChecksum,cmd,getLastDiagnostic};
  root.MiNoteX10Offline=api;
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
