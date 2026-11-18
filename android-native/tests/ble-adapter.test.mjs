@@ -56,43 +56,27 @@ test('muestra ayuda si ubicacion del sistema apagada',async()=>{
  await assert.rejects(()=>createNativeBLE(mock,{getItem(){return null},setItem(){}}).selectDevice(),/Activa Ubicación/);
 });
 
-test('reconnectAgendaOnly abre sesión limpia de agenda sin enviar comandos C9/C8/CA de tableta',async()=>{
+test('la conexión X10 siempre usa el protocolo de agenda y nunca inicia modo tableta',async()=>{
  await import('../../x10-ble.js');
  const sent=[];
- let disconnects=0,connects=0;
  const mock={
   async initialize(){},async isEnabled(){return true;},async isLocationEnabled(){return true;},
-  async connect(){connects++;},
-  async disconnect(){disconnects++;},
+  async connect(){},async disconnect(){},
   async getMtu(){return 141;},
-  async getServices(){return [{uuid:'0000ffe0-0000-1000-8000-00805f9b34fb',
-   characteristics:[
-    {uuid:'0000ffe1-0000-1000-8000-00805f9b34fb',properties:{notify:true}},
-    {uuid:'0000ffe2-0000-1000-8000-00805f9b34fb',properties:{writeWithoutResponse:true,indicate:true}}
-   ]}];},
-  async startNotifications(){},
-  async writeWithoutResponse(id,s,c,value){sent.push(value.getUint8(1));}
+  async getServices(){return [{uuid:'0000ffe0-0000-1000-8000-00805f9b34fb',characteristics:[
+   {uuid:'0000ffe1-0000-1000-8000-00805f9b34fb',properties:{notify:true}},
+   {uuid:'0000ffe2-0000-1000-8000-00805f9b34fb',properties:{writeWithoutResponse:true,indicate:true}}
+  ]}]},
+  async startNotifications(){},async writeWithoutResponse(id,s,c,value){sent.push(value.getUint8(1));}
  };
- const bridge=createNativeBLE(mock,{getItem(){return null;},setItem(){}});
- globalThis.MiNoteNativeBLE=bridge;
- const device=await bridge.getSavedDevice('x10-agenda');
- // V0.36 inicia en agenda por defecto: esta prueba requiere iniciar
- // explícitamente en tableta para verificar el cambio posterior a agenda.
- globalThis.localStorage={getItem:()=> 'tableta'};
+ globalThis.MiNoteNativeBLE=createNativeBLE(mock,{getItem(){return null},setItem(){}});
+ const device=await globalThis.MiNoteNativeBLE.getSavedDevice('x10-agenda');
  const conn=new globalThis.MiNoteX10Ble.Connection();
  await conn.connectSaved(device);
- assert.equal(conn.tabletCommandsSent,true);
- assert.equal(conn.sessionKind,'tableta');
- assert.deepEqual(sent.slice(0,3),[0xc9,0xc8,0xca]);
- sent.length=0;
- await conn.reconnectAgendaOnly({settleMs:10});
- assert.equal(disconnects,1);
- assert.equal(connects,2);
  assert.equal(conn.connected,true);
- assert.equal(conn.tabletCommandsSent,false);
  assert.equal(conn.sessionKind,'agenda-pura');
- assert.equal(sent.length,0);
+ assert.deepEqual(sent,[0x95,0x96,0x96,0x91,0x8d,0x81]);
+ assert.ok(!sent.some(op=>[0xc9,0xc8,0xca,0xd1,0x8b,0x8c].includes(op)));
  assert.equal(await conn.getMtu(),141);
- conn.disconnect();
- delete globalThis.localStorage;
+ conn.disconnect();delete globalThis.MiNoteNativeBLE;
 });
