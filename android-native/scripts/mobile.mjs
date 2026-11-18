@@ -34,7 +34,7 @@ const menu=[
 html=html.replace(/<div id="x10DirectArea"[\s\S]*?<\/div>/,
   '<div id="x10DirectArea" hidden aria-hidden="true" style="display:none!important"><button id="x10DirectConnect" type="button" tabindex="-1">Conectar X10</button></div>');
 html=html.replace('aria-label="Opciones Huion Note X10"','aria-label="Conectar Huion X10"');
-html=html.replace('◌ X10</button><button id="settingsBtn"','◌ Conectar X10</button><button id="settingsBtn"');
+html=html.replace('◌ X10</button><button id="settingsBtn"','X10</button><button id="settingsBtn"');
 html=html.replace('<button id="fullscreenBtn" class="icon-btn" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>','<button id="fullscreenBtn" class="icon-btn" title="Pantalla completa" aria-label="Pantalla completa">⛶</button><button id="mobileMoreBtn" type="button" class="icon-btn mobile" title="Más opciones" aria-label="Más opciones">⋮</button>');
 if(!html.includes('id="mobileMoreBtn"'))throw Error('No se pudo insertar menú móvil');
 const replayDialog=[
@@ -70,7 +70,7 @@ html=html.replace('</main>',menu+'\n'+replayDialog+'\n'+personalDialog+'\n'+memo
 const pageCounter='<button id="floatingPageNumber" class="floating-page-counter" type="button" title="Ver páginas o eliminar hoja" aria-label="Página 1 de 1. Administrar hoja">1 / 1</button>';
 if(!html.includes('<button id="tvBoardNext"'))throw Error('Barra flotante sin botón siguiente');
 html=html.replace('<button id="tvBoardNext"',pageCounter+'<button id="tvBoardNext"');
-const x10Quick='<button id="floatingX10Quick" class="floating-x10-button" type="button" title="Conectar Huion Note X10" aria-label="Conectar X10"><span id="floatingX10QuickDot" class="x10-status-dot" aria-hidden="true"></span>Conectar X10</button>';
+const x10Quick='<button id="floatingX10Quick" class="floating-x10-button" type="button" title="Conectar Huion Note X10" aria-label="Conectar X10"><span id="floatingX10QuickDot" class="x10-status-dot" aria-hidden="true"></span><span class="floating-x10-label">X10</span></button>';
 html=html.replace('<button id="tvBoardMore"',x10Quick+'<button id="tvBoardMore"');
 const libraryDialog=[
  '<dialog id="floatingLibraryDialog" class="dialog floating-library-dialog" aria-labelledby="floatingLibraryTitle">',
