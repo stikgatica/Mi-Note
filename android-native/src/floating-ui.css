@@ -246,14 +246,14 @@ body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick{
  min-width:45px!important;padding:5px 4px!important;font-size:12px!important;font-weight:700!important;
 }
 body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick[data-status="connected"]{
- background:rgba(45,128,101,.37)!important;
+ background:rgba(28,107,218,.42)!important;
 }
 body.minote-android .x10-status-dot{
  display:inline-block;flex:0 0 auto;width:9px;height:9px;border-radius:50%;
  background:#9aa5b5;box-shadow:0 0 0 1px rgba(255,255,255,.16);
  vertical-align:middle;
 }
-body.minote-android .x10-status-dot[data-status="connected"]{background:#34ce86;}
+body.minote-android .x10-status-dot[data-status="connected"]{background:#268bff;box-shadow:0 0 0 2px rgba(38,139,255,.17),0 0 9px #268bff;}
 body.minote-android .x10-status-dot[data-status="connecting"]{background:#5cafff;animation:minote-x10-pulse 1.2s ease-in-out infinite;}
 body.minote-android .x10-status-dot[data-status="error"]{background:#f56c69;}
 body.minote-android .x10-status-dot[data-status="disconnected"]{background:#9ca5b3;}
@@ -390,3 +390,38 @@ body.minote-android #tvBoardToolbar.floating-bar.floating-vertical #floatingX10Q
  font-size:11px!important;line-height:1.1!important;
 }
 body.minote-android #x10Dialog{max-width:min(440px,95vw);}
+
+/* V0.41: indicador del protocolo agenda en azul y solo icono Bluetooth. */
+body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick{
+ min-width:43px!important;max-width:90px!important;padding:4px 7px!important;
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;
+}
+body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick .floating-bluetooth-icon{
+ width:22px;height:22px;flex:0 0 22px;display:block;color:#eef5ff;
+}
+body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick[data-status="connected"]{
+ background:rgba(28,107,218,.44)!important;
+}
+body.minote-android #tvBoardToolbar.floating-bar #floatingX10Quick .x10-status-dot[data-status="connected"]{
+ background:#268bff!important;box-shadow:0 0 0 2px rgba(38,139,255,.2),0 0 8px #268bff!important;
+}
+body.minote-android #tvBoardToolbar.floating-bar.floating-vertical #floatingX10Quick{
+ min-width:0!important;max-width:64px!important;flex-wrap:wrap!important;
+}
+/* Barras automáticas: A5 vertical -> barra horizontal; pantalla apaisada -> barra vertical.
+   La barra conserva el desplazamiento táctil cuando la pantalla es estrecha. */
+@media (orientation:landscape){
+ body.minote-android #tvBoardToolbar.floating-bar{
+  flex-direction:column!important;max-width:70px!important;
+  max-height:calc(100dvh - 16px)!important;overflow-x:hidden!important;overflow-y:auto!important;
+ }
+ body.minote-android #tvBoardToolbar.floating-bar.floating-minimized{
+  flex-direction:row!important;
+ }
+}
+@media (orientation:portrait){
+ body.minote-android #tvBoardToolbar.floating-bar:not(.floating-minimized){
+  flex-direction:row!important;max-width:calc(100vw - 12px)!important;
+  overflow-x:auto!important;overflow-y:hidden!important;
+ }
+}
