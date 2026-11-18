@@ -81,7 +81,7 @@ test('modo agenda nativo es único y traduce muestras reales 0x8D',async()=>{
 test('el motor Android no ofrece cambiar a modo tableta',()=>{
  const engine=readFileSync(new URL('../scripts/features.mjs',import.meta.url),'utf8');
  assert.match(engine,/officialHandshake:true/);
- assert.match(engine,/await x10Connection.enableNoteLive\(\)/);
+ assert.doesNotMatch(engine,/await x10Connection\.enableNoteLive\(\)/);
  assert.doesNotMatch(engine,/reconnectTabletOnly|switchMode\(next\)/);
  const ui=readFileSync(new URL('../scripts/mobile.mjs',import.meta.url),'utf8');
  assert.doesNotMatch(ui,/x10MemorySwitchMode/);
