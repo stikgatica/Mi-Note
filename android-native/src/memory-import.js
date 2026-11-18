@@ -3,7 +3,6 @@ const $=id=>document.getElementById(id);
 const modal=$('x10MemoryDialog'),open=$('x10MemoryOpen'),select=$('x10MemoryNotebook');
 const message=$('x10MemoryProgress'),run=$('x10MemoryRun'),cancel=$('x10MemoryCancel');
 const resume=$('x10MemoryResumeDrawing');
-const switchMode=$('x10MemorySwitchMode');
 const exportDiagnostic=$('x10MemoryDiagnosticExport');
 function diagnostic(){
  return window.MiNoteX10Offline?.getLastDiagnostic?.(false)||null;
@@ -53,7 +52,6 @@ function refresh(){
  const previous=list.find(n=>n.id===old);
  select.value=previous?old:'__new__';
  updateNewField();
- if(switchMode)switchMode.textContent=api.preferredMode?.()==='tableta'?'Modo alternativo: agenda':'Modo alternativo: tableta';
  if(!api.connected())info('Conecte primero la Huion X10 mediante el botón superior. La lectura no elimina nada de la agenda.');
  else info('Huion conectada. Seleccione el cuaderno de destino y pulse Importar memoria.');
 }
@@ -68,7 +66,6 @@ function busy(flag){
  $('x10MemoryPin').disabled=flag;
  cancel.disabled=!flag;
  if(resume)resume.disabled=flag;
- if(switchMode)switchMode.disabled=flag;
  if(exportDiagnostic)exportDiagnostic.disabled=flag||exportingDiagnostic;
  $('x10MemoryClose').disabled=flag;
 }
@@ -112,7 +109,7 @@ async function importMemory(){
  }catch(e){info('Lectura interrumpida: '+(e?.message||e)+'. Las páginas recuperadas se conservan en Mi Note.',true);}
  finally{
   busy(false);
-  // Mantener el modo de agenda después de importar; la escritura en vivo se activa al reconectar.
+  // Mantener el modo agenda para importar y continuar escribiendo, sin cambiar de protocolo.
  }
 }
 open?.addEventListener('click',()=>{
@@ -122,18 +119,6 @@ open?.addEventListener('click',()=>{
 });
 select?.addEventListener('change',updateNewField);
 run?.addEventListener('click',()=>void importMemory());
-switchMode?.addEventListener('click',async()=>{
- const api=engine();if(active||api?.busy()||!api?.switchMode)return;
- const next=api.preferredMode?.()==='tableta'?'agenda':'tableta';
- switchMode.disabled=true;
- try{
-  info('Cambiando a modo '+next+'…');
-  await api.switchMode(next);
-  info('Modo '+next+' activado en la hoja actualmente abierta.');
-  switchMode.textContent=next==='tableta'?'Modo alternativo: agenda':'Modo alternativo: tableta';
- }catch(error){info('No se pudo activar modo '+next+': '+error.message,true);}
- finally{switchMode.disabled=false;}
-});
 resume?.addEventListener('click',async()=>{
  const api=engine();if(active||api?.busy())return;
  if(!api?.connected()){info('La X10 no está conectada. Pulse X10 para conectarla.',true);return;}
