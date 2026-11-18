@@ -54,7 +54,6 @@ document.addEventListener('minote:page-rendered',updatePages);
 updatePages();
 
 // Único control de Bluetooth para Android: Conectar X10.
-const statusElement=$('x10Status'),deviceButton=$('x10OpenBtn');
 let connecting=false;
 function x10State(){
  const connected=!!deviceButton?.classList.contains('is-connected');
