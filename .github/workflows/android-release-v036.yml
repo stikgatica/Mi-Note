@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/android-release-v036.yml'
       - 'android-native/tests/x10-agenda-live-v036.test.mjs'
+      - 'android-native/tests/ble-adapter.test.mjs'
       - 'x10-ble.js'
       - 'android-native/tests/x10-resume-current-page-v035.test.mjs'
       - 'android-native/tests/x10-reliability-v034.test.mjs'
