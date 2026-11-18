@@ -92,8 +92,10 @@ let x10Connection=null,x10ActiveStroke=null,x10ActivePageId=null,x10ActiveNoteId
 function x10Log(s){x10Logs.push(new Date().toISOString()+' '+s);if(x10Logs.length>80)x10Logs.shift();}
 function x10SetStatus(s){$('x10Status').textContent=s;x10Log(s);}
 function x10Details(){const mode=x10Connection?.mode||'desconectado',idx=note()?.pages.findIndex(p=>p.id===x10ActivePageId)??-1;
+ const ble=x10Connection?.liveDiagnostic?.();
  $('x10Details').textContent='Modo: '+mode+' · Hoja vinculada: '+(idx>=0?idx+1:'ninguna')+
- '\\nPuntos recibidos: '+x10PointCount+' · Paquetes de tinta no decodificados: '+x10Unknown+
+ '\\nPuntos dibujados: '+x10PointCount+' · Paquetes sin interpretar: '+x10Unknown+
+ (ble?'\\nBluetooth: '+ble.notifications+' notificaciones · '+ble.onlineFrames+' tramas 8D · '+ble.onlineSamples+' muestras · '+ble.invalidOnline+' rechazadas · '+ble.otherPackets+' otras.':'')+
  ' · Páginas físicas notificadas: '+x10PhysicalPages;
  $('x10OpenBtn').classList.toggle('is-connected',!!x10Connection?.connected);
  $('x10OpenBtn').textContent=x10Connection?.connected?'● X10':'◌ X10';
@@ -126,8 +128,13 @@ function x10NewPhysicalPage(physicalIndex){
  render();persist();x10SetStatus('X10 avisó una página nueva. Hoja digital '+nb.pages.length+' creada.');x10Details();
 }
 function x10Pen(raw,limits,mode){
- if(!x10ActivePageId||!x10ActiveNoteId)return;
- if(state.activeNotebookId!==x10ActiveNoteId||page().id!==x10ActivePageId){x10Flush();return;}
+ // Al navegar por páginas el lápiz sigue la hoja actualmente visible,
+ // sin crear páginas ni borrar los trazos importados.
+ if(!x10ActivePageId||!x10ActiveNoteId||
+    state.activeNotebookId!==x10ActiveNoteId||page().id!==x10ActivePageId){
+  if(!raw.touch||raw.press<=0){x10Flush();return;}
+  x10BindCurrent();
+ }
  if(!raw.touch||raw.press<=0){x10Flush();return;}
  const rot=x10RotationValue(mode);
  const coord=MiNoteX10Ble.mapPoint(raw,limits.maxX,limits.maxY,rot,W,H,true);
@@ -199,6 +206,9 @@ function x10MakeConnection(){
   onMode:(mode,limits)=>{x10SetStatus('Modo '+mode+' identificado.');x10Log('Límites: '+JSON.stringify(limits));x10Details();},
   onLimits:limits=>{x10Log('Límites físicos actualizados: '+JSON.stringify(limits));x10Details();},
   onPen:x10Pen,
+  onLiveDiagnostic:()=>{
+   x10Details();
+  },
   onNewPage:x10NewPhysicalPage,
   onPageCount:n=>{x10Log('Contador lógico X10: '+n);x10Details();},
   onUndecodedNote:b=>{
