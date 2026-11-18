@@ -4,7 +4,6 @@ const $=id=>document.getElementById(id);
 const num=$('floatingPageNumber'),count=$('pageCount'),originalNum=$('pageNumber');
 const pageDialog=$('floatingPageDialog'),menu=$('mobileMoreDialog');
 const x10Button=$('floatingX10Quick'),statusElement=$('x10Status'),deviceButton=$('x10OpenBtn');
-const x10Panel=$('floatingX10Panel');
 function pageState(){
  const index=Number.parseInt(originalNum?.textContent||'1',10);
  const total=Number.parseInt(count?.textContent||'1',10);
@@ -54,69 +53,35 @@ if(count)new MutationObserver(updatePages).observe(count,{childList:true,charact
 document.addEventListener('minote:page-rendered',updatePages);
 updatePages();
 
-const connectionButton=$('floatingX10ConnectNow'),disconnectButton=$('floatingX10DisconnectNow');
-let manualConnecting=false;
-function deviceState(){
+// Único control de Bluetooth para Android: Conectar X10.
+let connecting=false;
+function x10State(){
  const connected=!!deviceButton?.classList.contains('is-connected');
  const message=(statusElement?.textContent||'').trim();
- const pending=!connected&&(/conectando|reconectando|selector|buscando|solicitando|dispositivo seleccionado/i.test(message)||manualConnecting);
- const failed=!connected&&!pending&&/error|fall[oó]|no pudo|no respondió|agotad|rechaz|cancelad|denegad/i.test(message);
- const value=connected?'connected':pending?'connecting':failed?'error':'disconnected';
- return {value,connected,message};
+ const pending=!connected&&(connecting||/conectando|reconectando|selector|buscando|solicitando|dispositivo seleccionado/i.test(message));
+ const failure=!connected&&!pending&&/error|fall[oó]|no pudo|no respondió|agotad|rechaz|cancelad|denegad/i.test(message);
+ return {connected,pending,failure,message};
 }
-function updateX10(){
- const state=deviceState();
- const label=state.connected?'Conectada':state.value==='connecting'?'Conectando…':state.value==='error'?'Error de conexión':'Desconectada';
- for(const el of [$('floatingX10QuickDot'),$('floatingX10MenuDot')]){
-  if(el)el.dataset.status=state.value;
- }
- $('floatingX10Label').textContent='Huion X10 · '+label;
- if(x10Panel)x10Panel.dataset.status=state.value;
- if(x10Button){
-  x10Button.title='X10 '+label+'. '+(state.connected?'Ver detalles':'Conectar');
-  x10Button.setAttribute('aria-label',x10Button.title);
-  x10Button.dataset.status=state.value;
- }
- connectionButton.disabled=state.connected||state.value==='connecting';
- disconnectButton.disabled=!state.connected;
- const shortcut=$('floatingX10Menu');
- if(shortcut)shortcut.textContent=(state.connected?'●':state.value==='connecting'?'◌':state.value==='error'?'!':'○')+' Huion X10 · '+label;
-}
-function closeMenu(){if(menu?.open)menu.close();}
-function openX10Details(){
- closeMenu();
- const dialog=$('x10Dialog');
- if(dialog&&!dialog.open)dialog.showModal();
-}
-function connectDirect(){
- // No abrir otro diálogo antes del selector BLE: debe partir del toque real.
- closeMenu();
- manualConnecting=true;
- updateX10();
- $('x10DirectConnect')?.click();
- // El estado definitivo se consulta desde el botón nativo X10 y su diagnóstico.
- // Reiniciar solo el estado pendiente local, no desconectar Bluetooth.
- setTimeout(()=>{manualConnecting=false;updateX10();},14000);
-}
-function disconnectX10(){
- closeMenu();
- if(!deviceState().connected)return;
- // Misma acción que el diálogo X10, que detiene reconexiones y libera BLE.
- $('x10Connect')?.click();
- updateX10();
+function refreshX10(){
+ const state=x10State();
+ const dot=$('floatingX10QuickDot');
+ if(dot)dot.dataset.status=state.connected?'connected':state.pending?'connecting':state.failure?'error':'disconnected';
+ if(!x10Button)return;
+ x10Button.disabled=state.pending;
+ x10Button.dataset.status=dot?.dataset.status||'disconnected';
+ x10Button.title=state.connected?'Huion X10 conectada':state.pending?'Conectando X10…':state.failure?'Error Bluetooth · toque para reintentar':'Conectar Huion X10';
+ x10Button.setAttribute('aria-label',x10Button.title);
+ // No ofrecer una segunda acción oculta al tocar el indicador.
+ x10Button.lastChild.textContent=state.connected?' X10 conectada':state.pending?' Conectando X10':' Conectar X10';
 }
 x10Button?.addEventListener('click',()=>{
- if(deviceState().connected||deviceState().value==='connecting')openX10Details();
- else connectDirect();
+ if(x10State().connected||x10State().pending)return;
+ menu?.close();
+ connecting=true;refreshX10();
+ // La petición nativa BLE se lanza en el mismo gesto táctil, sin await.
+ $('x10DirectConnect')?.click();
+ setTimeout(()=>{connecting=false;refreshX10();},12000);
 });
-connectionButton?.addEventListener('click',connectDirect);
-disconnectButton?.addEventListener('click',disconnectX10);
-$('floatingX10ViewStatus')?.addEventListener('click',openX10Details);
-const statusHint=$('floatingX10Indicator');
-statusHint?.addEventListener('click',openX10Details);
-if(deviceButton)new MutationObserver(updateX10).observe(deviceButton,{attributes:true,attributeFilter:['class'],childList:true,characterData:true,subtree:true});
-if(statusElement)new MutationObserver(updateX10).observe(statusElement,{childList:true,characterData:true,subtree:true});
-menu?.addEventListener('click',event=>{
- if(event.target?.id==='floatingX10Panel')event.stopPropagation();
-});
-updateX10();
+if(deviceButton)new MutationObserver(refreshX10).observe(deviceButton,{attributes:true,attributeFilter:['class'],childList:true,characterData:true,subtree:true});
+if(statusElement)new MutationObserver(()=>{connecting=false;refreshX10();}).observe(statusElement,{childList:true,characterData:true,subtree:true});
+refreshX10();
