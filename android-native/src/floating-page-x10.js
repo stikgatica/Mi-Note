@@ -72,7 +72,8 @@ function refreshX10(){
  x10Button.title=state.connected?'Huion X10 conectada':state.pending?'Conectando X10…':state.failure?'Error Bluetooth · toque para reintentar':'Conectar Huion X10';
  x10Button.setAttribute('aria-label',x10Button.title);
  // No ofrecer una segunda acción oculta al tocar el indicador.
- x10Button.lastChild.textContent=state.connected?' X10 conectada':state.pending?' Conectando X10':' Conectar X10';
+ const label=x10Button.querySelector('.floating-x10-label');
+ if(label)label.textContent='X10'; // Mantener intacto el indicador de batería.
 }
 x10Button?.addEventListener('click',()=>{
  if(x10State().connected||x10State().pending)return;
