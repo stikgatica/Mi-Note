@@ -112,3 +112,13 @@ En Geometría puede activar el modo, seleccionar hasta 12 trazos tocándolos, y 
 Las mejoras se guardan en la propiedad `mathLayer` de cada página. Los puntos originales `strokes` nunca se reemplazan. Con el interruptor apagado o la capa oculta se muestra la tinta original. Si un trazo fuente cambia, su mejora deja de mostrarse hasta volver a reconocerlo. Los respaldos incluyen `mathLayer`; la reproducción sigue usando los trazos originales. Las exportaciones continúan priorizando la tinta original mientras se prepara la opción explícita de exportar la capa mejorada.
 
 La importación de memoria X10, Bluetooth LED azul, respaldo cifrado y Compartir Android no fueron modificados en el protocolo. Valide físicamente la V0.43 antes de considerarla estable y conserve una copia de los cuadernos y la V0.42.
+
+## V0.44 — mejoras automáticas en Modo Matemática
+
+Al activar **Modo Matemática → Geometría y medición**, Mi-Note analiza automáticamente el conjunto reciente de trazos **después de levantar el lápiz** y de una pausa de 650 ms. No necesita seleccionar trazos ni pulsar Mejorar. Un Web Worker ejecuta algoritmos locales sin red.
+
+Se generan correcciones reversibles de rectas, circunferencias y polígonos; las aristas y los dibujos ambiguos se conservan sin inventar caras. El reconocedor experimental de **números y medidas** utiliza plantillas de escritura para los dígitos 0–9 y las unidades `cm`, `mm`, `m`, `°`, coma y punto. **No es un modelo de escritura entrenado**: puede dejar números sin reconocer, y no debe considerarse fiable para todos los estilos de letra. Solo muestra coincidencias con umbrales estrictos; permite corregir el texto reconocido en el panel.
+
+**La tinta original nunca se borra:** se guarda por separado en `strokes`. Las mejoras quedan en `mathLayer`, pueden ocultarse y eliminarse, y se invalidan si cambia el trazo fuente. Para hojas anteriores o recuperadas existe el botón opcional «Analizar también los trazos de esta hoja». Las exportaciones y la reproducción conservan la tinta original. El protocolo BLE de agenda, la importación y el respaldo permanecen sin modificaciones.
+
+La versión es **experimental**; validar con el teléfono y la Huion antes de adoptarla y mantener un respaldo.
