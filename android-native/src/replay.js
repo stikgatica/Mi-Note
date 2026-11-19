@@ -1,7 +1,8 @@
 import {createTimeline, timelineAt} from './replay-timeline.mjs';
+import {exportBlob} from './export-native.js';
 const $=id=>document.getElementById(id);
 const dialog=$('replayDialog'),canvas=$('replayCanvas'),ctx=canvas?.getContext('2d',{alpha:false});
-const play=$('replayPlay'),seek=$('replaySeek'),status=$('replayStatus'),video=$('replayVideo');
+const play=$('replayPlay'),seek=$('replaySeek'),status=$('replayStatus'),video=$('replayVideo'),shareVideo=$('replayShareVideo');
 let snapshot=null,timeline=null,position=0,running=false,raf=0,previous=0,recording=false;
 const clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
 const tell=s=>{if(status)status.textContent=s;};
@@ -67,24 +68,18 @@ function open(){
  if(!window.MiNoteReplaySnapshot){tell('No se pudo obtener la hoja.');return;}
  snapshot=window.MiNoteReplaySnapshot();
  timeline=createTimeline(snapshot.strokes);stop();$('mobileMoreDialog')?.close();dialog.showModal();drawAt(0);
- play.disabled=!timeline.strokes;video.disabled=!timeline.strokes;
+ play.disabled=!timeline.strokes;video.disabled=!timeline.strokes;if(shareVideo)shareVideo.disabled=!timeline.strokes;
  tell(timeline.strokes+' trazos. Se reproduce el orden original; el tiempo es aproximado.');
 }
 function close(){
  stop();recording=false;dialog.close();snapshot=null;timeline=null;
 }
-function save(blob){
- const url=URL.createObjectURL(blob),a=document.createElement('a');
- a.href=url;a.download='MiNote_reproduccion.webm';a.style.display='none';
- document.body.append(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),30000);
-}
-async function exportVideo(){
+async function exportVideo(action='save'){
  if(recording||!timeline?.strokes)return;
  if(!canvas.captureStream||!window.MediaRecorder){tell('La grabación de video no está disponible en este Android.');return;}
  const mime=['video/webm;codecs=vp8','video/webm'].find(x=>MediaRecorder.isTypeSupported?.(x));
  if(!mime){tell('Este Android no admite WebM. Puede reproducir la escritura en pantalla.');return;}
- stop();drawAt(0);recording=true;video.disabled=true;
+ stop();drawAt(0);recording=true;video.disabled=true;if(shareVideo)shareVideo.disabled=true;
  let stream,recorder;
  try{
   stream=canvas.captureStream(30);recorder=new MediaRecorder(stream,{mimeType:mime});
@@ -104,13 +99,21 @@ async function exportVideo(){
   });
   if(recorder.state!=='inactive')recorder.stop();
   await complete;
-  if(parts.length){save(new Blob(parts,{type:mime}));tell('Video WebM generado sin modificar la hoja.');}
+  if(parts.length){
+   const name='MiNote_reproduccion_'+String(snapshot?.title||'hoja').replace(/[\\/<>:"|?*]/g,'_').slice(0,50)+'.webm';
+   tell(action==='save'?'Abriendo selector de Android para guardar el video…':'Preparando video para compartir…');
+   const result=await exportBlob(new Blob(parts,{type:'video/webm'}),name,'video/webm',action,(done,total)=>{
+    if(total>4*1024*1024)tell('Transfiriendo WebM a Android: '+Math.round(done/total*100)+'%');
+   });
+   if(result?.cancelled)tell('Guardado cancelado. La hoja no se modificó.');
+   else tell(action==='save'?'Video guardado con Android en la ubicación elegida.':'Panel Compartir de Android abierto. El video está listo para enviar.');
+  }
   else tell('No se obtuvieron datos de video.');
  }catch(e){tell('No se pudo exportar el video: '+e.message);}
  finally{
   try{if(recorder?.state!=='inactive')recorder.stop();}catch{}
   stream?.getTracks().forEach(track=>track.stop());
-  recording=false;video.disabled=false;cancelAnimationFrame(raf);
+  recording=false;video.disabled=false;if(shareVideo)shareVideo.disabled=false;cancelAnimationFrame(raf);
  }
 }
 $('replayOpen')?.addEventListener('click',open);
@@ -119,4 +122,5 @@ dialog?.addEventListener('cancel',e=>{e.preventDefault();close();});
 play?.addEventListener('click',()=>running?stop():start());
 $('replayRestart')?.addEventListener('click',()=>{stop();drawAt(0);});
 seek?.addEventListener('input',()=>{if(!recording){stop();drawAt(Number(seek.value)/1000);}});
-video?.addEventListener('click',()=>{void exportVideo();});
+video?.addEventListener('click',()=>{void exportVideo('save');});
+shareVideo?.addEventListener('click',()=>{void exportVideo('share');});
