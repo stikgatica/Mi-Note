@@ -29,11 +29,14 @@ for(const [from,to] of events){
 app+=`
 /* API de la capa matemática. Los trazos originales no se modifican. */
 window.MiNoteMathBridge={
+ activePageId:()=>state?.activePageId||null,
  snapshot(){
   if(!state||!page())return null;
   const pg=page();
-  return clone({id:pg.id,template:pg.template,orientation:pg.orientation||'landscape-cw',
-    strokes:pg.strokes,mathLayer:pg.mathLayer||null});
+  // Vista de solo lectura: evita clonar miles de puntos al terminar cada trazo.
+  // El módulo matemático copia los objetos antes de editar y solo saveLayer escribe.
+  return {id:pg.id,template:pg.template,orientation:pg.orientation||'landscape-cw',
+    strokes:pg.strokes,mathLayer:pg.mathLayer||null};
  },
  pointFromEvent:event=>pointFromEvent(event),
  repaint:()=>paint(),
