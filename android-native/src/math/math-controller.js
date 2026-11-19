@@ -10,7 +10,7 @@ const nsvg=(tag,attrs={})=>{const n=document.createElementNS(svgNS,tag);for(cons
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,Number(n)||0));
 const bridge=()=>window.MiNoteMathBridge;
 const dialog=make('dialog',{id:'mathDialog',class:'dialog minote-math-dialog','aria-labelledby':'mathTitle'});
-dialog.innerHTML=\`
+dialog.innerHTML=`
  <div class="dialog-head"><h2 id="mathTitle">Modo Matemática</h2><button type="button" id="mathClose" aria-label="Cerrar" class="icon-btn">✕</button></div>
  <label class="math-switch"><input id="mathMode" type="checkbox"> <strong>Activar Modo Matemática</strong></label>
  <label class="field">Eje<select id="mathAxis"></select></label>
@@ -44,7 +44,7 @@ dialog.innerHTML=\`
   <small>Para números y medidas manuscritos se añadirá reconocimiento local en la siguiente fase. No se inventan dimensiones.</small>
  </section>
  <p id="mathStatus" class="math-hint" role="status" aria-live="polite"></p>
-\`;
+`;
 document.body.append(dialog);
 const menu=document.querySelector('#mobileMoreDialog .mobile-actions-list');
 const mathMenu=make('div',{class:'math-menu-entry'});
