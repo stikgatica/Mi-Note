@@ -8,7 +8,7 @@ if(list){
  const groups=[
   ['Cuadernos',[ 'floatingLibraryOpenMenu','floatingNewNotebookMenu','action:renameNotebookBtn' ]],
   ['Hojas',[ 'action:pageNumber','action:renamePageBtn' ]],
-  ['Exportar y respaldar',[ 'action:exportPng','action:exportSvg','action:printPdf','action:backupBtn','action:importBtn','personalBackupOpen' ]],
+  ['Exportar y respaldar',[ 'shareDocumentOpen','action:exportPng','action:exportSvg','action:printPdf','action:backupBtn','action:importBtn','personalBackupOpen' ]],
   ['Más opciones de barra',[ 'floatingLockMenu' ]]
  ];
  for(const [label,ids] of groups){
