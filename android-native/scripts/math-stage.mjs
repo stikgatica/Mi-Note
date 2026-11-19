@@ -5,6 +5,8 @@ import path from 'node:path';
 const root=process.cwd(),stage=path.join(root,'stage');
 await fs.cp(path.join(root,'src','math'),path.join(stage,'math'),{recursive:true});
 // Indicador de proximidad: módulo y estilos exclusivos de Android.
+for(const file of ['x10-device-info-v051.js','x10-device-info.css'])
+ await fs.copyFile(path.join(root,'src',file),path.join(stage,file));
 for(const file of ['pen-hover.js','pen-hover.css','pen-hover-geometry.mjs'])
  await fs.copyFile(path.join(root,'src',file),path.join(stage,file));
 // El manejador de Atrás nativo se carga desde android-ui-main.js.
@@ -31,6 +33,12 @@ app=app.replace(x10Anchor,x10Anchor+`
   if(pt)document.dispatchEvent(new CustomEvent('minote:x10-hover',{detail:{x:pt[0],y:pt[1]}}));
  }
 `);
+// Exponer únicamente la lectura 0x85 (último índice) sin prometer capacidad.
+const pageCountAnchor="onPageCount:n=>{x10Log('Contador lógico X10: '+n);x10Details();},";
+if(!app.includes(pageCountAnchor))throw Error('No se encontró lector X10 0x85.');
+app=app.replace(pageCountAnchor,
+ "onPageCount:n=>{x10Log('Contador lógico X10: '+n);x10Details();"+
+ "window.dispatchEvent(new CustomEvent('minote:x10-memory-index',{detail:{lastIndex:n}}));},");
 const events=[
  ["pg.strokes.push(stroke);pg.updatedAt=now();nb.updatedAt=now();",
   "pg.strokes.push(stroke);pg.updatedAt=now();nb.updatedAt=now();"+
@@ -72,11 +80,25 @@ window.MiNoteMathBridge={
  }
 };
 `;
+app+=`
+window.MiNoteX10DeviceInfo={
+ async queryMemoryIndex(){
+  if(!x10Connection?.connected)throw Error('Primero conecte la Huion X10.');
+  if(x10Connection.offlineReading)throw Error('Termine la importación de páginas antes de consultar.');
+  if(x10Connection.sessionKind!=='agenda-pura')throw Error('La Huion no está en modo agenda.');
+  // Solicitud de contador: NO es 0x8B (borrado) ni 0x8C (limpieza física).
+  await x10Connection.send(Uint8Array.from([0xcd,0x85,0x08,0,0,0,0,0xed]));
+ },
+ clearLocalDiagnostics(){
+  x10Logs.length=0;
+ }
+};
+`;
 await fs.writeFile(appPath,app);
 const entry=path.join(stage,'android-ui-main.js');
 let ui=await fs.readFile(entry,'utf8');
 const anchor="await load('batería X10',()=>import('./battery-ui-v022.js'));";
 if(!ui.includes(anchor))throw Error('Matemática requiere la inicialización final Android tras batería.');
-ui=ui.replace(anchor,anchor+"\nawait load('Modo Matemática',()=>import('./math/math-controller.js'));\nawait load('Indicador de punta',()=>import('./pen-hover.js'));");
+ui=ui.replace(anchor,anchor+"\nawait load('Modo Matemática',()=>import('./math/math-controller.js'));\nawait load('Indicador de punta',()=>import('./pen-hover.js'));\nawait load('Detalles seguros X10',()=>import('./x10-device-info-v051.js'));");
 await fs.writeFile(entry,ui);
 console.log('Matemática: análisis automático al finalizar trazos X10/táctiles y capa reversible integrada.');
