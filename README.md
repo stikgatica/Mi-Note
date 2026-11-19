@@ -102,3 +102,13 @@ Para detalles técnicos consulte [ARQUITECTURA.md](ARQUITECTURA.md) y [android-n
 - Los archivos temporales están en caché privada y las aplicaciones receptoras solo reciben permiso temporal de lectura mediante FileProvider. Sin permiso general de almacenamiento ni conexión propia a Internet.
 - Los cuadernos no se alteran al exportar. La app no puede garantizar que una aplicación receptora acepte WebM o ZIP; confirme la recepción en la aplicación elegida.
 
+
+## Modo Matemática experimental — V0.43 (fases 1 y 2)
+
+El Modo Matemática se encuentra **apagado por defecto en cada inicio**. El menú presenta los cuatro ejes curriculares de Matemática de 5.º a 8.º básico; por ahora solo está habilitado **Geometría y medición**. Números, Álgebra y Datos aparecen como próximas etapas.
+
+En Geometría puede activar el modo, seleccionar hasta 12 trazos tocándolos, y solicitar **Mejorar selección**. Un Web Worker procesa copias de los trazos localmente, sin acceso a red. Se proponen rectas, circunferencias, polígonos cerrados o aristas separadas. La docente revisa la figura propuesta y puede aceptarla, descartarla, editar coordenadas y agregar etiquetas manuales; no se identifican todavía medidas manuscritas.
+
+Las mejoras se guardan en la propiedad `mathLayer` de cada página. Los puntos originales `strokes` nunca se reemplazan. Con el interruptor apagado o la capa oculta se muestra la tinta original. Si un trazo fuente cambia, su mejora deja de mostrarse hasta volver a reconocerlo. Los respaldos incluyen `mathLayer`; la reproducción sigue usando los trazos originales. Las exportaciones continúan priorizando la tinta original mientras se prepara la opción explícita de exportar la capa mejorada.
+
+La importación de memoria X10, Bluetooth LED azul, respaldo cifrado y Compartir Android no fueron modificados en el protocolo. Valide físicamente la V0.43 antes de considerarla estable y conserve una copia de los cuadernos y la V0.42.
