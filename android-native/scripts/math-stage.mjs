@@ -13,6 +13,20 @@ app=app.replace(original,
 const compare="template:p.template,strokes:p.strokes";
 if(!app.includes(compare))throw Error('Matemática: no se localizó comparador de versiones de hoja.');
 app=app.replace(compare,"template:p.template,strokes:p.strokes,mathLayer:p.mathLayer||null");
+const events=[
+ ["pg.strokes.push(stroke);pg.updatedAt=now();nb.updatedAt=now();",
+  "pg.strokes.push(stroke);pg.updatedAt=now();nb.updatedAt=now();"+
+  "document.dispatchEvent(new CustomEvent('minote:stroke-finished',{detail:{pageId:pg.id,strokeId:stroke.id,source:'huion'}}));"],
+ ["page().strokes.push(inStroke);inStroke=null;",
+  "page().strokes.push(inStroke);"+
+  "document.dispatchEvent(new CustomEvent('minote:stroke-finished',{detail:{pageId:page().id,strokeId:inStroke.id,source:'touch'}}));"+
+  "inStroke=null;"]
+];
+for(const [from,to] of events){
+ if(!app.includes(from))throw Error('Matemática automática: no se encontró el evento de trazo terminado: '+from);
+ app=app.replace(from,to);
+}
+
 app+=`
 /* API de la capa matemática. Los trazos originales no se modifican. */
 window.MiNoteMathBridge={
@@ -45,4 +59,4 @@ const anchor="await load('batería X10',()=>import('./battery-ui-v022.js'));";
 if(!ui.includes(anchor))throw Error('Matemática requiere la inicialización final Android tras batería.');
 ui=ui.replace(anchor,anchor+"\nawait load('Modo Matemática',()=>import('./math/math-controller.js'));");
 await fs.writeFile(entry,ui);
-console.log('Matemática: trabajador local, selección y capa independiente enlazados al WebView Android.');
+console.log('Matemática: análisis automático al finalizar trazos X10/táctiles y capa reversible integrada.');
