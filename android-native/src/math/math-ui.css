@@ -1,0 +1,21 @@
+/* Matemática: módulo opcional; no cambia el estilo ni el rendimiento de la tinta. */
+#mathOverlay{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;background:transparent;overflow:visible;}
+#mathOverlay[hidden]{display:none!important;}
+#paper.math-selecting{cursor:crosshair!important;touch-action:none!important;}
+.minote-math-dialog{width:min(95vw,525px);max-height:90dvh;overflow-y:auto;padding:14px;box-sizing:border-box;}
+.minote-math-dialog .math-switch{display:flex;align-items:center;gap:9px;padding:8px;border-radius:9px;}
+.minote-math-dialog .math-switch input{width:19px;height:19px;accent-color:#236dd0;}
+.minote-math-dialog .math-hint{font-size:13px;line-height:1.4;color:#556982;margin:8px 0;white-space:normal;}
+.minote-math-dialog .math-actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;}
+.minote-math-dialog button{min-height:36px;}
+.minote-math-dialog .field{display:flex;flex-direction:column;gap:4px;margin:8px 0;}
+.minote-math-dialog select,.minote-math-dialog input[type="text"],.minote-math-dialog input[type="number"]{box-sizing:border-box;width:100%;padding:9px;border:1px solid #afc3d9;border-radius:8px;color:#192e48;background:#fff;}
+.minote-math-dialog details{border:1px solid #cbd6e5;padding:10px;border-radius:10px;margin:12px 0;}
+.minote-math-dialog details summary{font-weight:700;cursor:pointer;}
+.minote-math-dialog .math-edit-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:210px;overflow-y:auto;margin:10px 0;}
+.minote-math-dialog .math-edit-fields label{font-size:12px;display:flex;flex-direction:column;}
+.minote-math-dialog .math-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin:7px 0;}
+.minote-math-dialog .math-row label{flex:1;min-width:0;font-size:12px;}
+.math-menu-entry{border:1px solid #aec6e6;border-radius:9px;background:#edf4ff;padding:10px;margin:4px 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.math-menu-entry .math-switch{display:flex;gap:7px;align-items:center;flex:1;min-width:130px;font-weight:600;color:#163e75;}
+.math-menu-entry button{padding:8px 10px;border:1px solid #adc4e4;border-radius:8px;background:white;color:#204d8f;}
