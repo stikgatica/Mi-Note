@@ -1,6 +1,7 @@
 /* Motor automático de Matemática. Solo analiza copias de trazos ya finalizados.
    La tinta manuscrita se conserva en su propio arreglo de puntos. */
 import {propose,fingerprint} from './math-geometry.mjs';
+import {fitStrongLine,straightenContour,straightenConnectedSides} from './math-strong-geometry.mjs';
 import {recognizeInk} from './math-ink-ocr.mjs';
 const box=strokes=>{
  const pts=strokes.flatMap(s=>s.pts||[]).filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
@@ -24,12 +25,32 @@ const fit=(strokes,kind)=>{
   if(extent(b)>150||b.maxY-b.minY>115)return null;
   result=recognizeInk(strokes);
  }else if(kind==='shape'){
-  result=propose(strokes,'auto');
+  // La corrección fuerte trabaja sobre una COPIA local y endereza curvas.
+  // No modifica los puntos manuscritos, no inventa caras y conserva la posición.
+  const parts=strokes.map(s=>(s.pts||[])
+    .filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]))
+    .map(p=>[p[0],p[1]]));
+  if(parts.some(p=>p.length<2))return null;
+  let strong=null;
+  if(parts.length===1){
+   strong=straightenContour(parts[0]);
+   if(!strong){
+    const line=fitStrongLine(parts[0],{lenMin:95,tolerance:.19});
+    if(line)strong={kind:'line',points:line.points};
+   }
+  }else strong=straightenConnectedSides(parts);
+  if(strong){
+   const enough=strong.kind==='line'?extent(b)>=105
+    :strong.kind==='polygon'?extent(b)>=62:false;
+   if(enough)result={type:strong.kind,label:strong.kind==='line'?'Línea recta':'Polígono',
+    geometry:strong,sourceStrokeIds:strokes.map(s=>s.id),
+    style:{color:strokes[0]?.color||'#000000',width:Number(strokes[0]?.width)||3}};
+  }
+  if(!result)result=propose(strokes,'auto');
   if(!result)return null;
   if(result.geometry.kind==='segments')return null; // No completar aristas arbitrarias.
   if(result.geometry.kind==='line'&&extent(b)<105)return null;
-  // Polígonos pequeños pueden ser números. No reemplazarlos automáticamente.
-  if(result.geometry.kind==='polygon'&&extent(b)<64)return null;
+  if(result.geometry.kind==='polygon'&&extent(b)<62)return null;
   if(result.geometry.kind==='circle'&&extent(b)<60)return null;
  }
  return candidate(result,strokes);
