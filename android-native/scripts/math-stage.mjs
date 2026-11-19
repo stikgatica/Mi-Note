@@ -4,6 +4,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 const root=process.cwd(),stage=path.join(root,'stage');
 await fs.cp(path.join(root,'src','math'),path.join(stage,'math'),{recursive:true});
+// El manejador de Atrás nativo se carga desde android-ui-main.js.
+await fs.copyFile(path.join(root,'src','android-back.js'),path.join(stage,'android-back.js'));
 const appPath=path.join(stage,'app.js');
 let app=await fs.readFile(appPath,'utf8');
 const original='for(const s of pg.strokes)drawStroke(ctx,s);';
