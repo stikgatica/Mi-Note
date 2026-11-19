@@ -19,3 +19,15 @@
 .math-menu-entry{border:1px solid #aec6e6;border-radius:9px;background:#edf4ff;padding:10px;margin:4px 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .math-menu-entry .math-switch{display:flex;gap:7px;align-items:center;flex:1;min-width:130px;font-weight:600;color:#163e75;}
 .math-menu-entry button{padding:8px 10px;border:1px solid #adc4e4;border-radius:8px;background:white;color:#204d8f;}
+
+/* Selector rápido disponible en la barra flotante solo en Modo Matemática. */
+#mathShapeShortcut{min-width:34px;min-height:34px;font-size:23px;line-height:1;
+ padding:4px 7px;border-radius:9px;color:#1451b7;background:#eaf2ff;border:1px solid #7dabe7;}
+#mathShapeShortcut[hidden]{display:none!important;}
+.math-quick-floating{position:fixed;right:12px;bottom:74px;z-index:950;}
+.minote-shape-dialog{width:min(94vw,490px);max-height:85dvh;overflow-y:auto;padding:16px;}
+.minote-shape-dialog .dialog-head h2{font-size:18px;}
+.math-shape-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;}
+.math-shape-grid button{white-space:normal;text-align:left;min-height:42px;padding:8px;font-size:13px;}
+.math-shape-grid button.selected{background:#1451b7;color:#fff;border-color:#1451b7;}
+@media(max-width:360px){.math-shape-grid{gap:5px}.math-shape-grid button{font-size:12px;}}
