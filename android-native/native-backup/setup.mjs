@@ -1,12 +1,14 @@
 // Android Storage Access Framework: instalar plugin en el proyecto generado por Capacitor.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {addMiNoteProvider,PROVIDER_CLASS,PROVIDER_AUTHORITY,PROVIDER_XML} from './share-provider.mjs';
 const root=process.cwd();
 const javaRoot=path.join(root,'android','app','src','main','java');
 const pkg=path.join(javaRoot,'cl','stikgatica','minote','x10');
 await fs.mkdir(pkg,{recursive:true});
 await fs.copyFile(path.join(root,'native-backup','PrivateBackupPlugin.java'),path.join(pkg,'PrivateBackupPlugin.java'));
 await fs.copyFile(path.join(root,'native-backup','MiNoteFileExportPlugin.java'),path.join(pkg,'MiNoteFileExportPlugin.java'));
+await fs.copyFile(path.join(root,'native-backup','MiNoteShareProvider.java'),path.join(pkg,'MiNoteShareProvider.java'));
 const activity=path.join(pkg,'MainActivity.java');
 const content=`package cl.stikgatica.minote.x10;
 
@@ -30,14 +32,9 @@ await fs.writeFile(path.join(xmlRoot,'minote_share_paths.xml'),`<?xml version="1
 </paths>\n`);
 const manifestFile=path.join(root,'android','app','src','main','AndroidManifest.xml');
 let manifest=await fs.readFile(manifestFile,'utf8');
-if(!manifest.includes('androidx.core.content.FileProvider')){
- const provider=`<provider android:name="androidx.core.content.FileProvider"
- android:authorities="\${applicationId}.minote.files"
- android:exported="false" android:grantUriPermissions="true">
- <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
- android:resource="@xml/minote_share_paths" />
- </provider>`;
- manifest=manifest.replace('</application>',provider+'\n</application>');
- await fs.writeFile(manifestFile,manifest);
-}
+manifest=addMiNoteProvider(manifest);
+await fs.writeFile(manifestFile,manifest);
+if(!manifest.includes(PROVIDER_CLASS)||!manifest.includes(PROVIDER_AUTHORITY)||!manifest.includes(PROVIDER_XML))
+ throw Error('Proveedor nativo de Compartir incompleto.');
+
 console.log('Plugins nativos de respaldo y Compartir Android registrados sin permisos globales de almacenamiento.');
