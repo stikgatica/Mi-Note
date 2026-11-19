@@ -41,3 +41,9 @@ El APK no solicita permiso de Internet. La memoria física nunca se borra (`0x8B
 `native-backup/MiNoteFileExportPlugin.java` añade `ACTION_CREATE_DOCUMENT` (guardar en lugar elegido) y `ACTION_SEND` + `FileProvider` (Compartir con otras aplicaciones), con acceso exclusivo a una carpeta temporal privada. Los datos se transfieren desde WebView mediante fragmentos base64 acotados de 96 KiB. `src/export-native.js` gestiona la transferencia; `src/share-documents.js` transforma hojas y cuadernos a SVG, PNG, ZIP y PDF A5 multipágina. `src/replay.js` utiliza el mismo complemento para WebM.
 
 Se ejecuta `native-backup/setup.mjs` después de sincronizar Capacitor para registrar el complemento y las rutas compartibles en AndroidManifest. No se solicita acceso global al almacenamiento.
+
+## Modo Matemática automático (V0.44)
+
+`src/math/math-auto.mjs` analiza ventanas pequeñas de tinta recién finalizada; `src/math/math-worker.js` procesa la geometría y las coincidencias del reconocedor experimental `src/math/math-ink-ocr.mjs`. El controlador `math-controller.js` guarda únicamente mejoras de alta confianza en `mathLayer`. La compilación conecta los eventos `minote:stroke-finished` al final de un trazo BLE o táctil mediante `scripts/math-stage.mjs`.
+
+El reconocedor **no usa un modelo entrenado**, no envía datos y no garantiza reconocimiento de cualquier caligrafía. No altera valores matemáticos por inferencia. Se conserva la capacidad de introducir una corrección manual en el panel. No se toca el protocolo BLE ni el importador de memoria.
