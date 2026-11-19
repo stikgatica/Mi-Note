@@ -285,7 +285,7 @@ $('mathAddLabel').addEventListener('click',()=>{
 });
 document.addEventListener('minote:stroke-finished',({detail})=>{
  if(!enabled||!detail?.pageId)return;
- if(detail.pageId!==get()?.id)return;
+ if(detail.pageId!==original()?.activePageId?.())return;
  scheduleScan();
 });
 document.addEventListener('minote:statechange',()=>{
