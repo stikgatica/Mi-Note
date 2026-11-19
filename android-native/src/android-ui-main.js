@@ -28,6 +28,7 @@ if(failures.length){
 }
 await load('interfaz Android',()=>import('./mobile-ui.js'));
 await load('reproducción',()=>import('./replay.js'));
+await load('compartir documentos Android',()=>import('./share-documents.js'));
 await load('respaldo personal',()=>import('./personal-backup.js'));
 await load('memoria Huion X10',()=>import('./memory-import.js'));
 await load('archivos Huion AHN/AHNS',()=>import('./huion-archive.js'));
