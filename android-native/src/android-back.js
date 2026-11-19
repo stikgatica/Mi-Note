@@ -24,7 +24,7 @@ export function closeTopLayer(doc=document){
  }
  // Biblioteca flotante personalizada que no usa <dialog>.
  if(doc.body.classList.contains('library-open')){
-  const close=doc.getElementById('floatingLibraryClose');
+  const close=doc.getElementById('floatingSidebarClose');
   if(close){close.click();return true;}
   doc.body.classList.remove('library-open');
   return true;
