@@ -36,11 +36,15 @@ test('Biblioteca tiene controles independientes sin superposición',()=>{
  assert.match(css,/\.huion-library-tools button/);
  assert.match(css,/position:static!important/);
 });
-test('La nueva compilación usa identificadores de versión V0.48',()=>{
+test('La compilación conserva versionado coherente y pizarra desde V0.48',()=>{
  const workflow=read('../../.github/workflows/android-release.yml');
  const pkg=JSON.parse(read('../package.json'));
- assert.equal(pkg.version,'0.48.0');
- assert.match(workflow,/versionCode 48/);
- assert.match(workflow,/Mi-Note-X10-Android-v0\.48\.apk/);
- assert.match(workflow,/android-v0\.48/);
+ const match=/^(\d+)\.(\d+)\.(\d+)$/.exec(pkg.version);
+ assert.ok(match);
+ const minor=Number(match[2]);
+ assert.ok(minor>=48);
+ assert.match(workflow,new RegExp('versionCode '+minor+'\\b'));
+ const tag='v'+match[1]+'.'+match[2];
+ assert.ok(workflow.includes('Mi-Note-X10-Android-'+tag+'.apk'));
+ assert.ok(workflow.includes('android-'+tag));
 });
