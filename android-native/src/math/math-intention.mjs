@@ -1,61 +1,150 @@
-/* Interpretación de intención de dibujo: auto, cuadrado, rectángulo, triángulo.
-   Corrige geometría en la capa digital, nunca la tinta manuscrita. */
+/* Intención explícita de dibujo, independiente de la X10 y de la tinta original.
+ * Una figura seleccionada se normaliza localmente al finalizar sus trazos. */
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1]];
 const add=(a,b)=>[a[0]+b[0],a[1]+b[1]];
 const scale=(a,s)=>[a[0]*s,a[1]*s];
 const len=a=>Math.hypot(...a);
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1];
+const dist=(a,b)=>len(sub(a,b));
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export const DRAW_INTENTIONS=Object.freeze([
- {id:'auto',label:'Detectar automáticamente'},
- {id:'square',label:'Cuadrado (4 lados iguales, 90°)'},
- {id:'rectangle',label:'Rectángulo (ángulos de 90°)'},
- {id:'triangle',label:'Triángulo (3 lados)'},
- {id:'polygon',label:'Cuadrilátero libre (sin corregir ángulos)'}
+ {id:'auto',label:'Automático (detectar figura)'},
+ {id:'circle',label:'Círculo / circunferencia'},
+ {id:'square',label:'Cuadrado'},
+ {id:'rectangle',label:'Rectángulo'},
+ {id:'triangle',label:'Triángulo'},
+ {id:'rhombus',label:'Rombo'},
+ {id:'parallelogram',label:'Paralelogramo'},
+ {id:'trapezoid',label:'Trapecio'},
+ {id:'pentagon',label:'Pentágono'},
+ {id:'hexagon',label:'Hexágono'},
+ {id:'line',label:'Línea recta'},
+ {id:'polygon',label:'Polígono libre'}
 ]);
-/** Ajusta solo un cuadrilátero validado. Para la intención explícita,
- *  se toman dimensiones promedio y se fuerzan vértices a 90°.
- *  El centro, la rotación y las dimensiones aproximadas se conservan.
- *  No se inventa un cuarto vértice de un triángulo. */
+export const geometryName=geometry=>{
+ if(!geometry)return 'Figura';
+ if(geometry.kind==='circle')return 'Circunferencia';
+ if(geometry.kind==='line')return 'Línea recta';
+ if(geometry.kind==='polygon')return ({
+  3:'Triángulo',4:'Cuadrilátero',5:'Pentágono',6:'Hexágono',7:'Heptágono',8:'Octágono'
+ })[geometry.points?.length]||'Polígono';
+ return geometry.kind==='text'?'Número o medida':'Figura';
+};
+const signedArea=points=>points.reduce((s,p,i)=>
+ s+p[0]*points[(i+1)%points.length][1]-points[(i+1)%points.length][0]*p[1],0);
+
+/* Corrige un cuadrilátero identificado; conserva centro, giro y dimensiones.
+ * Solo se utiliza si el usuario solicitó esa figura específica. */
 export function regularizeQuadrilateral(points,intention){
- if(!['square','rectangle'].includes(intention)||points?.length!==4)return null;
+ if(!['square','rectangle','rhombus','parallelogram'].includes(intention)||points?.length!==4)return null;
  if(!points.every(p=>Array.isArray(p)&&p.length>=2&&p.every(Number.isFinite)))return null;
  const center=scale(points.reduce(add,[0,0]),.25);
  const edges=points.map((p,i)=>sub(points[(i+1)%4],p));
  const lengths=edges.map(len);
  const min=Math.min(...lengths),max=Math.max(...lengths);
- if(min<12||max/min>4)return null;
- // Dirección del lado principal a partir de los lados opuestos, que apuntan
- // en sentido inverso. Ayuda cuando una esquina está desplazada.
- let axis=sub(edges[0],edges[2]);
- if(len(axis)<1)axis=edges[0];
- axis=scale(axis,1/Math.max(1,len(axis)));
- const signed=edges.reduce((s,e,i)=>s+points[i][0]*points[(i+1)%4][1]-points[(i+1)%4][0]*points[i][1],0);
- const winding=signed>=0?1:-1;
- const vertical=[-axis[1]*winding,axis[0]*winding];
- const w=Math.max(20,(lengths[0]+lengths[2])/2);
- const h=Math.max(20,(lengths[1]+lengths[3])/2);
- const size=intention==='square'?(w+h)/2:null;
- const hw=(size??w)/2,hh=(size??h)/2;
- const order=[[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]];
- const result=order.map(([x,y])=>add(center,add(scale(axis,x),scale(vertical,y))));
- // No desplazar el objeto fuera de su región original de forma extrema.
- const diagonal=Math.hypot(w,h);
- const avgMove=result.reduce((s,p,i)=>s+len(sub(p,points[i])),0)/4;
- if(avgMove>diagonal*.42)return null;
+ if(min<12||max/min>4||Math.abs(signedArea(points))<250)return null;
+ let result;
+ if(intention==='square'||intention==='rectangle'){
+  let axis=sub(edges[0],edges[2]);
+  if(len(axis)<1)axis=edges[0];
+  axis=scale(axis,1/Math.max(1,len(axis)));
+  const vertical=[-axis[1]*(signedArea(points)>=0?1:-1),axis[0]*(signedArea(points)>=0?1:-1)];
+  const w=Math.max(20,(lengths[0]+lengths[2])/2);
+  const h=Math.max(20,(lengths[1]+lengths[3])/2);
+  const size=intention==='square'?(w+h)/2:null;
+  const hw=(size??w)/2,hh=(size??h)/2;
+  result=[[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]]
+   .map(([x,y])=>add(center,add(scale(axis,x),scale(vertical,y))));
+ }else{
+  const a=scale(sub(points[0],points[2]),.5);
+  let b=scale(sub(points[1],points[3]),.5);
+  if(intention==='rhombus'){
+   let perpendicular=[-a[1],a[0]];
+   perpendicular=scale(perpendicular,1/Math.max(1,len(perpendicular)));
+   if(dot(perpendicular,b)<0)perpendicular=scale(perpendicular,-1);
+   b=scale(perpendicular,len(b));
+  }
+  result=[add(center,a),add(center,b),sub(center,a),sub(center,b)];
+ }
+ const diag=Math.hypot(Math.max(lengths[0],lengths[2]),Math.max(lengths[1],lengths[3]));
+ const avgMove=result.reduce((s,p,i)=>s+dist(p,points[i]),0)/4;
+ if(avgMove>diag*.42)return null;
  return {kind:'polygon',points:result};
+}
+
+/* Rescate de cuadrados/rectángulos de trazo continuo con curvas o esquinas
+ * que el detector libre simplificó como 5-6 vértices. Exige contorno cerrado,
+ * evidencia de LAS CUATRO esquinas y ajuste a cuatro lados; un triángulo no pasa. */
+export function fitIntendedQuadrilateral(pts,intention){
+ if(!['square','rectangle'].includes(intention)||!Array.isArray(pts)||pts.length<8)return null;
+ const points=pts.filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
+ if(points.length<8)return null;
+ const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
+ const diag=Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys));
+ if(diag<48||dist(points[0],points.at(-1))>Math.max(16,diag*.23))return null;
+ let best=null;
+ // Buscar la orientación que mejor explica cuatro lados en lugar de
+ // suponer que los ejes de la hoja son los ejes del cuadrado.
+ for(let j=0;j<90;j++){
+  const a=j*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+  const proj=points.map(p=>[p[0]*c+p[1]*s,-p[0]*s+p[1]*c]);
+  const u=proj.map(p=>p[0]),v=proj.map(p=>p[1]);
+  const x0=Math.min(...u),x1=Math.max(...u),y0=Math.min(...v),y1=Math.max(...v);
+  if(x1-x0<25||y1-y0<25)continue;
+  const corners=[[x0,y0],[x1,y0],[x1,y1],[x0,y1]];
+  const closeCorner=corners.map(q=>Math.min(...proj.map(p=>dist(p,q))));
+  // Esta comprobación impide dibujar un cuadrado inventado desde un círculo.
+  if(Math.max(...closeCorner)>diag*.125)continue;
+  const residual=proj.reduce((sum,p)=>sum+Math.min(
+   Math.abs(p[0]-x0),Math.abs(p[0]-x1),Math.abs(p[1]-y0),Math.abs(p[1]-y1)
+  ),0)/proj.length/diag;
+  const score=residual+Math.max(...closeCorner)/diag*.3;
+  if(!best||score<best.score){
+   const rotated=corners.map(([x,y])=>[x*c-y*s,x*s+y*c]);
+   best={score,points:rotated};
+  }
+ }
+ if(!best||best.score>.13)return null;
+ return regularizeQuadrilateral(best.points,intention);
+}
+
+/* Cuando se eligió circunferencia, usar una corrección más tolerante que el
+ * modo automático, pero nunca cerrar un arco abierto ni una línea suelta. */
+export function fitIntendedCircle(pts){
+ if(!Array.isArray(pts)||pts.length<12)return null;
+ const points=pts.filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
+ if(points.length<12)return null;
+ const x=points.map(p=>p[0]),y=points.map(p=>p[1]);
+ const minX=Math.min(...x),maxX=Math.max(...x),minY=Math.min(...y),maxY=Math.max(...y);
+ const w=maxX-minX,h=maxY-minY,diag=Math.hypot(w,h);
+ if(Math.min(w,h)<28||Math.max(w,h)/Math.min(w,h)>1.55)return null;
+ if(dist(points[0],points.at(-1))>Math.max(16,diag*.22))return null;
+ const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
+ const radii=points.map(p=>Math.hypot(p[0]-cx,p[1]-cy));
+ const r=radii.reduce((s,v)=>s+v,0)/radii.length;
+ if(r<15||r>800)return null;
+ const rms=Math.sqrt(radii.reduce((s,v)=>s+(v-r)**2,0)/radii.length)/r;
+ let sweep=0;
+ for(let i=1;i<points.length;i++){
+  const a=Math.atan2(points[i-1][1]-cy,points[i-1][0]-cx);
+  const b=Math.atan2(points[i][1]-cy,points[i][0]-cx);
+  sweep+=Math.atan2(Math.sin(b-a),Math.cos(b-a));
+ }
+ if(Math.abs(sweep)<4.7||rms>.23)return null;
+ return {kind:'circle',cx,cy,r};
 }
 export function interpretGeometry(geometry,intention='auto'){
  if(!geometry)return null;
- if(intention==='square'||intention==='rectangle'){
+ if(intention==='square'||intention==='rectangle'||intention==='rhombus'||intention==='parallelogram'){
   if(geometry.kind!=='polygon'||geometry.points?.length!==4)return null;
   return regularizeQuadrilateral(geometry.points,intention);
  }
- if(intention==='triangle'){
-  return geometry.kind==='polygon'&&geometry.points?.length===3?geometry:null;
- }
- if(intention==='polygon'){
-  return geometry.kind==='polygon'?geometry:null;
- }
+ if(intention==='line')return geometry.kind==='line'?geometry:null;
+ if(intention==='circle')return geometry.kind==='circle'?geometry:null;
+ if(intention==='triangle')return geometry.kind==='polygon'&&geometry.points?.length===3?geometry:null;
+ if(intention==='pentagon')return geometry.kind==='polygon'&&geometry.points?.length===5?geometry:null;
+ if(intention==='hexagon')return geometry.kind==='polygon'&&geometry.points?.length===6?geometry:null;
+ if(intention==='trapezoid')return geometry.kind==='polygon'&&geometry.points?.length===4?geometry:null;
+ if(intention==='polygon')return geometry.kind==='polygon'?geometry:null;
  return geometry;
 }
