@@ -4,6 +4,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 const root=process.cwd(),stage=path.join(root,'stage');
 await fs.cp(path.join(root,'src','math'),path.join(stage,'math'),{recursive:true});
+// Indicador de proximidad: módulo y estilos exclusivos de Android.
+for(const file of ['pen-hover.js','pen-hover.css','pen-hover-geometry.mjs'])
+ await fs.copyFile(path.join(root,'src',file),path.join(stage,file));
 // El manejador de Atrás nativo se carga desde android-ui-main.js.
 await fs.copyFile(path.join(root,'src','android-back.js'),path.join(stage,'android-back.js'));
 const appPath=path.join(stage,'app.js');
@@ -15,6 +18,19 @@ app=app.replace(original,
 const compare="template:p.template,strokes:p.strokes";
 if(!app.includes(compare))throw Error('Matemática: no se localizó comparador de versiones de hoja.');
 app=app.replace(compare,"template:p.template,strokes:p.strokes,mathLayer:p.mathLayer||null");
+// El lápiz X10 solo actualiza la marca visual si entrega una posición
+// de hover real (presión cero y SIN contacto). No se inventan coordenadas.
+const x10Anchor='function x10Pen(raw,limits,mode){';
+if(!app.includes(x10Anchor))throw Error('Puntero X10: no se encontró el receptor de muestras.');
+app=app.replace(x10Anchor,x10Anchor+`
+ if(raw?.touch&&raw?.press>0){
+  if(!x10ActiveStroke)document.dispatchEvent(new Event('minote:x10-hover-end'));
+ }else if(Number.isFinite(raw?.x)&&Number.isFinite(raw?.y)&&
+  raw.x>0&&raw.y>0&&raw.x<=limits.maxX&&raw.y<=limits.maxY){
+  const pt=MiNoteX10Ble.mapPoint(raw,limits.maxX,limits.maxY,x10RotationValue(mode),W,H,true);
+  if(pt)document.dispatchEvent(new CustomEvent('minote:x10-hover',{detail:{x:pt[0],y:pt[1]}}));
+ }
+`);
 const events=[
  ["pg.strokes.push(stroke);pg.updatedAt=now();nb.updatedAt=now();",
   "pg.strokes.push(stroke);pg.updatedAt=now();nb.updatedAt=now();"+
@@ -61,6 +77,6 @@ const entry=path.join(stage,'android-ui-main.js');
 let ui=await fs.readFile(entry,'utf8');
 const anchor="await load('batería X10',()=>import('./battery-ui-v022.js'));";
 if(!ui.includes(anchor))throw Error('Matemática requiere la inicialización final Android tras batería.');
-ui=ui.replace(anchor,anchor+"\nawait load('Modo Matemática',()=>import('./math/math-controller.js'));");
+ui=ui.replace(anchor,anchor+"\nawait load('Modo Matemática',()=>import('./math/math-controller.js'));\nawait load('Indicador de punta',()=>import('./pen-hover.js'));");
 await fs.writeFile(entry,ui);
 console.log('Matemática: análisis automático al finalizar trazos X10/táctiles y capa reversible integrada.');
