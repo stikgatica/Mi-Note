@@ -41,11 +41,15 @@ test('eventos sin contacto Huion X10 requieren datos realmente transmitidos',()=
  assert.match(stage,/pen-hover\.js/);
  assert.match(stage,/pen-hover\.css/);
 });
-test('versión APK V0.49 con firma y publicación propias',()=>{
+test('versión APK V0.49 o posterior con firma y publicación propias',()=>{
  const workflow=read('../../.github/workflows/android-release.yml');
  const pkg=JSON.parse(read('../package.json'));
- assert.equal(pkg.version,'0.49.0');
- assert.match(workflow,/versionCode 49/);
- assert.match(workflow,/Mi-Note-X10-Android-v0\.49\.apk/);
- assert.match(workflow,/android-v0\.49/);
+ const match=/^(\d+)\.(\d+)\.(\d+)$/.exec(pkg.version);
+ assert.ok(match);
+ const minor=Number(match[2]);
+ assert.ok(minor>=49);
+ assert.match(workflow,new RegExp('versionCode '+minor+'\\b'));
+ const tag='v'+match[1]+'.'+match[2];
+ assert.ok(workflow.includes('Mi-Note-X10-Android-'+tag+'.apk'));
+ assert.ok(workflow.includes('android-'+tag));
 });
