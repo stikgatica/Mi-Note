@@ -4,6 +4,7 @@
 import {AXES,fingerprint,validObject} from './math-geometry.mjs';
 import {mergeAutomatic} from './math-auto.mjs';
 import {DRAW_INTENTIONS} from './math-intention.mjs';
+import {compactAutomatic,listObjects,nearDuplicate} from './math-objects.mjs';
 import './math-ui.css';
 
 const $=id=>document.getElementById(id),ns='http://www.w3.org/2000/svg';
@@ -28,7 +29,11 @@ dialog.innerHTML=`
    <select id="mathIntention"></select>
   </label>
   <p class="math-hint">Seleccione una figura antes de dibujar. La corrección automática respetará esa intención y mantendrá intacta la tinta original.</p>
-  <label class="field">Reconocimientos de la hoja (para corregir)<select id="mathSavedObjects"></select></label>
+  <label class="field">Figuras reconocidas en esta hoja
+   <select id="mathSavedObjects"></select>
+  </label>
+  <p id="mathObjectCount" class="math-hint"></p>
+  <div class="math-actions"><button type="button" id="mathFindObject">Resaltar figura seleccionada</button><button type="button" id="mathCleanDuplicates">Limpiar reconocimientos repetidos</button></div>
   <details id="mathEditDetails"><summary>Corregir un reconocimiento</summary>
    <div id="mathCoordinateEditor" class="math-edit-fields"></div>
    <div class="math-actions"><button type="button" id="mathSaveEdit">Guardar corrección</button><button type="button" id="mathRemoveObject">Volver al original</button></div>
@@ -142,6 +147,10 @@ function renderOverlay(pg){
     fill:object.style?.color||'#000000'});
    label.textContent=g.text;group.append(label);
   }else{const node=shapeNode(g,object.style);if(node)group.append(node);}
+  if(highlightId===object.id){
+   const node=shapeNode(g,{color:'#e65b20',width:Math.max(5,Number(object.style?.width)||3)+5});
+   if(node)group.append(node);
+  }
   for(const lab of object.labels||[]){
    if(!lab?.text)continue;
    const label=svg('text',{x:clamp(lab.x,0,1000),y:clamp(lab.y,0,1400),
@@ -158,15 +167,29 @@ function selectedObject(){
 }
 function updateList(pg){
  const select=$('mathSavedObjects'),keep=select.value;
- select.replaceChildren(elm('option',{value:''},'Elegir mejora…'));
- for(const obj of layerOf(pg).objects||[]){
-  const ok=validObject(obj,pg);
-  const name=obj.geometry?.kind==='text'?(obj.geometry.text||'Texto'):(obj.label||obj.type||'Figura');
-  select.append(elm('option',{value:obj.id},name+(ok?'':' (trazo modificado)')));
+ const objects=layerOf(pg).objects||[];
+ const records=listObjects(objects,obj=>validObject(obj,pg));
+ select.replaceChildren(elm('option',{value:''},records.length?'Seleccione una figura…':'Ninguna figura reconocida'));
+ for(const item of records){
+  select.append(elm('option',{value:item.id},item.label));
  }
  if([...select.options].some(x=>x.value===keep))select.value=keep;
  else select.value='';
+ $('mathObjectCount').textContent=records.length+' figura(s) y número(s) reconocidos. Cada resultado indica su ubicación.';
+ $('mathFindObject').disabled=!select.value;
+ $('mathCleanDuplicates').disabled=compactAutomatic(objects).length===objects.length;
 }
+let highlightId='',highlightTimer=null;
+function highlightSelected(){
+ const obj=selectedObject(),pg=get();
+ if(!obj||!pg)return;
+ highlightId=obj.id;renderOverlay(pg);
+ clearTimeout(highlightTimer);
+ highlightTimer=setTimeout(()=>{
+  highlightId='';const current=get();if(current)renderOverlay(current);
+ },2400);
+}
+
 let refreshQueued=false;
 function refresh(){
  if(refreshQueued)return;
@@ -177,7 +200,7 @@ function refresh(){
  });
 }
 async function saveLayer(objects,visible){
- const success=await original()?.saveLayer?.({version:1,axis:'geometry',visible,objects});
+ const success=await original()?.saveLayer?.({version:1,axis:'geometry',visible,objects:compactAutomatic(objects)});
  if(!success)throw Error('No se pudo guardar la capa mejorada.');
  refresh();return true;
 }
@@ -228,7 +251,9 @@ async function runOne(pg,strokes){
  const candidate=await recognize(strokes);
  if(!candidate||epoch!==intentionEpoch)return false;
  const current=get();if(!current||current.id!==pg.id||!sigsMatch(candidate,current))return false;
- const previous=layerOf(current).objects||[],merge=mergeAutomatic(previous,candidate);
+ const previous=layerOf(current).objects||[];
+ if(previous.some(o=>nearDuplicate(o,candidate)))return false;
+ const merge=mergeAutomatic(previous,candidate);
  if(!merge)return false;
  const obj={id:globalThis.crypto?.randomUUID?.()||'math-'+Date.now()+'-'+sequence,
   accepted:true,automatic:true,type:candidate.type,label:candidate.label,geometry:copy(candidate.geometry),
@@ -335,7 +360,16 @@ $('mathIntention').addEventListener('change',event=>{
  // No reprocesar tinta de figuras antiguas al cambiar de intención.
 });
 $('mathScanPage').addEventListener('click',()=>void scanRecent(true));
-$('mathSavedObjects').addEventListener('change',editFields);
+$('mathSavedObjects').addEventListener('change',()=>{editFields();$('mathFindObject').disabled=!selectedObject();});
+$('mathFindObject').addEventListener('click',highlightSelected);
+$('mathCleanDuplicates').addEventListener('click',()=>{
+ const pg=get();if(!pg)return;
+ const objects=layerOf(pg).objects||[],clean=compactAutomatic(objects);
+ if(clean.length===objects.length){tell('No hay reconocimientos automáticos duplicados.');return;}
+ void saveLayer(clean,layerOf(pg).visible!==false).then(()=>
+  tell('Reconocimientos repetidos retirados: '+(objects.length-clean.length)+'. Los trazos originales permanecen intactos.')
+ ).catch(e=>tell(e.message));
+});
 $('mathSaveEdit').addEventListener('click',()=>{
  const obj=selectedObject();if(!obj)return;
  try{const geometry=readGeometry(obj.geometry);void mutate(o=>{o.geometry=geometry;});}
