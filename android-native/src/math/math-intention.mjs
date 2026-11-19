@@ -110,28 +110,69 @@ export function fitIntendedQuadrilateral(pts,intention){
 
 /* Cuando se eligió circunferencia, usar una corrección más tolerante que el
  * modo automático, pero nunca cerrar un arco abierto ni una línea suelta. */
-export function fitIntendedCircle(pts){
+export function fitIntendedCircle(pts,{strict=false}={}){
  if(!Array.isArray(pts)||pts.length<12)return null;
  const points=pts.filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
  if(points.length<12)return null;
  const x=points.map(p=>p[0]),y=points.map(p=>p[1]);
  const minX=Math.min(...x),maxX=Math.max(...x),minY=Math.min(...y),maxY=Math.max(...y);
  const w=maxX-minX,h=maxY-minY,diag=Math.hypot(w,h);
- if(Math.min(w,h)<28||Math.max(w,h)/Math.min(w,h)>1.55)return null;
- if(dist(points[0],points.at(-1))>Math.max(16,diag*.22))return null;
- const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
- const radii=points.map(p=>Math.hypot(p[0]-cx,p[1]-cy));
- const r=radii.reduce((s,v)=>s+v,0)/radii.length;
- if(r<15||r>800)return null;
- const rms=Math.sqrt(radii.reduce((s,v)=>s+(v-r)**2,0)/radii.length)/r;
- let sweep=0;
+ if(Math.min(w,h)<28||Math.max(w,h)/Math.min(w,h)>(strict?1.33:1.62))return null;
+ if(dist(points[0],points.at(-1))>Math.max(15,diag*(strict?.17:.22)))return null;
+ let cx=(minX+maxX)/2,cy=(minY+maxY)/2;
+ // Afinar el centro por minimización de variación radial.
+ // Evita desplazar los círculos dibujados irregularmente a un rincón del cuadro.
+ let delta=Math.min(w,h)*.07;
+ const error=(px,py)=>{
+  const radii=points.map(p=>Math.hypot(p[0]-px,p[1]-py));
+  const mean=radii.reduce((s,v)=>s+v,0)/radii.length;
+  const rms=Math.sqrt(radii.reduce((s,v)=>s+(v-mean)**2,0)/radii.length)/Math.max(1,mean);
+  return {r:mean,rms};
+ };
+ let best=error(cx,cy);
+ for(let k=0;k<4;k++){
+  for(const [dx,dy] of [[delta,0],[-delta,0],[0,delta],[0,-delta]]){
+   const next=error(cx+dx,cy+dy);
+   if(next.rms<best.rms){cx+=dx;cy+=dy;best=next;}
+  }
+  delta*=.52;
+ }
+ if(best.r<14||best.r>800||best.rms>(strict?.145:.225))return null;
+ let sweep=0,perimeter=0;
  for(let i=1;i<points.length;i++){
-  const a=Math.atan2(points[i-1][1]-cy,points[i-1][0]-cx);
-  const b=Math.atan2(points[i][1]-cy,points[i][0]-cx);
+  const p=points[i-1],q=points[i];
+  perimeter+=dist(p,q);
+  const a=Math.atan2(p[1]-cy,p[0]-cx),b=Math.atan2(q[1]-cy,q[0]-cx);
   sweep+=Math.atan2(Math.sin(b-a),Math.cos(b-a));
  }
- if(Math.abs(sweep)<4.7||rms>.23)return null;
- return {kind:'circle',cx,cy,r};
+ // Cobertura angular completa, no un arco ni dos bucles superpuestos.
+ if(Math.abs(sweep)<(strict?5.35:4.8)||Math.abs(sweep)>8.3)return null;
+ if(perimeter<4.6*best.r||perimeter>9.2*best.r)return null;
+ // En modo automático, un cuadrado redondeado sigue teniendo tramos rectos y
+ // cuatro cambios bruscos de dirección: no convertirlo en circunferencia.
+ if(strict){
+  const count=16,walk=[],lengths=[0];
+  for(let i=1;i<points.length;i++)lengths.push(lengths[i-1]+dist(points[i],points[i-1]));
+  for(let j=0;j<count;j++){
+   const target=perimeter*j/count;
+   let i=1;
+   while(i<lengths.length-1&&lengths[i]<target)i++;
+   const span=Math.max(1e-9,lengths[i]-lengths[i-1]);
+   const t=Math.max(0,Math.min(1,(target-lengths[i-1])/span));
+   walk.push([points[i-1][0]+t*(points[i][0]-points[i-1][0]),
+    points[i-1][1]+t*(points[i][1]-points[i-1][1])]);
+  }
+  let corners=0;
+  for(let i=0;i<count;i++){
+   const before=sub(walk[i],walk[(i+count-1)%count]);
+   const after=sub(walk[(i+1)%count],walk[i]);
+   const cosine=dot(before,after)/(Math.max(1,len(before))*Math.max(1,len(after)));
+   if(cosine<.65)corners++;
+  }
+  if(corners>=3)return null;
+ }
+ if(cx<0||cx>1000||cy<0||cy>1400)return null;
+ return {kind:'circle',cx,cy,r:best.r};
 }
 export function interpretGeometry(geometry,intention='auto'){
  if(!geometry)return null;
