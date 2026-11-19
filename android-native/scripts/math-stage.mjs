@@ -5,7 +5,7 @@ import path from 'node:path';
 const root=process.cwd(),stage=path.join(root,'stage');
 await fs.cp(path.join(root,'src','math'),path.join(stage,'math'),{recursive:true});
 // Indicador de proximidad: módulo y estilos exclusivos de Android.
-for(const file of ['x10-device-info-v051.js','x10-device-info.css'])
+for(const file of ['x10-device-info-v051.js','x10-device-info.css','x10-device-cache.mjs'])
  await fs.copyFile(path.join(root,'src',file),path.join(stage,file));
 for(const file of ['pen-hover.js','pen-hover.css','pen-hover-geometry.mjs'])
  await fs.copyFile(path.join(root,'src',file),path.join(stage,file));
@@ -89,8 +89,9 @@ window.MiNoteX10DeviceInfo={
   // Solicitud de contador: NO es 0x8B (borrado) ni 0x8C (limpieza física).
   await x10Connection.send(Uint8Array.from([0xcd,0x85,0x08,0,0,0,0,0xed]));
  },
- clearLocalDiagnostics(){
-  x10Logs.length=0;
+ // Modo explícito, sin reintentos. El módulo BLE espera respuesta 0x8C.
+ clearDeviceCache(){
+  return import('./x10-device-cache.mjs').then(module=>module.clearHuionPhysicalCache(x10Connection));
  }
 };
 `;

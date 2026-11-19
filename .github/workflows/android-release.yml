@@ -1,4 +1,4 @@
-name: Mi Note X10 Android v0.51 - compartir Android y selector de figura
+name: Mi Note X10 Android v0.52 - compartir Android y selector de figura
 on:
   push:
     branches: [main]
@@ -88,7 +88,7 @@ jobs:
           # Revision final de mejoras en trazos, guardado e interfaz.
           # Validar selector sin expresiones regulares ambiguas en Node 22.
           npx vite build
-          sed -i 's/Mi Note X10 Android V0.42/Mi Note X10 Android V0.51/g' dist/index.html
+          sed -i 's/Mi Note X10 Android V0.42/Mi Note X10 Android V0.52/g' dist/index.html
       - name: Crear Android y configurar privacidad
         run: |
           npx cap add android
@@ -100,7 +100,7 @@ jobs:
           node native-backup/setup.mjs
           grep -Fq 'MiNoteShareProvider' android/app/src/main/AndroidManifest.xml
           grep -Fq 'minote_share_paths' android/app/src/main/AndroidManifest.xml
-          sed -i -E 's/versionCode [0-9]+/versionCode 51/; s/versionName "[^"]+"/versionName "0.51.0"/' android/app/build.gradle
+          sed -i -E 's/versionCode [0-9]+/versionCode 52/; s/versionName "[^"]+"/versionName "0.52.0"/' android/app/build.gradle
       - name: Generar APK release sin depuracion
         run: |
           cd android
@@ -135,17 +135,17 @@ jobs:
           "$TOOLS/zipalign" -p -f 4 "$UNSIGNED" signed/unsigned-aligned.apk
           "$TOOLS/apksigner" sign --ks "$RUNNER_TEMP/minote-v02-release.jks" \
             --ks-key-alias minote-x10 --ks-pass "pass:$PASSWORD" \
-            --key-pass "pass:$PASSWORD" --out signed/Mi-Note-X10-Android-v0.51.apk \
+            --key-pass "pass:$PASSWORD" --out signed/Mi-Note-X10-Android-v0.52.apk \
             signed/unsigned-aligned.apk
-          "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.51.apk
-          sha256sum signed/Mi-Note-X10-Android-v0.51.apk | tee signed/SHA256SUMS.txt
+          "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.52.apk
+          sha256sum signed/Mi-Note-X10-Android-v0.52.apk | tee signed/SHA256SUMS.txt
       - name: Verificar permisos del APK
         shell: bash
         run: |
           set -euo pipefail
           TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.51.apk | tee signed/PERMISOS.txt
-          "$TOOLS/aapt" dump xmltree signed/Mi-Note-X10-Android-v0.51.apk AndroidManifest.xml | tee signed/MANIFIESTO.txt
+          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.52.apk | tee signed/PERMISOS.txt
+          "$TOOLS/aapt" dump xmltree signed/Mi-Note-X10-Android-v0.52.apk AndroidManifest.xml | tee signed/MANIFIESTO.txt
           grep -Fq 'cl.stikgatica.minote.x10.minote.files' signed/MANIFIESTO.txt
           if grep -Fq 'android.permission.INTERNET' signed/PERMISOS.txt; then
             echo 'ERROR: permiso INTERNET incluido' >&2; exit 1
@@ -153,23 +153,23 @@ jobs:
       - name: Guardar APK para respaldo
         uses: actions/upload-artifact@v4
         with:
-          name: Mi-Note-X10-v0.51-APK
+          name: Mi-Note-X10-v0.52-APK
           path: |
-            android-native/signed/Mi-Note-X10-Android-v0.51.apk
+            android-native/signed/Mi-Note-X10-Android-v0.52.apk
             android-native/signed/SHA256SUMS.txt
             android-native/signed/PERMISOS.txt
           if-no-files-found: error
-      - name: Publicar Mi Note X10 Android v0.51
+      - name: Publicar Mi Note X10 Android v0.52
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           # La publicación final reemplaza artefactos de compilaciones previas de prueba.
-          if gh release view android-v0.51 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete android-v0.51 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          if gh release view android-v0.52 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete android-v0.52 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
           fi
-          gh release create android-v0.51 signed/Mi-Note-X10-Android-v0.51.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
+          gh release create android-v0.52 signed/Mi-Note-X10-Android-v0.52.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title 'Mi Note X10 Android V0.51 — Detalles seguros X10: batería y memoria' \
-            --notes 'V0.51: panel Detalles de la Huion X10 con batería Bluetooth real cuando el periférico la entregue; índice de páginas 0x85 claramente diferenciado de memoria libre (no inventa capacidad); limpiar diagnósticos temporales locales sin borrar ningún cuaderno ni la memoria física. Actualización de firmware mediante la app oficial Huion Note, sin flasheo desde Mi Note. Incluye reconexión rápida V0.50. Respaldar cuadernos antes de instalar.' \
+            --title 'Mi Note X10 Android V0.52 — Huion X10 CLEAR_CACHE físico confirmado' \
+            --notes 'V0.52: sustituye Limpiar caché local por CLEAR_CACHE físico 0x8C de la Huion X10, documentado por ingeniería inversa. Operación potencialmente destructiva, manual, con doble confirmación y comprobación de respuesta BLE; no envía DELETE_PAGE 0x8B ni borra cuadernos de Mi Note. La función no garantiza borrar por sí sola todas las páginas. Respalde y verifique las notas antes de utilizarla. Incluye panel de batería y memoria V0.51.' \
             --prerelease --latest=false
