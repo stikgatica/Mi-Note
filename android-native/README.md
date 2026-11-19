@@ -51,3 +51,11 @@ El reconocedor **no usa un modelo entrenado**, no envía datos y no garantiza re
 ## GeoInk: referencia conceptual, sin dependencia PWA
 
 El módulo nuevo `src/math/math-strong-geometry.mjs` reimplementa de manera local los principios de simplificación y ajuste de segmentos de GeoInk V2 para mejorar curvas y ajustar vértices. No utiliza los scripts de aquella PWA, ni toca `x10-ble.js` ni `offline-x10.js`. Funciona en Web Worker al levantar el lápiz. Si el usuario desactiva el modo matemático, reaparecen los trazos originales.
+
+## Archivo compartido nativo — V0.46
+
+El instalador `native-backup/setup.mjs` registra la subclase `MiNoteShareProvider`, en lugar de confiar en `androidx.core.content.FileProvider` genérico. `native-backup/share-provider.mjs` añade la declaración completa al manifiesto incluso si Capacitor u otro módulo instala otro proveedor. El complemento `MiNoteFileExportPlugin.java` solicita la autoridad `<package>.minote.files` y el XML `res/xml/minote_share_paths.xml` limita el acceso temporal a la caché privada. Sin permisos generales de almacenamiento.
+
+## Selección anticipada de figura
+
+`src/math/math-intention.mjs` contiene la normalización geométrica de un cuadrilátero en cuadrado o rectángulo, sin modificar `strokes`. `math-controller.js` conserva el selector mientras está activo y envía la intención al `math-worker.js`; `math-auto.mjs` permite actualizar una figura ya reconocida al cambiar su interpretación.
