@@ -29,6 +29,7 @@ dialog.innerHTML=`
    <select id="mathIntention"></select>
   </label>
   <p class="math-hint">Seleccione una figura antes de dibujar. La corrección automática respetará esa intención y mantendrá intacta la tinta original.</p>
+  <details id="mathRecognizedDetails"><summary>Figuras reconocidas (administrar)</summary>
   <label class="field">Figuras reconocidas en esta hoja
    <select id="mathSavedObjects"></select>
   </label>
@@ -42,6 +43,7 @@ dialog.innerHTML=`
    <label>Posición Y<input type="number" id="mathLabelY" min="0" max="1400" value="700"></label></div>
    <button type="button" id="mathAddLabel">Añadir etiqueta</button>
    <div id="mathLabels"></div>
+  </details>
   </details>
  </section>
  <p id="mathStatus" class="math-hint" role="status" aria-live="polite"></p>
@@ -175,7 +177,8 @@ function updateList(pg){
  }
  if([...select.options].some(x=>x.value===keep))select.value=keep;
  else select.value='';
- $('mathObjectCount').textContent=records.length+' figura(s) y número(s) reconocidos. Cada resultado indica su ubicación.';
+ $('mathObjectCount').textContent=records.length+' reconocimiento(s) válido(s). Se muestra su ubicación para identificar cada uno.';
+ $('mathRecognizedDetails').querySelector('summary').textContent='Figuras reconocidas ('+records.length+') · administrar';
  $('mathFindObject').disabled=!select.value;
  $('mathCleanDuplicates').disabled=compactAutomatic(objects).length===objects.length;
 }
