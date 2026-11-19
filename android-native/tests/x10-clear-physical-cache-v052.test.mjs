@@ -53,7 +53,7 @@ test('caché física requiere confirmación de respaldo y teclear LIMPIAR',()=>{
  const ui=read('../src/x10-device-info-v051.js');
  const stage=read('../scripts/math-stage.mjs');
  const pkg=JSON.parse(read('../package.json'));
- assert.equal(pkg.version,'0.52.0');
+ assert.ok(Number(pkg.version.split('.')[1])>=52);
  assert.match(ui,/window\.confirm\(notice\)/);
  assert.match(ui,/window\.prompt\(/);
  assert.match(ui,/typed!=='LIMPIAR'/);

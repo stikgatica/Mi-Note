@@ -46,6 +46,12 @@ const menuButton=(id,text,handler)=>{
  });return b;
 };
 menuButton('floatingLibraryMenu','▤ Biblioteca de cuadernos',()=>openLibrary());
+menuButton('floatingX10DetailsMenu','⌁ Detalles de Huion X10',()=>{
+ const dialog=$('x10Dialog');
+ if(!dialog){window.alert('No se pudo abrir el panel Huion X10.');return;}
+ if(!dialog.open)dialog.showModal();
+});
+
 const lockButton=menuButton('floatingLockMenu','◌ Bloquear posición de la barra',()=>setLocked(!locked));
 const colorLabel=document.createElement('label');colorLabel.className='floating-color-label field';
 colorLabel.textContent='Color del lápiz';
