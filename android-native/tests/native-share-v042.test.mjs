@@ -26,7 +26,10 @@ test('Android abre ACTION_CREATE_DOCUMENT y ACTION_SEND mediante FileProvider',(
  const setup=read('../native-backup/setup.mjs');
  assert.match(setup,/registerPlugin\(MiNoteFileExportPlugin\.class\)/);
  assert.match(setup,/minote_share_paths\.xml/);
- assert.match(setup,/androidx\.core\.content\.FileProvider/);
+ assert.match(setup,/addMiNoteProvider\(manifest\)/);
+ const provider=read('../native-backup/MiNoteShareProvider.java');
+ assert.match(provider,/extends FileProvider/);
+ assert.match(provider,/cl\.stikgatica\.minote\.x10/);
 });
 test('Compartir hoja o libro soporta SVG PNG y PDF; varios SVG PNG van en ZIP',()=>{
  const ui=read('../scripts/mobile.mjs'),js=read('../src/share-documents.js');
