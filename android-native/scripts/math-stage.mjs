@@ -18,9 +18,8 @@ const events=[
   "pg.strokes.push(stroke);pg.updatedAt=now();nb.updatedAt=now();"+
   "document.dispatchEvent(new CustomEvent('minote:stroke-finished',{detail:{pageId:pg.id,strokeId:stroke.id,source:'huion'}}));"],
  ["page().strokes.push(inStroke);inStroke=null;",
-  "page().strokes.push(inStroke);"+
-  "document.dispatchEvent(new CustomEvent('minote:stroke-finished',{detail:{pageId:page().id,strokeId:inStroke.id,source:'touch'}}));"+
-  "inStroke=null;"]
+  "page().strokes.push(inStroke);inStroke=null;"+
+  "document.dispatchEvent(new CustomEvent('minote:stroke-finished',{detail:{pageId:page().id,strokeId:page().strokes.at(-1).id,source:'touch'}}));"]
 ];
 for(const [from,to] of events){
  if(!app.includes(from))throw Error('Matemática automática: no se encontró el evento de trazo terminado: '+from);
