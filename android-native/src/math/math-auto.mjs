@@ -43,7 +43,7 @@ export function recognizeAutomatic(strokes){
   const result=fit(subset,'shape');
   if(result?.geometry.kind==='polygon')return result;
  }
- for(let n=Math.min(strokes.length,8);n>=2;n--){
+ for(let n=Math.min(strokes.length,9);n>=2;n--){
   const subset=strokes.slice(-n),text=fit(subset,'text');
   if(text)return text;
  }
