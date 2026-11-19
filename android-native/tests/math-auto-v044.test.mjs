@@ -16,6 +16,24 @@ test('OCR de números local reconoce al menos un 7 de trazo inequívoco',()=>{
  assert.deepEqual(result.sourceStrokeIds,['number']);
  assert.equal(result.type,'text');
 });
+test('OCR local interpreta una medida 7 cm solo con plantillas de tinta inequívoca',()=>{
+ const glyph=(symbol,id,x,y,w,h)=>HANDWRITING_TEMPLATES[symbol].map((path,i)=>make(id+i,path,x,y,w,h));
+ const strokes=[
+  ...glyph('7','seven',100,200,25,42),
+  ...glyph('c','centi',135,212,18,30),
+  ...glyph('m','meter',161,212,30,30)
+ ];
+ const result=recognizeInk(strokes);
+ assert.equal(result?.geometry?.text,'7cm');
+ assert.deepEqual(result.sourceStrokeIds,strokes.map(x=>x.id));
+});
+test('OCR contextual diferencia 7° de 70 por altura del círculo',()=>{
+ const number=make('digit',HANDWRITING_TEMPLATES['7'][0],100,200,30,45);
+ const degree=make('degree',HANDWRITING_TEMPLATES['°'][0],141,201,14,14);
+ assert.equal(recognizeInk([number,degree])?.geometry?.text,'7°');
+ const zero=make('zero',HANDWRITING_TEMPLATES['0'][0],141,200,29,45);
+ assert.equal(recognizeInk([number,zero])?.geometry?.text,'70');
+});
 test('no inventa un número ante tinta ambigua o garabatos',()=>{
  const x=make('ambiguous',[[0,0],[.3,.3],[.6,.2],[1,.9],[0,.8],[.7,0]]);
  assert.equal(recognizeInk([x]),null);
