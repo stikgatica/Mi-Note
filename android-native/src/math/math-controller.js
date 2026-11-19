@@ -3,6 +3,7 @@
    sin nube, sin modificar tinta fuente, sin trabajo en el hilo de escritura. */
 import {AXES,fingerprint,validObject} from './math-geometry.mjs';
 import {mergeAutomatic} from './math-auto.mjs';
+import {DRAW_INTENTIONS} from './math-intention.mjs';
 import './math-ui.css';
 
 const $=id=>document.getElementById(id),ns='http://www.w3.org/2000/svg';
@@ -23,6 +24,10 @@ dialog.innerHTML=`
   <label class="math-switch"><input id="mathShowLayer" type="checkbox" checked> Mostrar capa digital mejorada</label>
   <p class="math-hint">No es necesario seleccionar trazos ni pulsar Mejorar. Los números y medidas solo se digitalizan si el reconocimiento local alcanza una confianza alta; los casos dudosos permanecen manuscritos.</p>
   <button type="button" id="mathScanPage">Analizar también los trazos de esta hoja</button>
+  <label class="field">Figura que voy a dibujar
+   <select id="mathIntention"></select>
+  </label>
+  <p class="math-hint">Si va a dibujar un cuadrado, elija Cuadrado antes de escribir. Mi Note enderezará automáticamente sus cuatro lados y sus ángulos a 90°, aunque haya quedado inclinado o trapezoidal.</p>
   <label class="field">Figuras y números mejorados<select id="mathSavedObjects"></select></label>
   <details id="mathEditDetails"><summary>Corregir un reconocimiento</summary>
    <div id="mathCoordinateEditor" class="math-edit-fields"></div>
@@ -49,8 +54,11 @@ const overlay=svg('svg',{id:'mathOverlay',preserveAspectRatio:'none','aria-label
 overlay.style.pointerEvents='none';shell.style.position='relative';paper.after(overlay);
 for(const axis of AXES)$('mathAxis').append(elm('option',{value:axis.id,...(axis.ready?{}:{disabled:'disabled'})},axis.label+(axis.ready?'':' (próximamente)')));
 $('mathAxis').value='geometry';
+for(const shape of DRAW_INTENTIONS)$('mathIntention').append(elm('option',{value:shape.id},shape.label));
+$('mathIntention').value='auto';
 
 let enabled=false,worker=null,sequence=0,scanTimer=0,scanRunning=false,scanAgain=false,lastPage='';
+let intendedShape='auto';
 let cachedPage='',hiddenIds=new Set(),lastStatus='';
 const jobs=new Map();
 const tell=s=>{lastStatus=s;$('mathStatus').textContent=s;};
@@ -159,7 +167,7 @@ function recognize(strokes){
  return new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>{jobs.delete(id);reject(Error('El reconocedor local tardó demasiado.'));},3500);
   jobs.set(id,{resolve,reject,timer});
-  service.postMessage({id,action:'automatic',strokes});
+  service.postMessage({id,action:'automatic',strokes,intention:intendedShape});
  });
 }
 const sigsMatch=(candidate,pg)=>{
@@ -264,6 +272,15 @@ $('mathShowLayer').addEventListener('change',async e=>{
  const pg=get();if(!pg)return;
  try{await saveLayer(copy(layerOf(pg).objects||[]),e.target.checked);}
  catch(err){tell(err.message);}
+});
+$('mathIntention').addEventListener('change',event=>{
+ intendedShape=event.target.value;
+ tell(intendedShape==='auto'
+  ?'Detección automática activada. Se respetan los cuadriláteros irregulares.'
+  :'Figura prevista: '+$('mathIntention').selectedOptions[0]?.textContent+
+    '. La corrección actuará automáticamente al levantar el lápiz.');
+ // Escanear la hoja actual también permite ajustar figuras antes reconocidas.
+ if(enabled)void scanRecent(true);
 });
 $('mathScanPage').addEventListener('click',()=>void scanRecent(true));
 $('mathSavedObjects').addEventListener('change',editFields);
