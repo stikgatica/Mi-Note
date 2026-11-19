@@ -122,3 +122,11 @@ Se generan correcciones reversibles de rectas, circunferencias y polígonos; las
 **La tinta original nunca se borra:** se guarda por separado en `strokes`. Las mejoras quedan en `mathLayer`, pueden ocultarse y eliminarse, y se invalidan si cambia el trazo fuente. Para hojas anteriores o recuperadas existe el botón opcional «Analizar también los trazos de esta hoja». Las exportaciones y la reproducción conservan la tinta original. El protocolo BLE de agenda, la importación y el respaldo permanecen sin modificaciones.
 
 La versión es **experimental**; validar con el teléfono y la Huion antes de adoptarla y mantener un respaldo.
+
+## V0.45 — corrección geométrica reforzada (referencia GeoInk V2)
+
+A partir de una captura real de la Huion X10, se reforzó el Modo Matemática para que la corrección **no solo identifique una figura**, sino que enderece cada lado y una con mayor precisión los vértices. Se analizó el prototipo GeoInk V2 como **referencia conceptual** para Douglas–Peucker, ajuste de segmentos y unión de extremos próximos, pero **no se incorporó su PWA ni el antiguo Bluetooth**.
+
+El motor nuevo `math-strong-geometry.mjs` realiza ajuste local por mínimos cuadrados ortogonales, simplificación de contornos con distintos umbrales, reconstrucción de triángulos y cuadriláteros curvos, unión de lados trazados por separado y corrección de pequeñas diferencias entre esquinas. No cierra trayectorias abiertas o figuras inconexas, ni inventa dimensiones. Preserva la detección previa de circunferencias. Todo funciona automáticamente al finalizar el trazo y deja el original íntegro en `strokes`; las correcciones se guardan por separado en `mathLayer`.
+
+Se incorporaron pruebas de líneas onduladas, triángulos con lados curvos, rectángulos de cuatro trazos y situaciones que deben permanecer abiertas. Las tolerancias se deben validar con sus anotaciones físicas antes de considerarlas definitivas.
