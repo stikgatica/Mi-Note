@@ -54,11 +54,11 @@ document.addEventListener('minote:page-rendered',updatePages);
 updatePages();
 
 // Único control de Bluetooth para Android: Conectar X10.
-let connecting=false;
+let connecting=false,connectTimer=null;
 function x10State(){
  const connected=!!deviceButton?.classList.contains('is-connected');
  const message=(statusElement?.textContent||'').trim();
- const pending=!connected&&(connecting||/conectando|reconectando|selector|buscando|solicitando|dispositivo seleccionado/i.test(message));
+ const pending=!connected&&(connecting||/conectando|reconectando|selector|buscando|solicitando|dispositivo seleccionado/i.test(message)&&!/error|fall[oó]|no pudo|no respondió|agotad|rechaz|cancelad|denegad/i.test(message));
  const failure=!connected&&!pending&&/error|fall[oó]|no pudo|no respondió|agotad|rechaz|cancelad|denegad/i.test(message);
  return {connected,pending,failure,message};
 }
@@ -82,5 +82,11 @@ x10Button?.addEventListener('click',()=>{
  setTimeout(()=>{connecting=false;refreshX10();},12000);
 });
 if(deviceButton)new MutationObserver(refreshX10).observe(deviceButton,{attributes:true,attributeFilter:['class'],childList:true,characterData:true,subtree:true});
-if(statusElement)new MutationObserver(()=>{connecting=false;refreshX10();}).observe(statusElement,{childList:true,characterData:true,subtree:true});
+if(statusElement)new MutationObserver(()=>{
+ const status=(statusElement.textContent||'').trim();
+ if(/error|fall[oó]|no pudo|no respondió|agotad|rechaz|cancelad|denegad|conectada|conectado/i.test(status)){
+  connecting=false;clearTimeout(connectTimer);
+ }
+ refreshX10();
+}).observe(statusElement,{childList:true,characterData:true,subtree:true});
 refreshX10();
