@@ -3,7 +3,7 @@
 import {propose,fingerprint} from './math-geometry.mjs';
 import {fitStrongLine,straightenContour,straightenConnectedSides} from './math-strong-geometry.mjs';
 import {recognizeInk} from './math-ink-ocr.mjs';
-import {interpretGeometry} from './math-intention.mjs';
+import {interpretGeometry,fitIntendedQuadrilateral,fitIntendedCircle,geometryName} from './math-intention.mjs';
 const box=strokes=>{
  const pts=strokes.flatMap(s=>s.pts||[]).filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
  if(!pts.length)return null;
@@ -27,6 +27,24 @@ const fit=(strokes,kind,intention='auto')=>{
   if(extent(b)>150||b.maxY-b.minY>115)return null;
   result=recognizeInk(strokes);
  }else if(kind==='shape'){
+  // Prioridad absoluta a la figura elegida; el ajuste de un círculo no
+  // debe convertirse en un polígono, y un cuadrado no debe quedar trapezoidal.
+  const parts=strokes.map(s=>(s.pts||[])
+    .filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]))
+    .map(p=>[p[0],p[1]]));
+  if(parts.some(p=>p.length<2))return null;
+  if(strokes.length===1&&intention==='circle'){
+   const circle=fitIntendedCircle(parts[0])||propose(strokes,'circle')?.geometry;
+   if(!circle)return null;
+   return candidate({type:'circle',label:'Circunferencia',geometry:circle,sourceStrokeIds:strokes.map(s=>s.id),
+    style:{color:strokes[0]?.color||'#000000',width:Number(strokes[0]?.width)||3}},strokes);
+  }
+  if(strokes.length===1&&['square','rectangle'].includes(intention)){
+   const quad=fitIntendedQuadrilateral(parts[0],intention);
+   if(quad)return candidate({type:'polygon',label:intention==='square'?'Cuadrado':'Rectángulo',
+    geometry:quad,sourceStrokeIds:strokes.map(s=>s.id),
+    style:{color:strokes[0]?.color||'#000000',width:Number(strokes[0]?.width)||3}},strokes);
+  }
   // Mantener las circunferencias reales antes de intentar aproximarlas
   // a polígonos: RDP podría convertir erróneamente un círculo en un hexágono.
   if(strokes.length===1&&intention==='auto'){
@@ -36,10 +54,6 @@ const fit=(strokes,kind,intention='auto')=>{
   }
   // La corrección fuerte trabaja sobre una COPIA local y endereza curvas.
   // No modifica los puntos manuscritos, no inventa caras y conserva la posición.
-  const parts=strokes.map(s=>(s.pts||[])
-    .filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]))
-    .map(p=>[p[0],p[1]]));
-  if(parts.some(p=>p.length<2))return null;
   let strong=null;
   if(parts.length===1){
    strong=straightenContour(parts[0]);
@@ -55,7 +69,7 @@ const fit=(strokes,kind,intention='auto')=>{
     geometry:strong,sourceStrokeIds:strokes.map(s=>s.id),
     style:{color:strokes[0]?.color||'#000000',width:Number(strokes[0]?.width)||3}};
   }
-  if(!result)result=propose(strokes,'auto');
+  if(!result)result=propose(strokes,intention==='circle'?'circle':'auto');
   if(!result)return null;
   if(result.geometry.kind==='segments')return null; // No completar aristas arbitrarias.
   if(result.geometry.kind==='line'&&extent(b)<105)return null;
@@ -64,12 +78,25 @@ const fit=(strokes,kind,intention='auto')=>{
   // La intención elegida no inventa vértices: exige 3 para triángulo, 4 para cuadrados.
   const final=interpretGeometry(result.geometry,intention);
   if(!final)return null;
-  result={...result,geometry:final,label:intention==='square'?'Cuadrado':intention==='rectangle'?'Rectángulo':result.label};
+  result={...result,geometry:final,label:intention==='auto'?geometryName(final):
+   ({square:'Cuadrado',rectangle:'Rectángulo',rhombus:'Rombo',parallelogram:'Paralelogramo',
+     trapezoid:'Trapecio',pentagon:'Pentágono',hexagon:'Hexágono',triangle:'Triángulo',
+     circle:'Circunferencia',line:'Línea recta'}[intention]||geometryName(final))};
  }
  return candidate(result,strokes);
 };
 export function recognizeAutomatic(strokes,intention='auto'){
  if(!Array.isArray(strokes)||strokes.length<1||strokes.length>9)return null;
+ // Cuando el usuario escoge figura, nunca interpretar sus lados como números
+ // ni guardar una línea aislada antes de cerrar un cuadrado/triángulo.
+ if(intention!=='auto'){
+  if(intention==='circle'||intention==='line')return fit([strokes.at(-1)],'shape',intention);
+  for(let n=Math.min(strokes.length,8);n>=3;n--){
+   const result=fit(strokes.slice(-n),'shape',intention);
+   if(result?.geometry?.kind==='polygon')return result;
+  }
+  return fit([strokes.at(-1)],'shape',intention);
+ }
  // Evaluar primeramente figuras cerradas con varios trazos y textos agrupados.
  // Se procesan últimos segmentos terminados sin alterar el registro original.
  for(let n=Math.min(strokes.length,7);n>=3;n--){
