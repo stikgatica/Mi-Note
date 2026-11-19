@@ -37,8 +37,7 @@ const fit=(strokes,kind,intention='auto')=>{
   const joined=parts.length>1?joinClosedStrokes(parts):null;
   if(intention==='circle'){
    const ring=parts.length===1?parts[0]:joined;
-   const circle=ring&&(fitIntendedCircle(ring)||(
-    parts.length===1?propose(strokes,'circle')?.geometry:null));
+   const circle=ring&&fitIntendedCircle(ring);
    if(!circle)return null;
    return candidate({type:'circle',label:'Circunferencia',geometry:circle,sourceStrokeIds:strokes.map(s=>s.id),
     style:{color:strokes[0]?.color||'#000000',width:Number(strokes[0]?.width)||3}},strokes);
