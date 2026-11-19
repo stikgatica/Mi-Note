@@ -40,11 +40,15 @@ test('Estados de error Bluetooth no permanecen como búsqueda perpetua',()=>{
  assert.match(ui,/clearTimeout\(connectTimer\)/);
  assert.match(ui,/Error Bluetooth/);
 });
-test('APK V0.50 y mismo paquete de instalación',()=>{
+test('APK V0.50 o posterior y mismo paquete de instalación',()=>{
  const workflow=read('../../.github/workflows/android-release.yml');
  const pkg=JSON.parse(read('../package.json'));
- assert.equal(pkg.version,'0.50.0');
- assert.match(workflow,/versionCode 50/);
- assert.match(workflow,/Mi-Note-X10-Android-v0\.50\.apk/);
- assert.match(workflow,/android-v0\.50/);
+ const match=/^(\d+)\.(\d+)\.(\d+)$/.exec(pkg.version);
+ assert.ok(match);
+ const minor=Number(match[2]);
+ assert.ok(minor>=50);
+ assert.match(workflow,new RegExp('versionCode '+minor+'\\b'));
+ const tag='v'+match[1]+'.'+match[2];
+ assert.ok(workflow.includes('Mi-Note-X10-Android-'+tag+'.apk'));
+ assert.ok(workflow.includes('android-'+tag));
 });
