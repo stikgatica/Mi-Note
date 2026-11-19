@@ -25,6 +25,13 @@ const fit=(strokes,kind)=>{
   if(extent(b)>150||b.maxY-b.minY>115)return null;
   result=recognizeInk(strokes);
  }else if(kind==='shape'){
+  // Mantener las circunferencias reales antes de intentar aproximarlas
+  // a polígonos: RDP podría convertir erróneamente un círculo en un hexágono.
+  if(strokes.length===1){
+   const originalCircle=propose(strokes,'auto');
+   if(originalCircle?.geometry?.kind==='circle'&&extent(b)>=60)
+    return candidate(originalCircle,strokes);
+  }
   // La corrección fuerte trabaja sobre una COPIA local y endereza curvas.
   // No modifica los puntos manuscritos, no inventa caras y conserva la posición.
   const parts=strokes.map(s=>(s.pts||[])
