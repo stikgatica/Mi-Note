@@ -328,6 +328,7 @@ let lastPageId='';
 document.addEventListener('minote:statechange',()=>{const pg=workingPage();if(pg?.id!==lastPageId){lastPageId=pg?.id||'';clearSelection();}
  refresh();});
 document.addEventListener('minote:page-rendered',()=>{refresh();});
+window.addEventListener('minote:changed',()=>{if(enabled)refresh();});
 window.addEventListener('resize',()=>{drawOverlay(workingPage());},{passive:true});
 dialog.addEventListener('cancel',()=>{});
 updateUi();
