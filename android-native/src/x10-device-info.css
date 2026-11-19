@@ -44,3 +44,15 @@ body.minote-android .minote-device-firmware{
  padding-top:10px;border-top:1px solid #dce6ed;font-size:12px;
 }
 body.minote-android .minote-device-firmware p{margin:5px 0 0;color:#5d7083;line-height:1.35;}
+
+/* Acción destructiva física: siempre diferenciada de las consultas. */
+body.minote-android .minote-device-actions .minote-device-danger{
+ background:#fff1ed!important;
+ color:#9a3023!important;
+ border:1px solid #e1a69d!important;
+ font-weight:650;
+}
+body.minote-android .minote-device-actions .minote-device-danger:disabled{
+ opacity:.5!important;
+ cursor:not-allowed;
+}
