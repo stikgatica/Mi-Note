@@ -59,7 +59,7 @@ const shareDialog=[
 '<button id="shareDocumentRun" type="button" class="primary">Continuar</button>',
 '<small>PDF conserva varias hojas en un documento. PNG y SVG del cuaderno completo se entregan en ZIP, una hoja por archivo. No se modifican los cuadernos.</small>',
 '</dialog>'
-].join('\\n');
+].join('\n');
 const memoryDialog=[
 '<dialog id="x10MemoryDialog" class="dialog memory-import-dialog" aria-labelledby="x10MemoryTitle">',
 '<div class="dialog-head"><h2 id="x10MemoryTitle">Importar memoria agenda</h2><button type="button" id="x10MemoryClose" class="icon-btn" aria-label="Cerrar">✕</button></div>',
