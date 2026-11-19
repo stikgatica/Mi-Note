@@ -1,0 +1,46 @@
+/* Detalles X10 V0.51: compactos, legibles, sin simular capacidad. */
+body.minote-android .minote-device-info{
+ border:1px solid #dce6ed;border-radius:14px;padding:14px;
+ margin:12px 0;background:#f9fbfd;color:#263b50;
+}
+body.minote-android .minote-device-info h3{
+ font-size:17px;line-height:1.2;margin:0 0 14px;
+}
+body.minote-android .minote-device-metrics{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+}
+body.minote-android .minote-device-metric{
+ min-width:0;display:flex;align-items:center;flex-direction:column;text-align:center;
+ padding:8px 4px;gap:5px;border-radius:10px;background:#fff;
+ border:1px solid #e2e9f0;
+}
+body.minote-android .minote-device-metric strong{font-size:13px;}
+body.minote-android .minote-device-metric small{
+ font-size:11px;line-height:1.3;color:#637287;
+}
+body.minote-android .minote-device-meter{
+ --x10-progress:0%;
+ width:76px;height:76px;border-radius:50%;
+ background:conic-gradient(#36b995 0 var(--x10-progress),#e4eaf0 var(--x10-progress) 100%);
+ display:flex;justify-content:center;align-items:center;position:relative;
+}
+body.minote-android .minote-device-meter::before{
+ content:'';position:absolute;inset:8px;border-radius:50%;background:#fff;
+}
+body.minote-android .minote-device-meter span{position:relative;font-size:16px;font-weight:700;}
+body.minote-android .minote-device-memory{
+ background:conic-gradient(#dce5ee 0 100%);
+}
+body.minote-android .minote-device-actions{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px;
+}
+body.minote-android .minote-device-actions button{
+ min-height:42px;font-size:12px;white-space:normal;padding:7px 8px;
+}
+body.minote-android .minote-device-note{
+ font-size:11px;line-height:1.4;color:#566b80;margin:9px 0;
+}
+body.minote-android .minote-device-firmware{
+ padding-top:10px;border-top:1px solid #dce6ed;font-size:12px;
+}
+body.minote-android .minote-device-firmware p{margin:5px 0 0;color:#5d7083;line-height:1.35;}
