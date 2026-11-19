@@ -46,7 +46,7 @@ async function pngPage(page){
 async function pdfBook(pages,name,actionType){
  const plugin=native();
  if(!plugin)throw Error('El módulo nativo de exportación no está instalado.');
- const token=await plugin.beginPdf({filename:name+'.pdf'});
+ const token=await plugin.beginPdf({filename:name+'.pdf',mime:'application/pdf'});
  let completed=false;
  try{
   for(let i=0;i<pages.length;i++){
