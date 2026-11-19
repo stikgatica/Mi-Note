@@ -130,3 +130,11 @@ A partir de una captura real de la Huion X10, se reforzó el Modo Matemática pa
 El motor nuevo `math-strong-geometry.mjs` realiza ajuste local por mínimos cuadrados ortogonales, simplificación de contornos con distintos umbrales, reconstrucción de triángulos y cuadriláteros curvos, unión de lados trazados por separado y corrección de pequeñas diferencias entre esquinas. No cierra trayectorias abiertas o figuras inconexas, ni inventa dimensiones. Preserva la detección previa de circunferencias. Todo funciona automáticamente al finalizar el trazo y deja el original íntegro en `strokes`; las correcciones se guardan por separado en `mathLayer`.
 
 Se incorporaron pruebas de líneas onduladas, triángulos con lados curvos, rectángulos de cuatro trazos y situaciones que deben permanecer abiertas. Las tolerancias se deben validar con sus anotaciones físicas antes de considerarlas definitivas.
+
+## V0.46 — Compartir Android y figura prevista
+
+**Compartir hojas y cuadernos:** se corrigió la declaración de FileProvider Android usando la clase propia `MiNoteShareProvider`, con autoridad exclusiva `cl.stikgatica.minote.x10.minote.files`. El flujo Compartir usa el panel Android para PDF, PNG, SVG, ZIP y WebM. El manifiesto de la APK comprueba el proveedor; se eliminan los caracteres `\\n` literales del diálogo. La opción **Guardar archivo…** sigue utilizando el selector de documentos del sistema.
+
+**Matemática:** al activar Geometría se presenta el selector **Figura que voy a dibujar**: Automática, Cuadrado, Rectángulo, Triángulo o Cuadrilátero libre. Al elegir Cuadrado, el reconocimiento de una figura de cuatro vértices ajusta automáticamente los cuatro ángulos a 90° y los lados a igual longitud, conservando aproximadamente posición, tamaño y giro. Rectángulo endereza ángulos manteniendo lados opuestos iguales. No transforma un triángulo en cuadrilátero ni modifica los trazos físicos originales; el ajuste permanece reversible en `mathLayer`. La detección automática no fuerza un cuadrado para evitar modificar un trapecio intencional.
+
+**Valide en el teléfono:** Compartir → PDF/PNG/SVG, envío a otra app, guardar en Descargas y los dibujos cuadrados hechos en papel X10. Conserve respaldo antes de instalar.
