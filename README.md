@@ -92,3 +92,13 @@ Para detalles técnicos consulte [ARQUITECTURA.md](ARQUITECTURA.md) y [android-n
 - El selector «Color del lápiz» aparece directamente debajo de «Grosor del lápiz» en el menú; se retira la sección «Herramientas».
 - El cambio sigue la autorrotación del sistema Android; si el teléfono tiene bloqueado el giro automático, habilítelo en ajustes rápidos.
 
+
+## Guardar y compartir desde Android — V0.42
+
+- **Reproducir escritura → Guardar video WebM…**: la grabación abre el selector de documentos de Android para elegir dónde guardarla. No se considera guardada si el usuario cancela o el proveedor devuelve un error.
+- **Reproducir escritura → Compartir video**: crea WebM y abre el panel Compartir de Android para enviar a aplicaciones compatibles (la disponibilidad depende de las aplicaciones instaladas).
+- **Más opciones → Exportar y respaldar → Compartir hoja o cuaderno**: elegir hoja actual o cuaderno completo, formato SVG/PNG/PDF y Guardar/Compartir.
+- **Cuaderno PDF**: documento multipágina A5. **Cuaderno SVG o PNG**: ZIP con un archivo por hoja, conservando sus colores y trazos.
+- Los archivos temporales están en caché privada y las aplicaciones receptoras solo reciben permiso temporal de lectura mediante FileProvider. Sin permiso general de almacenamiento ni conexión propia a Internet.
+- Los cuadernos no se alteran al exportar. La app no puede garantizar que una aplicación receptora acepte WebM o ZIP; confirme la recepción en la aplicación elegida.
+
