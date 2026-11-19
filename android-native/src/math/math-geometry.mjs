@@ -59,7 +59,7 @@ function area(pts){
  }return Math.abs(a)/2;
 }
 function polygonOf(raw,forced=false){
- const diag=diagonal(raw);if(diag<28||raw.length<5)return null;
+ const diag=diagonal(raw);if(diag<28||raw.length<4)return null;
  const near=d(raw[0],raw.at(-1))<=Math.max(12,diag*.16);
  if(!near&&!forced)return null;
  let pts=raw.slice();if(near)pts.pop();
