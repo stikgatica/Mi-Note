@@ -3,6 +3,7 @@
 import {propose,fingerprint} from './math-geometry.mjs';
 import {fitStrongLine,straightenContour,straightenConnectedSides} from './math-strong-geometry.mjs';
 import {recognizeInk} from './math-ink-ocr.mjs';
+import {interpretGeometry} from './math-intention.mjs';
 const box=strokes=>{
  const pts=strokes.flatMap(s=>s.pts||[]).filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));
  if(!pts.length)return null;
@@ -15,19 +16,20 @@ const candidate=(proposal,strokes)=>proposal?{
  sources:strokes.map(s=>({id:s.id,signature:fingerprint(s)})),automatic:true
 }:null;
 const same=idList=>new Set(idList).size===idList.length;
-const fit=(strokes,kind)=>{
+const fit=(strokes,kind,intention='auto')=>{
  if(!strokes.length||strokes.length>9||!same(strokes.map(s=>s.id)))return null;
  const b=box(strokes);
  if(!b||extent(b)>550)return null;
  let result=null;
  if(kind==='text'){
+  if(intention!=='auto')return null;
   // Los números y unidades nunca se infieren a partir de líneas grandes o figuras.
   if(extent(b)>150||b.maxY-b.minY>115)return null;
   result=recognizeInk(strokes);
  }else if(kind==='shape'){
   // Mantener las circunferencias reales antes de intentar aproximarlas
   // a polígonos: RDP podría convertir erróneamente un círculo en un hexágono.
-  if(strokes.length===1){
+  if(strokes.length===1&&intention==='auto'){
    const originalCircle=propose(strokes,'auto');
    if(originalCircle?.geometry?.kind==='circle'&&extent(b)>=60)
     return candidate(originalCircle,strokes);
@@ -59,26 +61,30 @@ const fit=(strokes,kind)=>{
   if(result.geometry.kind==='line'&&extent(b)<105)return null;
   if(result.geometry.kind==='polygon'&&extent(b)<62)return null;
   if(result.geometry.kind==='circle'&&extent(b)<60)return null;
+  // La intención elegida no inventa vértices: exige 3 para triángulo, 4 para cuadrados.
+  const final=interpretGeometry(result.geometry,intention);
+  if(!final)return null;
+  result={...result,geometry:final,label:intention==='square'?'Cuadrado':intention==='rectangle'?'Rectángulo':result.label};
  }
  return candidate(result,strokes);
 };
-export function recognizeAutomatic(strokes){
+export function recognizeAutomatic(strokes,intention='auto'){
  if(!Array.isArray(strokes)||strokes.length<1||strokes.length>9)return null;
  // Evaluar primeramente figuras cerradas con varios trazos y textos agrupados.
  // Se procesan últimos segmentos terminados sin alterar el registro original.
  for(let n=Math.min(strokes.length,7);n>=3;n--){
   const subset=strokes.slice(-n);
-  const result=fit(subset,'shape');
+  const result=fit(subset,'shape',intention);
   if(result?.geometry.kind==='polygon')return result;
  }
  for(let n=Math.min(strokes.length,9);n>=2;n--){
-  const subset=strokes.slice(-n),text=fit(subset,'text');
+  const subset=strokes.slice(-n),text=fit(subset,'text',intention);
   if(text)return text;
  }
  const last=strokes.at(-1);
- const shape=fit([last],'shape');
+ const shape=fit([last],'shape',intention);
  if(shape)return shape;
- const text=fit([last],'text');
+ const text=fit([last],'text',intention);
  if(text)return text;
  return null;
 }
