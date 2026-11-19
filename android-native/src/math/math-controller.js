@@ -27,8 +27,8 @@ dialog.innerHTML=`
   <label class="field">Figura que voy a dibujar
    <select id="mathIntention"></select>
   </label>
-  <p class="math-hint">Si va a dibujar un cuadrado, elija Cuadrado antes de escribir. Mi Note enderezará automáticamente sus cuatro lados y sus ángulos a 90°, aunque haya quedado inclinado o trapezoidal.</p>
-  <label class="field">Figuras y números mejorados<select id="mathSavedObjects"></select></label>
+  <p class="math-hint">Seleccione una figura antes de dibujar. La corrección automática respetará esa intención y mantendrá intacta la tinta original.</p>
+  <label class="field">Reconocimientos de la hoja (para corregir)<select id="mathSavedObjects"></select></label>
   <details id="mathEditDetails"><summary>Corregir un reconocimiento</summary>
    <div id="mathCoordinateEditor" class="math-edit-fields"></div>
    <div class="math-actions"><button type="button" id="mathSaveEdit">Guardar corrección</button><button type="button" id="mathRemoveObject">Volver al original</button></div>
@@ -58,7 +58,49 @@ for(const shape of DRAW_INTENTIONS)$('mathIntention').append(elm('option',{value
 $('mathIntention').value='auto';
 
 let enabled=false,worker=null,sequence=0,scanTimer=0,scanRunning=false,scanAgain=false,lastPage='';
+const shapePreference='minote_math_intention_v047';
 let intendedShape='auto';
+try{
+ const saved=localStorage.getItem(shapePreference);
+ if(DRAW_INTENTIONS.some(s=>s.id===saved))intendedShape=saved;
+}catch{}
+$('mathIntention').value=intendedShape;
+const quickDialog=elm('dialog',{id:'mathShapeDialog',class:'dialog minote-shape-dialog','aria-label':'Elegir figura geométrica'});
+quickDialog.innerHTML='<div class="dialog-head"><h2>Figura que dibujaré</h2><button type="button" class="icon-btn" id="mathShapeClose" aria-label="Cerrar">✕</button></div><p class="math-hint">Elija primero la figura. Al levantar el lápiz se corregirá automáticamente, sin seleccionar trazos.</p><div class="math-shape-grid" id="mathShapeGrid"></div>';
+document.body.append(quickDialog);
+const quickButton=elm('button',{type:'button',id:'mathShapeShortcut','aria-label':'Elegir figura matemática',title:'Elegir figura matemática'},'◯');
+const floatingToolbar=$('tvBoardToolbar');
+if(floatingToolbar){
+ const before=$('tvBoardMore');
+ if(before)before.before(quickButton);else floatingToolbar.append(quickButton);
+}else{
+ const fallback=elm('div',{class:'math-quick-floating'});
+ fallback.append(quickButton);document.body.append(fallback);
+}
+function updateQuickShape(){
+ const current=DRAW_INTENTIONS.find(x=>x.id===intendedShape)||DRAW_INTENTIONS[0];
+ const icons={auto:'◇',circle:'◯',square:'□',rectangle:'▭',triangle:'△',rhombus:'◇',
+  parallelogram:'▱',trapezoid:'⏢',pentagon:'⬠',hexagon:'⬡',line:'╱',polygon:'⬡'};
+ quickButton.textContent=icons[current.id]||'◇';
+ quickButton.title='Figura: '+current.label;
+ quickButton.setAttribute('aria-label','Figura: '+current.label+'. Cambiar');
+ quickButton.hidden=!enabled;
+ for(const button of quickDialog.querySelectorAll('[data-math-shape]')){
+  button.classList.toggle('selected',button.dataset.mathShape===intendedShape);
+ }
+}
+for(const shape of DRAW_INTENTIONS){
+ const button=elm('button',{type:'button','data-math-shape':shape.id},shape.label);
+ button.addEventListener('click',()=>{
+  $('mathIntention').value=shape.id;
+  $('mathIntention').dispatchEvent(new Event('change'));
+  quickDialog.close();
+ });
+ $('mathShapeGrid').append(button);
+}
+quickButton.addEventListener('click',()=>{updateQuickShape();quickDialog.showModal();});
+$('mathShapeClose').addEventListener('click',()=>quickDialog.close());
+quickDialog.addEventListener('click',e=>{if(e.target===quickDialog)quickDialog.close();});
 let cachedPage='',hiddenIds=new Set(),lastStatus='';
 const jobs=new Map();
 const tell=s=>{lastStatus=s;$('mathStatus').textContent=s;};
@@ -138,7 +180,7 @@ async function saveLayer(objects,visible){
  refresh();return true;
 }
 function updateInterface(){
- $('mathMode').checked=enabled;menuToggle.checked=enabled;
+ $('mathMode').checked=enabled;menuToggle.checked=enabled;updateQuickShape();
  $('mathAxis').disabled=!enabled;$('mathGeometryControls').hidden=!enabled;
  $('mathShowLayer').checked=layerOf(get()).visible!==false;
  refresh();
@@ -275,12 +317,13 @@ $('mathShowLayer').addEventListener('change',async e=>{
 });
 $('mathIntention').addEventListener('change',event=>{
  intendedShape=event.target.value;
+ try{localStorage.setItem(shapePreference,intendedShape);}catch{}
+ updateQuickShape();
  tell(intendedShape==='auto'
   ?'Detección automática activada. Se respetan los cuadriláteros irregulares.'
   :'Figura prevista: '+$('mathIntention').selectedOptions[0]?.textContent+
     '. La corrección actuará automáticamente al levantar el lápiz.');
- // Escanear la hoja actual también permite ajustar figuras antes reconocidas.
- if(enabled)void scanRecent(true);
+ // No reprocesar tinta de figuras antiguas al cambiar de intención.
 });
 $('mathScanPage').addEventListener('click',()=>void scanRecent(true));
 $('mathSavedObjects').addEventListener('change',editFields);
