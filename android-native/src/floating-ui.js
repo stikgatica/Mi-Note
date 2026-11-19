@@ -37,7 +37,7 @@ libraryBackdrop.id='floatingLibraryBackdrop';libraryBackdrop.type='button';
 libraryBackdrop.setAttribute('aria-label','Cerrar biblioteca');
 libraryBackdrop.hidden=true;
 document.body.append(libraryBackdrop);
-const closeLibrary=node('floatingLibraryClose','✕','Cerrar biblioteca');
+const closeLibrary=node('floatingSidebarClose','✕','Cerrar biblioteca');
 closeLibrary.className='icon-btn';shell.prepend(closeLibrary);
 const menuItems=panel.querySelector('.mobile-actions-list');
 const menuButton=(id,text,handler)=>{
