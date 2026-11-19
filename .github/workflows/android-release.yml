@@ -1,4 +1,4 @@
-name: Mi Note X10 Android v0.44 - Matematica automatica y numeros
+name: Mi Note X10 Android v0.45 - correccion geometrica fuerte
 on:
   push:
     branches: [main]
@@ -56,6 +56,7 @@ jobs:
           node --check stage/math/math-worker.js
           node --check stage/math/math-controller.js
           node --check stage/math/math-geometry.mjs
+          node --check stage/math/math-strong-geometry.mjs
           node --check stage/math/math-auto.mjs
           node --check stage/math/math-ink-ocr.mjs
           node --check stage/app.js
@@ -86,14 +87,14 @@ jobs:
           # Revision final de mejoras en trazos, guardado e interfaz.
           # Validar selector sin expresiones regulares ambiguas en Node 22.
           npx vite build
-          sed -i 's/Mi Note X10 Android V0.42/Mi Note X10 Android V0.44/g' dist/index.html
+          sed -i 's/Mi Note X10 Android V0.42/Mi Note X10 Android V0.45/g' dist/index.html
       - name: Crear Android y configurar privacidad
         run: |
           npx cap add android
           npx cap sync android
           node scripts/harden.mjs
           node native-backup/setup.mjs
-          sed -i -E 's/versionCode [0-9]+/versionCode 44/; s/versionName "[^"]+"/versionName "0.44.0"/' android/app/build.gradle
+          sed -i -E 's/versionCode [0-9]+/versionCode 45/; s/versionName "[^"]+"/versionName "0.45.0"/' android/app/build.gradle
       - name: Generar APK release sin depuracion
         run: |
           cd android
@@ -128,39 +129,39 @@ jobs:
           "$TOOLS/zipalign" -p -f 4 "$UNSIGNED" signed/unsigned-aligned.apk
           "$TOOLS/apksigner" sign --ks "$RUNNER_TEMP/minote-v02-release.jks" \
             --ks-key-alias minote-x10 --ks-pass "pass:$PASSWORD" \
-            --key-pass "pass:$PASSWORD" --out signed/Mi-Note-X10-Android-v0.44.apk \
+            --key-pass "pass:$PASSWORD" --out signed/Mi-Note-X10-Android-v0.45.apk \
             signed/unsigned-aligned.apk
-          "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.44.apk
-          sha256sum signed/Mi-Note-X10-Android-v0.44.apk | tee signed/SHA256SUMS.txt
+          "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.45.apk
+          sha256sum signed/Mi-Note-X10-Android-v0.45.apk | tee signed/SHA256SUMS.txt
       - name: Verificar permisos del APK
         shell: bash
         run: |
           set -euo pipefail
           TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.44.apk | tee signed/PERMISOS.txt
+          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.45.apk | tee signed/PERMISOS.txt
           if grep -Fq 'android.permission.INTERNET' signed/PERMISOS.txt; then
             echo 'ERROR: permiso INTERNET incluido' >&2; exit 1
           fi
       - name: Guardar APK para respaldo
         uses: actions/upload-artifact@v4
         with:
-          name: Mi-Note-X10-v0.44-APK
+          name: Mi-Note-X10-v0.45-APK
           path: |
-            android-native/signed/Mi-Note-X10-Android-v0.44.apk
+            android-native/signed/Mi-Note-X10-Android-v0.45.apk
             android-native/signed/SHA256SUMS.txt
             android-native/signed/PERMISOS.txt
           if-no-files-found: error
-      - name: Publicar Mi Note X10 Android v0.44
+      - name: Publicar Mi Note X10 Android v0.45
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           # La publicación final reemplaza artefactos de compilaciones previas de prueba.
-          if gh release view android-v0.44 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete android-v0.44 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          if gh release view android-v0.45 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete android-v0.45 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
           fi
-          gh release create android-v0.44 signed/Mi-Note-X10-Android-v0.44.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
+          gh release create android-v0.45 signed/Mi-Note-X10-Android-v0.45.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title 'Mi Note X10 Android V0.44 — Matemática automática' \
-            --notes 'V0.44 experimental: mejora automática al levantar lápiz, sin selección manual. Rectas, polígonos, circunferencias y OCR local conservador de números y medidas cm/mm/m/grados por plantillas; edición manual, originales intactos en strokes. No es OCR entrenado y puede no reconocer ciertos estilos. BLE/importación/compartir originales preservados. Haga respaldo previo.' \
+            --title 'Mi Note X10 Android V0.45 — geometría reforzada' \
+            --notes 'V0.45 experimental: referencia conceptual GeoInk V2, reimplementación Android con enderezado geométrico más fuerte. Rectas curvas ajustadas por mínimos cuadrados; polígonos de uno o varios trazos con vértices unidos; círculos preservados; trazos originales intactos y mejora automática en capa separada. No se incorporó PWA GeoInk. Mantenga respaldo, compruebe con X10 física.' \
             --prerelease --latest=false
