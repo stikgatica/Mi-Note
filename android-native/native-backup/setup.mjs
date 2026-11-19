@@ -9,6 +9,7 @@ await fs.mkdir(pkg,{recursive:true});
 await fs.copyFile(path.join(root,'native-backup','PrivateBackupPlugin.java'),path.join(pkg,'PrivateBackupPlugin.java'));
 await fs.copyFile(path.join(root,'native-backup','MiNoteFileExportPlugin.java'),path.join(pkg,'MiNoteFileExportPlugin.java'));
 await fs.copyFile(path.join(root,'native-backup','MiNoteShareProvider.java'),path.join(pkg,'MiNoteShareProvider.java'));
+await fs.copyFile(path.join(root,'native-backup','MiNoteCalendarPlugin.java'),path.join(pkg,'MiNoteCalendarPlugin.java'));
 const activity=path.join(pkg,'MainActivity.java');
 const content=`package cl.stikgatica.minote.x10;
 
@@ -22,6 +23,7 @@ public class MainActivity extends BridgeActivity {
   @Override public void onCreate(Bundle savedInstanceState) {
     registerPlugin(PrivateBackupPlugin.class);
     registerPlugin(MiNoteFileExportPlugin.class);
+    registerPlugin(MiNoteCalendarPlugin.class);
     super.onCreate(savedInstanceState);
     applyPizarraFullscreen();
   }
@@ -56,6 +58,17 @@ public class MainActivity extends BridgeActivity {
 }
 `;
 await fs.writeFile(activity,content);
+// El modelo español se descarga SOLO con el consentimiento del usuario.
+// Una vez descargado, el reconocimiento de trazos se hace en el dispositivo.
+const gradle=path.join(root,'android','app','build.gradle');
+let build=await fs.readFile(gradle,'utf8');
+if(!build.includes("com.google.mlkit:digital-ink-recognition:19.0.0")){
+ const marker='dependencies {';
+ if(!build.includes(marker))throw Error('No se encontró bloque dependencies para ML Kit.');
+ build=build.replace(marker,marker+"\n    implementation 'com.google.mlkit:digital-ink-recognition:19.0.0'");
+ await fs.writeFile(gradle,build);
+}
+
 const xmlRoot=path.join(root,'android','app','src','main','res','xml');
 await fs.mkdir(xmlRoot,{recursive:true});
 await fs.writeFile(path.join(xmlRoot,'minote_share_paths.xml'),`<?xml version="1.0" encoding="utf-8"?>
@@ -65,6 +78,11 @@ await fs.writeFile(path.join(xmlRoot,'minote_share_paths.xml'),`<?xml version="1
 const manifestFile=path.join(root,'android','app','src','main','AndroidManifest.xml');
 let manifest=await fs.readFile(manifestFile,'utf8');
 manifest=addMiNoteProvider(manifest);
+if(!manifest.includes('android.permission.INTERNET')){
+ manifest=manifest.replace('<manifest ', '<manifest ');
+ manifest=manifest.replace(/(<manifest[^>]*>)/,'$1\n<uses-permission android:name="android.permission.INTERNET" />');
+}
+
 await fs.writeFile(manifestFile,manifest);
 if(!manifest.includes(PROVIDER_CLASS)||!manifest.includes(PROVIDER_AUTHORITY)||!manifest.includes(PROVIDER_XML))
  throw Error('Proveedor nativo de Compartir incompleto.');
