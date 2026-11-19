@@ -109,6 +109,21 @@ export function recognizeInk(strokes){
   if(!res)return null;
   glyphs.push({...res,box:b});
  }
+ // Un pequeño círculo situado en superíndice después de un número es °;
+ // el mismo círculo a altura normal sigue siendo 0. Evita inventar grados.
+ if(glyphs.length>=2){
+  const last=glyphs.at(-1),previous=glyphs[glyphs.length-2];
+  const maxPrevious=Math.max(...glyphs.slice(0,-1).map(g=>g.box.h));
+  const small=last.box.h<maxPrevious*.59&&last.box.h>=6;
+  const raised=last.box.maxY<previous.box.maxY-maxPrevious*.22;
+  const hasRing=last.alternatives.some(g=>g.symbol==='0'&&g.confidence>=.84);
+  if(small&&raised&&hasRing){
+   const ring=last.alternatives.find(g=>g.symbol==='0');
+   const runner=last.alternatives.find(g=>g.symbol!=='0'&&g.symbol!=='°');
+   last.best={symbol:'°',confidence:ring.confidence};
+   last.second=runner||{symbol:'?',confidence:0};
+  }
+ }
  const text=glyphs.map(g=>g.best.symbol).join('');
  if(!/^(?:\d{1,4}(?:[.,]\d{1,2})?)(?:cm|mm|m|°)?$/.test(text))return null;
  const minConf=Math.min(...glyphs.map(g=>g.best.confidence));
