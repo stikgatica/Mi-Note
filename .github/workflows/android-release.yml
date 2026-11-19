@@ -1,4 +1,4 @@
-name: Mi Note X10 Android v0.41 - orientacion automatica y Bluetooth azul
+name: Mi Note X10 Android v0.42 - guardar y compartir nativamente
 on:
   push:
     branches: [main]
@@ -57,6 +57,8 @@ jobs:
           node --check stage/floating-page-x10.js
           node --check stage/floating-geometry.mjs
           node --check stage/personal-backup.js
+          node --check stage/export-native.js
+          node --check stage/share-documents.js
           node scripts/assert-v018.mjs
           node --check stage/app.js
           node --check stage/android-ui-main.js
@@ -72,14 +74,14 @@ jobs:
           # Revision final de mejoras en trazos, guardado e interfaz.
           # Validar selector sin expresiones regulares ambiguas en Node 22.
           npx vite build
-          sed -i 's/Mi Note X10 Android V0.4/Mi Note X10 Android V0.41/g' dist/index.html
+          sed -i 's/Mi Note X10 Android V0.4/Mi Note X10 Android V0.42/g' dist/index.html
       - name: Crear Android y configurar privacidad
         run: |
           npx cap add android
           npx cap sync android
           node scripts/harden.mjs
           node native-backup/setup.mjs
-          sed -i -E 's/versionCode [0-9]+/versionCode 41/; s/versionName "[^"]+"/versionName "0.41.0"/' android/app/build.gradle
+          sed -i -E 's/versionCode [0-9]+/versionCode 42/; s/versionName "[^"]+"/versionName "0.42.0"/' android/app/build.gradle
       - name: Generar APK release sin depuracion
         run: |
           cd android
@@ -114,39 +116,39 @@ jobs:
           "$TOOLS/zipalign" -p -f 4 "$UNSIGNED" signed/unsigned-aligned.apk
           "$TOOLS/apksigner" sign --ks "$RUNNER_TEMP/minote-v02-release.jks" \
             --ks-key-alias minote-x10 --ks-pass "pass:$PASSWORD" \
-            --key-pass "pass:$PASSWORD" --out signed/Mi-Note-X10-Android-v0.41.apk \
+            --key-pass "pass:$PASSWORD" --out signed/Mi-Note-X10-Android-v0.42.apk \
             signed/unsigned-aligned.apk
-          "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.41.apk
-          sha256sum signed/Mi-Note-X10-Android-v0.41.apk | tee signed/SHA256SUMS.txt
+          "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.42.apk
+          sha256sum signed/Mi-Note-X10-Android-v0.42.apk | tee signed/SHA256SUMS.txt
       - name: Verificar permisos del APK
         shell: bash
         run: |
           set -euo pipefail
           TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.41.apk | tee signed/PERMISOS.txt
+          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.42.apk | tee signed/PERMISOS.txt
           if grep -Fq 'android.permission.INTERNET' signed/PERMISOS.txt; then
             echo 'ERROR: permiso INTERNET incluido' >&2; exit 1
           fi
       - name: Guardar APK para respaldo
         uses: actions/upload-artifact@v4
         with:
-          name: Mi-Note-X10-v0.41-APK
+          name: Mi-Note-X10-v0.42-APK
           path: |
-            android-native/signed/Mi-Note-X10-Android-v0.41.apk
+            android-native/signed/Mi-Note-X10-Android-v0.42.apk
             android-native/signed/SHA256SUMS.txt
             android-native/signed/PERMISOS.txt
           if-no-files-found: error
-      - name: Publicar Mi Note X10 Android v0.41
+      - name: Publicar Mi Note X10 Android v0.42
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           # La publicación final reemplaza artefactos de compilaciones previas de prueba.
-          if gh release view android-v0.41 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete android-v0.41 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          if gh release view android-v0.42 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete android-v0.42 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
           fi
-          gh release create android-v0.41 signed/Mi-Note-X10-Android-v0.41.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
+          gh release create android-v0.42 signed/Mi-Note-X10-Android-v0.42.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title 'Mi Note X10 Android V0.41 — interfaz agenda adaptable' \
-            --notes 'V0.41: acción Importar memoria agenda, icono Bluetooth azul sin texto X10, color de lápiz negro predeterminado, barra horizontal en vertical y vertical en horizontal, hoja A5 que sigue la orientación del celular con los dos giros horizontales usando landscape-cw. Color del lápiz directamente debajo del grosor, fuera de Herramientas. No cambia el protocolo BLE ni el importador validado; realizar respaldo antes de instalar.' \
+            --title 'Mi Note X10 Android V0.42 — compartir y guardar documentos' \
+            --notes 'V0.42: WebM guardado realmente con selector nativo de Android y Compartir video; compartir hoja o cuaderno en SVG PNG PDF, cuaderno PDF multipágina y SVG/PNG como ZIP. Transferencia temporal en caché privada con FileProvider, sin permisos de almacenamiento general y sin modificar trazos ni protocolo BLE X10. Realice respaldo antes de instalar.' \
             --prerelease --latest=false
