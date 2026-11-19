@@ -20,16 +20,16 @@ root.innerHTML=[
  '</div></div>',
  '<div class="minote-device-actions">',
  '<button type="button" class="subtle" id="x10DeviceRefresh">↻ Consultar información</button>',
- '<button type="button" class="subtle" id="x10DeviceClearCache">Limpiar caché local</button>',
+ '<button type="button" class="subtle minote-device-danger" id="x10DeviceClearCache">Limpiar caché de la Huion X10</button>',
  '</div>',
- '<p class="minote-device-note" id="x10DeviceHint">La memoria física de la Huion no se borra. Limpiar caché local elimina solamente diagnósticos temporales de Mi Note.</p>',
+ '<p class="minote-device-note" id="x10DeviceHint">La limpieza de la Huion X10 utiliza el comando físico CLEAR_CACHE (0x8C). Puede afectar las notas almacenadas sin conexión. Exporte y compruebe sus notas antes de utilizarla.</p>',
  '<div class="minote-device-firmware"><strong>Actualizaciones de firmware</strong>',
  '<p>Para comprobar o instalar firmware de la X10, use la aplicación oficial Huion Note. Mi Note no modifica el firmware de la agenda.</p>',
  '</div>'
 ].join('');
 status.before(root);
 const $=id=>document.getElementById(id);
-let connected=false,level=null,lastIndex=null,queryTimer=0,queryReceived=false;
+let connected=false,level=null,lastIndex=null,queryTimer=0,queryReceived=false,clearing=false;
 function paint(){
  const meter=$('x10BatteryMeter');
  const valid=connected&&Number.isInteger(level)&&level>=0&&level<=100;
@@ -43,6 +43,7 @@ function paint(){
   'Último índice de página informado: '+lastIndex+'. No equivale a espacio libre.':
   'Sin lectura de capacidad libre.';
  $('x10DeviceRefresh').disabled=!connected;
+ $('x10DeviceClearCache').disabled=!connected||clearing;
 }
 function refreshConnection(){
  connected=!!document.getElementById('x10OpenBtn')?.classList.contains('is-connected');
@@ -89,11 +90,37 @@ $('x10DeviceRefresh').addEventListener('click',async()=>{
    '. La memoria de la X10 no se modificó.';
  }
 });
-$('x10DeviceClearCache').addEventListener('click',()=>{
- if(!window.confirm('¿Borrar solo los diagnósticos temporales de Mi Note? No se borrarán hojas, respaldos ni la memoria de la Huion X10.'))return;
+$('x10DeviceClearCache').addEventListener('click',async()=>{
+ if(!connected||clearing)return;
+ const api=window.MiNoteX10DeviceInfo;
+ if(typeof api?.clearDeviceCache!=='function'){
+  $('x10DeviceHint').textContent='Limpieza física no disponible: el módulo Bluetooth no pudo cargarse.';
+  return;
+ }
+ const notice='ATENCIÓN: Esta opción envía CLEAR_CACHE (0x8C) directamente a la Huion X10. '
+  +'El repositorio de ingeniería inversa lo clasifica como destructivo y lo utiliza después de exportar y eliminar páginas. '
+  +'No está verificado que elimine por sí solo todas las páginas guardadas. '
+  +'Podría eliminar información no respaldada. ¿Ha exportado y comprobado todas sus notas y desea continuar?';
+ if(!window.confirm(notice))return;
+ const typed=window.prompt('Segunda confirmación: escriba LIMPIAR para autorizar el comando físico 0x8C. Cancelar no modifica la Huion.','');
+ if(typed!=='LIMPIAR'){
+  $('x10DeviceHint').textContent='Limpieza cancelada. No se envió ningún comando.';
+  return;
+ }
+ clearing=true;paint();
+ const hint=$('x10DeviceHint');
+ hint.textContent='Enviando orden física 0x8C a la Huion X10 y verificando su respuesta…';
  try{
-  window.MiNoteX10DeviceInfo?.clearLocalDiagnostics?.();
-  $('x10DeviceHint').textContent='Diagnósticos temporales limpiados. Cuadernos y memoria de la X10 intactos.';
- }catch(error){$('x10DeviceHint').textContent='No se pudo limpiar la caché local: '+error.message;}
+  const result=await api.clearDeviceCache();
+  if(result?.acknowledged){
+   lastIndex=null;
+   hint.textContent='La Huion confirmó CLEAR_CACHE (0x8C). Compruebe en la app oficial qué notas permanecen. Esto no demuestra que todas las páginas hayan sido borradas.';
+  }else hint.textContent='La limpieza no obtuvo confirmación; revise la agenda antes de cualquier nuevo intento.';
+ }catch(error){
+  hint.textContent='No se pudo confirmar la limpieza: '+(error?.message||String(error))+
+   '. Revise la X10 antes de intentar nuevamente.';
+ }finally{
+  clearing=false;paint();
+ }
 });
 refreshConnection();
