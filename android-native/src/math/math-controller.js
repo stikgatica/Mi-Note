@@ -99,7 +99,7 @@ function geometryElement(geo,style,preview=false){
  return nsvg('g');
 }
 function drawOverlay(page){
- const visible=enabled&&currentLayer(page).visible;
+ const visible=enabled&&(currentLayer(page).visible||selecting||!!proposal);
  layer.replaceChildren();
  layer.hidden=!visible;
  const rotated=page?.orientation==='landscape-cw';
@@ -115,6 +115,15 @@ function drawOverlay(page){
     'font-family':'sans-serif','text-anchor':'middle'});
    text.textContent=label.text;group.append(text);
   }
+ }
+ if(selecting&&selected.size){
+  const selectedInk=nsvg('g',{fill:'none',stroke:'#0b97df','stroke-width':4,'stroke-dasharray':'5 6',opacity:.85});
+  for(const stroke of page.strokes||[]){
+   if(!selected.has(stroke.id)||!Array.isArray(stroke.pts)||stroke.pts.length<2)continue;
+   const line=stroke.pts.filter(p=>Array.isArray(p)&&p.length>=2).map(p=>p[0]+','+p[1]).join(' ');
+   if(line)selectedInk.append(nsvg('polyline',{points:line}));
+  }
+  group.append(selectedInk);
  }
  if(proposal&&proposal.pageId===page.id)group.append(geometryElement(proposal.geometry,proposal.style||{},true));
  layer.append(group);
