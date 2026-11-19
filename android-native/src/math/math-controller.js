@@ -58,6 +58,8 @@ for(const shape of DRAW_INTENTIONS)$('mathIntention').append(elm('option',{value
 $('mathIntention').value='auto';
 
 let enabled=false,worker=null,sequence=0,scanTimer=0,scanRunning=false,scanAgain=false,lastPage='';
+const intentCutoffs=new Map();
+let intentionEpoch=0;
 const shapePreference='minote_math_intention_v047';
 let intendedShape='auto';
 try{
@@ -186,7 +188,9 @@ function updateInterface(){
  refresh();
 }
 function setEnabled(value){
- enabled=!!value;clearTimeout(scanTimer);
+ const previously=enabled;
+ enabled=!!value;clearTimeout(scanTimer);intentionEpoch++;
+ if(enabled&&!previously){const page=get();if(page)intentCutoffs.set(page.id,page.strokes?.length||0);}
  updateInterface();
  tell(enabled?'Automático activo. Escriba normalmente en la agenda; las mejoras aparecen al terminar cada trazo.':'Modo normal: todos los trazos manuscritos se conservan.');
 }
@@ -220,8 +224,9 @@ const sigsMatch=(candidate,pg)=>{
 };
 async function runOne(pg,strokes){
  if(!enabled||!strokes.length)return false;
+ const epoch=intentionEpoch;
  const candidate=await recognize(strokes);
- if(!candidate)return false;
+ if(!candidate||epoch!==intentionEpoch)return false;
  const current=get();if(!current||current.id!==pg.id||!sigsMatch(candidate,current))return false;
  const previous=layerOf(current).objects||[],merge=mergeAutomatic(previous,candidate);
  if(!merge)return false;
@@ -246,7 +251,9 @@ async function scanRecent(all=false){
   for(const end of ends){
    if(!enabled||get()?.id!==page.id)break;
    const current=get();if(!current||current.id!==page.id)break;
-   const count=Math.min(end,9),window=current.strokes.slice(end-count,end);
+   const cutoff=all?0:(intentCutoffs.get(current.id)??0);
+   if(end<=cutoff)continue;
+   const count=Math.min(end-cutoff,9),window=current.strokes.slice(end-count,end);
    if(await runOne(page,window))changed++;
    if(all&&end%8===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
@@ -317,6 +324,8 @@ $('mathShowLayer').addEventListener('change',async e=>{
 });
 $('mathIntention').addEventListener('change',event=>{
  intendedShape=event.target.value;
+ clearTimeout(scanTimer);intentionEpoch++;
+ const current=get();if(current)intentCutoffs.set(current.id,current.strokes?.length||0);
  try{localStorage.setItem(shapePreference,intendedShape);}catch{}
  updateQuickShape();
  tell(intendedShape==='auto'
