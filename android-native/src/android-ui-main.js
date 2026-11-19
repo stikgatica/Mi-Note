@@ -44,3 +44,6 @@ if(failures.length){
  note.addEventListener('click',()=>alert('Errores de Mi Note Android:\\n'+failures.join('\\n')));
  document.body.appendChild(note);
 }
+
+// Se instala al final, cuando todos los diálogos Android ya existen.
+await load('Botón Atrás Android',()=>import('./android-back.js'));
