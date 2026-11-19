@@ -27,8 +27,11 @@ test('el proveedor de compartir se añade aunque otro FileProvider de Capacitor 
 });
 test('Compartir HTML usa saltos de línea reales en diálogo, no secuencias visibles',()=>{
  const builder=read('../scripts/mobile.mjs');
- assert.ok(builder.includes("].join('\\n');\nconst memoryDialog=[")===false,'no debe unir con barra invertida literal');
- assert.ok(builder.includes("].join('\n');\nconst memoryDialog=["));
+ const context=builder.slice(builder.indexOf('const shareDialog=['),builder.indexOf('const memoryDialog=['));
+ const realJoin=String.raw`].join('\\n');`;
+ const literalJoin=String.raw`].join('\\\\n');`;
+ assert.ok(context.includes(realJoin),'el diálogo debe unirse con saltos reales');
+ assert.ok(!context.includes(literalJoin),'no debe mostrarse la secuencia literal barra-n');
 });
 test('cuadrilátero trapezoidal intencional se ajusta a cuadrado girado de 90°',()=>{
  const input=[[120,130],[265,118],[291,291],[109,277]];
