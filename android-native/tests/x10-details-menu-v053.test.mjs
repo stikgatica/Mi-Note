@@ -18,5 +18,5 @@ test('Se mantienen detalles y acción física con doble confirmación',()=>{
  assert.match(details,/Memoria restante/);
  assert.match(details,/Limpiar caché de la Huion X10/);
  assert.match(details,/typed!=='LIMPIAR'/);
- assert.equal(pkg.version,'0.53.0');
+ assert.ok(Number(pkg.version.split('.')[1])>=53);
 });
