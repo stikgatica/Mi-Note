@@ -13,7 +13,7 @@ app=app.replace(original,
 const compare="template:p.template,strokes:p.strokes";
 if(!app.includes(compare))throw Error('Matemática: no se localizó comparador de versiones de hoja.');
 app=app.replace(compare,"template:p.template,strokes:p.strokes,mathLayer:p.mathLayer||null");
-app+=\`
+app+=`
 /* API de la capa matemática. Los trazos originales no se modifican. */
 window.MiNoteMathBridge={
  snapshot(){
@@ -37,8 +37,7 @@ window.MiNoteMathBridge={
   return true;
  }
 };
-\`;
-app=app.replaceAll('\\`','`');
+`;
 await fs.writeFile(appPath,app);
 const entry=path.join(stage,'android-ui-main.js');
 let ui=await fs.readFile(entry,'utf8');
