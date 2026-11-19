@@ -4,10 +4,10 @@ const dialog=$('floatingLibraryDialog'),menu=$('mobileMoreDialog');
 if(!dialog)throw Error('Falta biblioteca');
 dialog.classList.add('huion-library');
 dialog.innerHTML=[
-'<header class="huion-library-head"><h2>Mis cuadernos</h2><div class="huion-library-tools">',
-'<button id="huionSearchToggle" type="button" aria-label="Buscar">⌕</button>',
-'<button id="huionNewNotebook" type="button" aria-label="Nuevo cuaderno">＋</button>',
-'<button id="floatingLibraryClose" type="button" aria-label="Cerrar">✕</button></div></header>',
+'<header class="huion-library-head"><h2 id="floatingLibraryTitle">Mis cuadernos</h2><div class="huion-library-tools" role="group" aria-label="Acciones de cuadernos">',
+'<button id="huionSearchToggle" type="button" aria-label="Buscar cuadernos" title="Buscar cuadernos">⌕</button>',
+'<button id="huionNewNotebook" type="button" aria-label="Crear nuevo cuaderno" title="Crear nuevo cuaderno">＋</button>',
+'<button id="floatingLibraryClose" type="button" aria-label="Cerrar biblioteca" title="Cerrar biblioteca">✕</button></div></header>',
 '<div id="huionSearchWrap" hidden><input id="huionSearch" type="search" placeholder="Buscar cuadernos…"></div>',
 '<nav class="huion-sort"><button id="huionSortModified" type="button" class="active">Fecha modificada</button>',
 '<button id="huionSortCreated" type="button">Fecha creada</button></nav>',

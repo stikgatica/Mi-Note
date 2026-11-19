@@ -82,3 +82,43 @@ body.minote-android.clean-notes #floatingLibraryItems.huion-notebook-grid{
  .huion-library-head h2{font-size:20px!important;}
  .huion-create-fields{grid-template-columns:1fr 1fr;gap:7px;}
 }
+
+/* V0.47: tres acciones alineadas, sin controles absolutos ni superposiciones. */
+body.minote-android.clean-notes dialog.huion-library .huion-library-head{
+ display:flex!important;align-items:center!important;justify-content:space-between!important;
+ flex-wrap:nowrap!important;gap:10px!important;
+ padding:12px 16px!important;
+ min-height:66px;box-sizing:border-box;
+}
+body.minote-android.clean-notes dialog.huion-library .huion-library-head h2{
+ flex:1 1 auto;min-width:0;margin:0!important;
+ font-size:clamp(17px,4.5vw,24px)!important;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+body.minote-android.clean-notes dialog.huion-library .huion-library-tools{
+ position:static!important;display:flex!important;align-items:center!important;
+ justify-content:flex-end!important;flex:0 0 auto!important;gap:9px!important;
+ margin:0!important;padding:0!important;
+}
+body.minote-android.clean-notes dialog.huion-library .huion-library-tools button{
+ position:static!important;inset:auto!important;transform:none!important;
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;
+ flex:0 0 46px!important;width:46px!important;height:46px!important;
+ min-width:46px!important;min-height:46px!important;max-width:46px!important;
+ margin:0!important;padding:0!important;box-sizing:border-box!important;
+ border-radius:12px!important;font-size:24px!important;line-height:1!important;
+ background:#fff!important;border:1px solid #dce4eb!important;color:#233e5a!important;
+ touch-action:manipulation;
+}
+body.minote-android.clean-notes dialog.huion-library #floatingLibraryClose{
+ margin-left:4px!important;border-color:#cbd8e5!important;
+}
+@media(max-width:400px){
+ body.minote-android.clean-notes dialog.huion-library .huion-library-head{gap:5px!important;padding:10px 11px!important;}
+ body.minote-android.clean-notes dialog.huion-library .huion-library-tools{gap:6px!important;}
+ body.minote-android.clean-notes dialog.huion-library .huion-library-tools button{
+  flex-basis:42px!important;width:42px!important;height:44px!important;
+  min-width:42px!important;max-width:42px!important;min-height:44px!important;
+ }
+ body.minote-android.clean-notes dialog.huion-library .huion-library-head h2{font-size:17px!important;}
+}

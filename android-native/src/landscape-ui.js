@@ -11,9 +11,18 @@ const toast=message=>{const note=get('tvBoardHint');if(note){note.textContent=me
 // Ambas orientaciones apaisadas mantienen landscape-cw, la misma rotación
 // utilizada por Mi Note, sin espejar ni alterar coordenadas de tinta Huion.
 const viewportOrientation=()=>window.innerWidth>window.innerHeight?'landscape-cw':'portrait';
+function syncBoardViewport(){
+ const landscape=window.innerWidth>window.innerHeight;
+ document.body.classList.toggle('landscape-board',landscape);
+ document.body.dataset.viewportMode=landscape?'pizarra-horizontal':'cuaderno-vertical';
+ // La tinta sigue en el sistema original de coordenadas A5 de la X10.
+ requestAnimationFrame(()=>pageLayout()?.repaint?.());
+}
+syncBoardViewport();
 let orienting=false,orientationQueued=false;
 async function updateSelection(){
  const layout=pageLayout();if(!layout)return;
+ syncBoardViewport();
  const wanted=viewportOrientation();
  document.body.dataset.pageOrientation=wanted;
  if(orientation)orientation.value=wanted;
@@ -33,6 +42,7 @@ async function updateSelection(){
  }
 }
 const scheduleOrientation=()=>{
+ syncBoardViewport();
  clearTimeout(scheduleOrientation.timer);
  scheduleOrientation.timer=setTimeout(()=>void updateSelection(),85);
 };
