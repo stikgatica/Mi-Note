@@ -28,8 +28,8 @@ test('el proveedor de compartir se añade aunque otro FileProvider de Capacitor 
 test('Compartir HTML usa saltos de línea reales en diálogo, no secuencias visibles',()=>{
  const builder=read('../scripts/mobile.mjs');
  const context=builder.slice(builder.indexOf('const shareDialog=['),builder.indexOf('const memoryDialog=['));
- const realJoin=String.raw`].join('\\n');`;
- const literalJoin=String.raw`].join('\\\\n');`;
+ const realJoin="].join('"+String.fromCharCode(92)+"n');";
+ const literalJoin="].join('"+String.fromCharCode(92)+String.fromCharCode(92)+"n');";
  assert.ok(context.includes(realJoin),'el diálogo debe unirse con saltos reales');
  assert.ok(!context.includes(literalJoin),'no debe mostrarse la secuencia literal barra-n');
 });
