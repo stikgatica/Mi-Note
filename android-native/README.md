@@ -35,3 +35,9 @@ cd android
 La tarea `npm run build:web` **empaqueta la interfaz local de la APK**, no genera una PWA para distribución. GitHub Actions publica el APK firmado de prueba desde `.github/workflows/android-release.yml`.
 
 El APK no solicita permiso de Internet. La memoria física nunca se borra (`0x8B/0x8C` no se transmiten). Respalde los cuadernos antes de actualizar: las claves de firma de prueba cambian entre compilaciones.
+
+## Compartir y exportar archivos nativos
+
+`native-backup/MiNoteFileExportPlugin.java` añade `ACTION_CREATE_DOCUMENT` (guardar en lugar elegido) y `ACTION_SEND` + `FileProvider` (Compartir con otras aplicaciones), con acceso exclusivo a una carpeta temporal privada. Los datos se transfieren desde WebView mediante fragmentos base64 acotados de 96 KiB. `src/export-native.js` gestiona la transferencia; `src/share-documents.js` transforma hojas y cuadernos a SVG, PNG, ZIP y PDF A5 multipágina. `src/replay.js` utiliza el mismo complemento para WebM.
+
+Se ejecuta `native-backup/setup.mjs` después de sincronizar Capacitor para registrar el complemento y las rutas compartibles en AndroidManifest. No se solicita acceso global al almacenamiento.
