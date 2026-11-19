@@ -15,6 +15,7 @@ const menu=[
 '<button type="button" id="tvBoardToggle">▣ Proyectar en TV</button>',
 '<button type="button" data-action="pageNumber">Todas las hojas</button>',
 '<button type="button" data-action="renamePageBtn">Renombrar hoja</button>',
+'<button type="button" id="shareDocumentOpen">↗ Compartir hoja o cuaderno</button>',
 '<button type="button" data-action="exportSvg">Exportar SVG</button>',
 '<button type="button" data-action="exportPng">Exportar PNG</button>',
 '<button type="button" data-action="printPdf">Imprimir PDF</button>',
@@ -43,11 +44,22 @@ const replayDialog=[
 '<canvas id="replayCanvas" width="700" height="980" aria-label="Vista previa de la escritura"></canvas>',
 '<div class="replay-controls"><input id="replaySeek" type="range" min="0" max="1000" value="0" aria-label="Avance de la reproducción"><output id="replayProgress">0%</output></div>',
 '<div class="replay-controls"><button id="replayPlay" type="button" class="primary">▶ Reproducir</button><button id="replayRestart" type="button">↺ Reiniciar</button><label>Velocidad <select id="replaySpeed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label></div>',
-'<div class="replay-controls"><button id="replayVideo" type="button">Guardar video WebM</button></div>',
+'<div class="replay-controls"><button id="replayVideo" type="button">Guardar video WebM…</button><button id="replayShareVideo" type="button">Compartir video</button></div>',
 '<small>Los trazos se reproducen en orden. Para hojas antiguas, la duración es aproximada. La hoja original no se modifica.</small>',
 '</dialog>'
 ].join('\n');
 
+const shareDialog=[
+'<dialog id="shareDocumentDialog" class="dialog" aria-labelledby="shareDocumentTitle">',
+'<div class="dialog-head"><h2 id="shareDocumentTitle">Compartir hoja o cuaderno</h2><button type="button" id="shareDocumentClose" class="icon-btn" aria-label="Cerrar">✕</button></div>',
+'<label class="field">Contenido<select id="shareDocumentScope"><option value="page">Hoja actual</option><option value="book">Cuaderno completo</option></select></label>',
+'<label class="field">Formato<select id="shareDocumentFormat"><option value="pdf">PDF</option><option value="png">PNG</option><option value="svg">SVG</option></select></label>',
+'<label class="field">Acción<select id="shareDocumentAction"><option value="share">Compartir con Android</option><option value="save">Guardar archivo…</option></select></label>',
+'<p id="shareDocumentStatus" role="status" aria-live="polite">Seleccione el destino.</p>',
+'<button id="shareDocumentRun" type="button" class="primary">Continuar</button>',
+'<small>PDF conserva varias hojas en un documento. PNG y SVG del cuaderno completo se entregan en ZIP, una hoja por archivo. No se modifican los cuadernos.</small>',
+'</dialog>'
+].join('\\n');
 const memoryDialog=[
 '<dialog id="x10MemoryDialog" class="dialog memory-import-dialog" aria-labelledby="x10MemoryTitle">',
 '<div class="dialog-head"><h2 id="x10MemoryTitle">Importar memoria agenda</h2><button type="button" id="x10MemoryClose" class="icon-btn" aria-label="Cerrar">✕</button></div>',
@@ -64,7 +76,7 @@ const memoryDialog=[
 ].join('\n');
 const personalDialog="<dialog id=\"personalBackupDialog\" class=\"dialog personal-backup-dialog\" aria-labelledby=\"personalBackupTitle\">\n<div class=\"dialog-head\"><h2 id=\"personalBackupTitle\">Copia privada en Drive</h2><button id=\"personalBackupClose\" class=\"icon-btn\" aria-label=\"Cerrar\">✕</button></div>\n<p>Seleccione Google Drive desde el selector de archivos de Android. Mi Note accederá únicamente al archivo que usted autorice.</p>\n<div class=\"personal-backup-actions\"><button id=\"personalBackupNew\" type=\"button\">Crear copia nueva</button><button id=\"personalBackupExisting\" type=\"button\">Vincular copia existente</button></div>\n<label class=\"field\">Contraseña de cifrado (mínimo 12 caracteres)<input id=\"personalBackupPassword\" type=\"password\" autocomplete=\"new-password\" minlength=\"12\"></label>\n<label class=\"field\">Repita la contraseña si crea una copia nueva<input id=\"personalBackupConfirm\" type=\"password\" autocomplete=\"new-password\" minlength=\"12\"></label>\n<div class=\"personal-backup-actions\"><button id=\"personalBackupUnlock\" type=\"button\" class=\"primary\">Activar copia cifrada</button><button id=\"personalBackupSync\" type=\"button\">Sincronizar ahora</button></div>\n<div id=\"personalBackupStatus\" class=\"x10-details\" role=\"status\" aria-live=\"polite\">Sin configurar</div>\n<button id=\"personalBackupUnlink\" type=\"button\" class=\"subtle\">Desvincular archivo</button>\n<small>La contraseña no se envía a Google. La clave de cifrado se protege en Android Keystore. La copia es un archivo cifrado; sin la contraseña no se podrá recuperar tras reinstalar. La sincronización funciona mientras la app está activa y puede quedar pendiente hasta que Google Drive suba el archivo. No se eliminan sus cuadernos locales.</small>\n</dialog>";
 const projectionToolbar="<div id=\"tvBoardToolbar\" hidden aria-label=\"Controles de pizarra\">\n<button id=\"tvBoardPen\" type=\"button\" title=\"Lápiz\" aria-label=\"Lápiz\">✎</button>\n<button id=\"tvBoardErase\" type=\"button\" title=\"Borrador\" aria-label=\"Borrador\">⌫</button>\n<button id=\"tvBoardUndo\" type=\"button\" title=\"Deshacer\" aria-label=\"Deshacer\">↶</button>\n<button id=\"tvBoardPrev\" type=\"button\" title=\"Página anterior\" aria-label=\"Página anterior\">‹</button>\n<button id=\"tvBoardNext\" type=\"button\" title=\"Página siguiente\" aria-label=\"Página siguiente\">›</button>\n<button id=\"tvBoardOrientation\" type=\"button\" title=\"Girar hoja\" aria-label=\"Girar hoja\">⤾</button>\n<button id=\"tvBoardFullscreen\" type=\"button\" title=\"Pantalla completa\" aria-label=\"Pantalla completa\">⛶</button>\n<button id=\"tvBoardMore\" type=\"button\" title=\"Opciones\" aria-label=\"Opciones\">⋮</button>\n<button id=\"tvBoardClose\" type=\"button\" title=\"Salir de proyección\" aria-label=\"Salir de pizarra\">✕</button>\n</div>\n<div id=\"tvBoardHint\" hidden role=\"status\"></div>";
-html=html.replace('</main>',menu+'\n'+replayDialog+'\n'+personalDialog+'\n'+memoryDialog+'\n'+projectionToolbar+'\n</main>');
+html=html.replace('</main>',menu+'\n'+replayDialog+'\n'+shareDialog+'\n'+personalDialog+'\n'+memoryDialog+'\n'+projectionToolbar+'\n</main>');
 // V0.15: controles esenciales visibles incluso antes de cargar módulos JS.
 const pageCounter='<button id="floatingPageNumber" class="floating-page-counter" type="button" title="Ver páginas o eliminar hoja" aria-label="Página 1 de 1. Administrar hoja">1 / 1</button>';
 if(!html.includes('<button id="tvBoardNext"'))throw Error('Barra flotante sin botón siguiente');
@@ -102,7 +114,7 @@ html=html.replace('</head>','<link rel="stylesheet" href="./mobile-ui.css">\n<li
 html=html.replace(/<script type="module" src="\.\/native-main\.js"><\/script>\s*/,'');
 html=html.replace('</body>','<script type="module" src="./android-ui-main.js"></script>\n</body>');
 await fs.writeFile(path.join(stage,'index.html'),html);
-for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','personal-backup.js','memory-import.js','huion-archive.js','landscape-ui.css','landscape-ui.js','floating-ui.css','floating-ui.js','floating-geometry.mjs','floating-page-x10.js','library-page-ui.js','android-ui-main.js','menu-v019.js','menu-v019.css','library-v021.js','library-v021.css','battery-ui-v022.js','battery-ui-v022.css'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
+for(const file of ['mobile-ui.css','mobile-ui.js','replay.js','replay-timeline.mjs','export-native.js','share-documents.js','personal-backup.js','memory-import.js','huion-archive.js','landscape-ui.css','landscape-ui.js','floating-ui.css','floating-ui.js','floating-geometry.mjs','floating-page-x10.js','library-page-ui.js','android-ui-main.js','menu-v019.js','menu-v019.css','library-v021.js','library-v021.css','battery-ui-v022.js','battery-ui-v022.css'])await fs.copyFile(path.join(project,'src',file),path.join(stage,file));
 console.log('Mi Note Android V0.6 preparado: escritura principal y X10 directo');
 
 // Solo en el paquete Android: acceso seguro a una copia de la hoja actual.
@@ -111,7 +123,7 @@ let app=await fs.readFile(appFile,'utf8');
 const replayHook="window.MiNoteReplaySnapshot=()=>({title:page().title,template:page().template,strokes:clone(page().strokes)});";
 if(!app.includes('start();'))throw Error('No se pudo registrar la lectura de la hoja');
 app=app.replace(/start\(\);\s*$/,match=>match+'\n'+replayHook+'\n'
- +'window.MiNoteBackupSnapshot=()=>({schema:VERSION,notebooks:clone(state.notebooks),exportedAt:now()});\n'
+ +'window.MiNoteExportSnapshot=()=>{x10Flush();const nb=note();return {id:nb.id,title:nb.title,pageId:page().id,pages:clone(nb.pages)};};\n'\n +'window.MiNoteExportSvg=(pg)=>svgFor(pg);\n'\n +'window.MiNoteBackupSnapshot=()=>({schema:VERSION,notebooks:clone(state.notebooks),exportedAt:now()});\n'
  +'window.MiNoteBackupMerge=(data)=>mergeBackup(data);\n');
 await fs.writeFile(appFile,app);
 
