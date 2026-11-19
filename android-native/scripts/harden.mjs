@@ -9,8 +9,9 @@ xml=xml.replace(/<uses-permission\s+android:name="android.permission.INTERNET"\s
 xml=xml.replace(/<uses-permission\s+android:name="android.permission.ACCESS_FINE_LOCATION"[^>]*\/>/g,'');
 xml=xml.replace(/<uses-permission\s+android:name="android.permission.ACCESS_COARSE_LOCATION"[^>]*\/>/g,'');
 xml=xml.replace(/<uses-permission\s+android:name="android.permission.ACCESS_BACKGROUND_LOCATION"[^>]*\/>/g,'');
-xml=xml.replace('<application ', '<uses-permission android:name="android.permission.INTERNET" tools:node="remove" />\n'
- +'    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove" />\n'
+// La V0.54 permite INTERNET exclusivamente para descargar el modelo español
+// bajo una acción explícita; setup.mjs declara el permiso después de este paso.
+xml=xml.replace('<application ', '<uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove" />\n'
  +'    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" tools:node="replace" />\n'
  +'    <application ');
 xml=xml.replace(/android:allowBackup="[^"]*"/g,'android:allowBackup="false"');
@@ -35,4 +36,4 @@ if(!grad.includes('versionCode 4')){
  grad=grad.replace(/versionName\s+["'][^"']+["']/,'versionName "0.4.0"');
 }
 await fs.writeFile(gradle,grad);
-console.log('Android: permisos limitados, red desactivada, backup desactivado y versión 0.4.0.');
+console.log('Android: permisos limitados, modelo opcional de reconocimiento, backup desactivado y versión final definida por workflow.');
