@@ -47,3 +47,7 @@ Se ejecuta `native-backup/setup.mjs` después de sincronizar Capacitor para regi
 `src/math/math-auto.mjs` analiza ventanas pequeñas de tinta recién finalizada; `src/math/math-worker.js` procesa la geometría y las coincidencias del reconocedor experimental `src/math/math-ink-ocr.mjs`. El controlador `math-controller.js` guarda únicamente mejoras de alta confianza en `mathLayer`. La compilación conecta los eventos `minote:stroke-finished` al final de un trazo BLE o táctil mediante `scripts/math-stage.mjs`.
 
 El reconocedor **no usa un modelo entrenado**, no envía datos y no garantiza reconocimiento de cualquier caligrafía. No altera valores matemáticos por inferencia. Se conserva la capacidad de introducir una corrección manual en el panel. No se toca el protocolo BLE ni el importador de memoria.
+
+## GeoInk: referencia conceptual, sin dependencia PWA
+
+El módulo nuevo `src/math/math-strong-geometry.mjs` reimplementa de manera local los principios de simplificación y ajuste de segmentos de GeoInk V2 para mejorar curvas y ajustar vértices. No utiliza los scripts de aquella PWA, ni toca `x10-ble.js` ni `offline-x10.js`. Funciona en Web Worker al levantar el lápiz. Si el usuario desactiva el modo matemático, reaparecen los trazos originales.
