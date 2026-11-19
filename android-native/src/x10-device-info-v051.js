@@ -29,7 +29,7 @@ root.innerHTML=[
 ].join('');
 status.before(root);
 const $=id=>document.getElementById(id);
-let connected=false,level=null,lastIndex=null,queryTimer=0;
+let connected=false,level=null,lastIndex=null,queryTimer=0,queryReceived=false;
 function paint(){
  const meter=$('x10BatteryMeter');
  const valid=connected&&Number.isInteger(level)&&level>=0&&level<=100;
@@ -59,6 +59,7 @@ window.addEventListener('minote:x10-memory-index',event=>{
  const index=event.detail?.lastIndex;
  if(Number.isInteger(index)&&index>=0&&index<=65535){
   lastIndex=index;
+  queryReceived=true;
   clearTimeout(queryTimer);
   $('x10DeviceHint').textContent='Consulta de solo lectura. El índice informado no permite calcular la memoria libre.';
   paint();
@@ -70,6 +71,7 @@ dialog.addEventListener('close',()=>clearTimeout(queryTimer));
 $('x10DeviceRefresh').addEventListener('click',async()=>{
  if(!connected)return;
  const hint=$('x10DeviceHint');
+ queryReceived=false;
  hint.textContent='Consultando batería e índice de páginas sin borrar contenido…';
  try{
   if(typeof window.MiNoteX10BatteryRefresh==='function')
@@ -78,8 +80,8 @@ $('x10DeviceRefresh').addEventListener('click',async()=>{
   if(typeof api?.queryMemoryIndex==='function'){
    await api.queryMemoryIndex();
    clearTimeout(queryTimer);
-   queryTimer=setTimeout(()=>{
-    hint.textContent='La Huion no respondió con un índice. No se borró ni modificó su memoria.';
+   if(!queryReceived)queryTimer=setTimeout(()=>{
+    if(!queryReceived)hint.textContent='La Huion no respondió con un índice. No se borró ni modificó su memoria.';
    },4500);
   }else hint.textContent='Consulta de memoria no disponible en esta versión.';
  }catch(error){
