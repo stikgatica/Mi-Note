@@ -139,8 +139,8 @@ public class MiNoteCalendarPlugin extends Plugin {
     intent.putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME,start.getTimeInMillis());
     intent.putExtra(CalendarContract.EXTRA_EVENT_END_TIME,end.getTimeInMillis());
    }
-   if(intent.resolveActivity(getContext().getPackageManager())==null)
-    throw new ActivityNotFoundException("No hay aplicación de calendario disponible.");
+   // Android 11+ puede ocultar paquetes en resolveActivity aunque haya un
+   // calendario instalado. Intentar abrir directamente y capturar el error.
    getActivity().startActivity(intent);
    JSObject o=new JSObject();o.put("opened",true);
    call.resolve(o);
