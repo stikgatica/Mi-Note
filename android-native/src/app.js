@@ -278,6 +278,36 @@ function setupX10(){
    notice('La Huion X10 ya está conectada.');return;
   }
   x10ManualPause=false;x10CancelRetry();x10AutoTries=0;
+  // El identificador fue guardado únicamente después de una selección y
+  // conexión exitosas. En Android el adaptador BLE puede conectar por ID sin
+  // volver a buscar ni mostrar el selector de dispositivos.
+  const rememberedId=localStorage.getItem('minote_x10_device_id');
+  if(rememberedId&&window.MiNoteNativeBLE?.getSavedDevice){
+   const connection=x10MakeConnection();
+   x10Connection=connection;
+   const attempt=Symbol('X10 recordada');
+   x10ManualAttempt=attempt;
+   x10SetStatus('Reconectando Huion X10 guardada sin buscar dispositivos…');
+   x10Details();
+   Promise.resolve().then(()=>window.MiNoteNativeBLE.getSavedDevice(rememberedId))
+    .then(async device=>{
+     if(x10ManualAttempt!==attempt)return;
+     if(!device?.gatt)throw Error('No se pudo recuperar la X10 guardada.');
+     await connection.connectSaved(device);
+     if(x10ManualAttempt!==attempt)return;
+     x10InMemoryDevice=device;
+     x10SetStatus('X10 guardada conectada. Ya puedes escribir.');
+     notice('Huion X10 reconectada sin abrir el selector Bluetooth.');
+     x10Details();
+    }).catch(error=>{
+     if(x10ManualAttempt!==attempt)return;
+     x10SetStatus('Error al reconectar la X10 guardada: '+error.message+
+      '. Enciende la agenda y vuelve a tocar Bluetooth; para cambiarla, usa Conectar X10 en los ajustes.');
+     x10Details();
+    });
+   return;
+  }
+  // Sin dispositivo previamente vinculado: solo entonces abrir el selector.
   const connection=x10MakeConnection();x10Connection=connection;
   let chooser;
   // CRÍTICO: requestDevice() se inicia directamente en el clic, sin awaits,
