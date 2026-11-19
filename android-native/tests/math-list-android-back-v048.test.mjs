@@ -48,7 +48,7 @@ test('Atrás nativo cierra interfaces primero sin salir cuando hay diálogo',()=
  assert.match(nav,/App.addListener\('backButton'/);
  assert.match(nav,/closeTopLayer\(\)/);
  assert.match(nav,/dialog\[open\]/);
- assert.match(nav,/document\.body\.classList\.contains\('library-open'\)/);
+ assert.match(nav,/doc\.body\.classList\.contains\('library-open'\)/);
  assert.match(nav,/top\.close\(\)/);
  assert.match(nav,/App.minimizeApp\(\)/);
  assert.match(ui,/import\('\.\/android-back\.js'\)/);
