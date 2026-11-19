@@ -6,6 +6,7 @@ import { createNativeBLE } from './ble-adapter.js';
 if (Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform()) {
   window.MiNoteNativeBLE = createNativeBLE(BleClient);
   window.MiNotePrivateBackup = registerPlugin('PrivateBackup');
+  window.MiNoteFileExport = registerPlugin('MiNoteFileExport');
 } else {
   console.warn('Este paquete Android necesita ejecutarse con Capacitor nativo.');
 }
