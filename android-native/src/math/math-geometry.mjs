@@ -65,7 +65,10 @@ function polygonOf(raw,forced=false){
  let pts=raw.slice();if(near)pts.pop();
  let far=1,dist=0;
  for(let i=1;i<pts.length;i++){const v=d(pts[0],pts[i]);if(v>dist){far=i;dist=v;}}
- if(far===pts.length-1||far===0)return null;
+ // Si el vértice más alejado es el último antes de cerrar, dividir por un
+ // vértice intermedio en lugar de descartar un triángulo legítimo.
+ if(far===pts.length-1)far=Math.floor(pts.length/2);
+ if(far===0||far===pts.length-1)return null;
  const epsilon=Math.max(4,diag*.026);
  const a=simplify(pts.slice(0,far+1),epsilon),b=simplify([...pts.slice(far),pts[0]],epsilon);
  const corners=[...a.slice(0,-1),...b.slice(0,-1)];
