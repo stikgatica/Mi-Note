@@ -100,7 +100,8 @@ export function mergeAutomatic(objects,recognized){
  const unchanged=conflicted.length===1&&
   conflicted[0].type===recognized.type&&
   conflicted[0].sources.length===recognized.sources.length&&
-  conflicted[0].sources.every(x=>signatures.has(x.id+':'+x.signature));
+  conflicted[0].sources.every(x=>signatures.has(x.id+':'+x.signature))&&
+  JSON.stringify(conflicted[0].geometry)===JSON.stringify(recognized.geometry);
  if(unchanged)return null;
  const keep=(objects||[]).filter(o=>!conflicted.includes(o));
  return {objects:keep,replaced:conflicted.map(o=>o.id)};
