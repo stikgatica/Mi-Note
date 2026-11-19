@@ -123,7 +123,9 @@ let app=await fs.readFile(appFile,'utf8');
 const replayHook="window.MiNoteReplaySnapshot=()=>({title:page().title,template:page().template,strokes:clone(page().strokes)});";
 if(!app.includes('start();'))throw Error('No se pudo registrar la lectura de la hoja');
 app=app.replace(/start\(\);\s*$/,match=>match+'\n'+replayHook+'\n'
- +'window.MiNoteExportSnapshot=()=>{x10Flush();const nb=note();return {id:nb.id,title:nb.title,pageId:page().id,pages:clone(nb.pages)};};\n'\n +'window.MiNoteExportSvg=(pg)=>svgFor(pg);\n'\n +'window.MiNoteBackupSnapshot=()=>({schema:VERSION,notebooks:clone(state.notebooks),exportedAt:now()});\n'
+ +'window.MiNoteExportSnapshot=()=>{x10Flush();const nb=note();return {id:nb.id,title:nb.title,pageId:page().id,pages:clone(nb.pages)};};\n'
+ +'window.MiNoteExportSvg=(pg)=>svgFor(pg);\n'
+ +'window.MiNoteBackupSnapshot=()=>({schema:VERSION,notebooks:clone(state.notebooks),exportedAt:now()});\n'
  +'window.MiNoteBackupMerge=(data)=>mergeBackup(data);\n');
 await fs.writeFile(appFile,app);
 
