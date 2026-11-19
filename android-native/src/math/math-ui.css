@@ -1,4 +1,4 @@
-/* Matemática: módulo opcional; no cambia el estilo ni el rendimiento de la tinta. */
+/* Matemática automática: módulo opcional; analiza solo trazos finalizados. */
 #mathOverlay{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;background:transparent;overflow:visible;}
 #mathOverlay[hidden]{display:none!important;}
 #paper.math-selecting{cursor:crosshair!important;touch-action:none!important;}
