@@ -148,7 +148,7 @@ async function recognize({silent=false}={}){
    // Usar primero la lectura por renglones; nunca crear una propuesta mezclando títulos.
    const contextual=extractImportedReminders(result.text||selected,{now:new Date()});
    if(contextual.length){
-    for(const proposal of contextual)enqueueImportedSuggestion(proposal,{imported:false});
+    for(const proposal of contextual)enqueueImportedSuggestion(proposal,{imported:false,pageId:snapshot()?.id||''});
     maybeShowNextSuggestion();
     return;
    }
@@ -156,7 +156,7 @@ async function recognize({silent=false}={}){
    const signature=reminderKey(event);
    if(signature===suggestionSignature)return;
    suggestionSignature=signature;
-   enqueueImportedSuggestion(event,{imported:false});
+   enqueueImportedSuggestion(event,{imported:false,pageId:snapshot()?.id||''});
    maybeShowNextSuggestion();
   }
  }catch(error){
