@@ -62,3 +62,10 @@ body.minote-android #miNoteCalendarSuggestion .minote-suggestion-actions button:
   bottom:max(8px,env(safe-area-inset-bottom))!important;
  }
 }
+
+/* V0.58: estado de OCR tras leer páginas de memoria X10. */
+body.minote-android .minote-calendar-import-summary{
+ margin:10px 0;padding:9px 11px;border:1px solid #c6dce9;
+ background:#f2f8fd;color:#315773;border-radius:10px;
+ font-size:12px;line-height:1.45;
+}
