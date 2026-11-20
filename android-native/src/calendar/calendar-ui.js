@@ -29,7 +29,7 @@ dialog.innerHTML=[
  '<p class="minote-calendar-explain">Reconozca sus notas de forma privada y revise las fechas antes de preparar el evento. Mi Note nunca guarda eventos sin su autorización.</p>',
  '<div class="minote-calendar-row"><button type="button" id="miNoteCalendarScan">Reconocer escritura de esta hoja</button>',
  '<button type="button" id="miNoteCalendarDownload">Descargar modelo español</button></div>',
- '<label class="minote-calendar-opt"><input id="miNoteCalendarAuto" type="checkbox"> Detectar posibles recordatorios automáticamente al terminar de escribir (opcional)</label>',
+ '<label class="minote-calendar-opt"><input id="miNoteCalendarAuto" type="checkbox"> Detectar compromisos y guardarlos en la bandeja de revisión (opcional)</label>',
  '<p class="minote-calendar-hint">El reconocimiento usa ML Kit en el celular. La primera descarga del modelo necesita internet; después funciona sin conexión. La tinta no se envía a Google Calendar.</p>',
  '<label class="field">Texto reconocido (puede corregirlo)<textarea id="miNoteCalendarText" rows="4" placeholder="Ej. Reunión Consejo Escolar, 25 de noviembre 15:30"></textarea></label>',
  '<button type="button" id="miNoteCalendarExtract">Detectar fecha y horario</button>',
@@ -338,7 +338,11 @@ function renderInbox(){
     }catch(error){alert('No se pudo abrir Calendar: '+error.message);}
    });
   }
-  makeButton('Editar',()=>{
+  makeButton(e.possibleCorrection&&e.previousStatus==='opened'?'Cómo actualizar':'Editar',()=>{
+   if(e.possibleCorrection&&e.previousStatus==='opened'){
+    alert('Mi Note no puede editar eventos existentes en Google Calendar. Abra el evento original en su calendario y cambie la hora manualmente. Cuando termine, pulse «Ya lo revisé» en esta bandeja.');
+    return;
+   }
    editingInboxId=item.id;
    inboxDialog.close();
    show();
