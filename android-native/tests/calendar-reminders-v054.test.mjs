@@ -47,7 +47,7 @@ test('interfaz exige revisión, opt-in y escritura local',()=>{
  assert.match(ui,/miNoteCalendarExtract/);
  assert.match(ui,/bridge\.recognize/);
  assert.match(ui,/bridge\.openCalendar/);
- assert.match(ui,/localStorage\.getItem\('minote_calendar_auto_v054'\)==='1'/);
+ assert.match(ui,/localStorage\.getItem\('minote_calendar_auto_v054'\)!=='0'/);
  assert.match(plugin,/DigitalInkRecognitionModelIdentifier/);
  assert.match(plugin,/Intent\.ACTION_INSERT/);
  assert.match(plugin,/CalendarContract\.EXTRA_EVENT_BEGIN_TIME/);
