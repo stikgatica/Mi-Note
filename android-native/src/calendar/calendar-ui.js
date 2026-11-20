@@ -46,20 +46,25 @@ let busy=false,modelAvailable=false,detectTimer=0,lastSignature='',suggestionSig
 try{auto.checked=localStorage.getItem('minote_calendar_auto_v054')==='1';}catch{}
 auto.addEventListener('change',()=>{
  try{localStorage.setItem('minote_calendar_auto_v054',auto.checked?'1':'0');}catch{}
+ if(!auto.checked)clearTimeout(detectTimer);
+ else void checkModel({silent:true});
  status(auto.checked?'Detección automática activada. Solo se proponen eventos con fechas reconocibles.':
   'Detección automática desactivada.');
 });
 function toggleTime(){time.disabled=allDay.checked;}
 allDay.addEventListener('change',toggleTime);
 toggleTime();
-async function checkModel(){
+async function checkModel({silent=false}={}){
  try{
   const state=await bridge.modelStatus();
   modelAvailable=!!state.downloaded;
   $('miNoteCalendarDownload').hidden=modelAvailable;
-  status(modelAvailable?'Modelo español disponible. El reconocimiento se ejecuta en su teléfono.':
+  if(!silent)status(modelAvailable?'Modelo español disponible. El reconocimiento se ejecuta en su teléfono.':
    'Para reconocer escritura, descargue una vez el modelo español (~20 MB). También puede escribir el recordatorio manualmente.');
- }catch(error){status('Reconocimiento automático no disponible: '+error.message+'. Puede escribir el recordatorio manualmente.');}
+ }catch(error){
+  modelAvailable=false;
+  if(!silent)status('Reconocimiento automático no disponible: '+error.message+'. Puede escribir el recordatorio manualmente.');
+ }
 }
 function show(){
  if(shell.open)shell.close();
@@ -181,4 +186,10 @@ document.addEventListener('minote:stroke-finished',()=>{
   void recognize({silent:true});
  },6500);
 });
-document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeout(detectTimer);});
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden)clearTimeout(detectTimer);
+ else if(auto.checked)void checkModel({silent:true});
+});
+// Recuperar el estado real de ML Kit al iniciar la app; la casilla se
+// conserva entre sesiones, pero modelAvailable comienza en false.
+if(auto.checked)void checkModel({silent:true});
