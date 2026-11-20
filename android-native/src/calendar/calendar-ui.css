@@ -15,3 +15,8 @@ background:#f3f9ff;color:#123d68;border:1px solid #9ac8ed;border-radius:12px;pad
 body.minote-android #miNoteCalendarSuggestion[hidden]{display:none!important;}
 @media(orientation:landscape){body.minote-android .minote-calendar-dialog{max-height:calc(100dvh - 14px)!important;width:min(85vw,650px);}}
 @media(max-width:350px){body.minote-android .minote-calendar-row{grid-template-columns:1fr;}}
+
+/* V0.55: la detección confirma el resultado justo debajo del botón. */
+body.minote-android .minote-calendar-detection-feedback{font-size:12px;line-height:1.35;margin:7px 0 12px;padding:9px 11px;color:#49647c;background:#f4f8fc;border:1px solid #dce6f0;border-radius:8px;}
+body.minote-android .minote-calendar-detection-feedback[data-state="success"]{color:#24583b;background:#f0f9f2;border-color:#afd8bb;}
+body.minote-android .minote-calendar-detection-feedback[data-state="error"]{color:#8b3d29;background:#fff5f2;border-color:#e8bbb1;}
