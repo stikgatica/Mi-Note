@@ -68,7 +68,7 @@ test('la importación X10 emite hojas tras persistir y no manipula memoria físi
  assert.match(ui,/minote:x10-import-finished/);
  assert.match(ui,/recognizeImportedPage\(pg,args=>bridge\.recognize\(args\)\)/);
  assert.match(ui,/importDialog\?\.addEventListener\('close'/);
- assert.match(ui,/suggestionQueue\.push/);
+ assert.match(ui,/agendaInbox\.add/);
  assert.match(ui,/maybeShowNextSuggestion/);
 });
 test('APK V0.58',()=>{
