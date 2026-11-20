@@ -121,7 +121,7 @@ async function recognize({silent=false}={}){
   const mathMode=!!window.MiNoteMath?.enabled;
   const automatic=silent?candidates.map(x=>({text:x,event:autoReminderCandidate(x,{mathMode})}))
    .find(item=>item.event):null;
-  const selected=silent?(automatic?.text||''):(candidates.find(x=>parseReminder(x))||result.text||'');
+  const selected=silent?(result.text||automatic?.text||''):(candidates.find(x=>parseReminder(x))||result.text||'');
   if(!selected.trim()){
    if(!silent)status('No se pudo reconocer texto en la hoja. Puede escribir el recordatorio manualmente.');
    return;
@@ -129,11 +129,12 @@ async function recognize({silent=false}={}){
   if(!silent){textBox.value=selected;applyText();status('Texto reconocido. Revise el título, fecha y hora antes de continuar.');}
   else{
    const event=automatic?.event;
-   // Revisar toda la hoja con contexto: no limitar a la primera cita encontrada.
-   const contextual=extractImportedReminders(result.text||'',{now:new Date()});
-   for(const proposal of contextual){
-    if(event&&reminderKey(proposal)===reminderKey(event))continue;
-    enqueueImportedSuggestion(proposal,{imported:false});
+   // Usar primero la lectura por renglones; nunca crear una propuesta mezclando títulos.
+   const contextual=extractImportedReminders(result.text||selected,{now:new Date()});
+   if(contextual.length){
+    for(const proposal of contextual)enqueueImportedSuggestion(proposal,{imported:false});
+    maybeShowNextSuggestion();
+    return;
    }
    if(!event||ledger.has(event)||pendingReminder){maybeShowNextSuggestion();return;}
    const signature=reminderKey(event);
