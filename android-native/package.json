@@ -1,7 +1,7 @@
 {
   "name": "mi-note-x10-android",
   "private": true,
-  "version": "0.58.0",
+  "version": "0.59.0",
   "type": "module",
   "description": "Mi Note X10: aplicación Android Capacitor con BLE Huion modo agenda, cuadernos locales y respaldo privado",
   "scripts": {
