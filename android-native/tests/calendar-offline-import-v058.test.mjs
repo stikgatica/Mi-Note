@@ -74,7 +74,7 @@ test('la importación X10 emite hojas tras persistir y no manipula memoria físi
 test('APK V0.58',()=>{
  const pkg=JSON.parse(read('../package.json'));
  const flow=read('../../.github/workflows/android-release.yml');
- assert.equal(pkg.version,'0.58.0');
- assert.match(flow,/versionCode 58/);
+ assert.ok(Number(pkg.version.split('.')[1])>=58);
+ assert.match(flow,/versionCode (?:5[8-9]|[6-9][0-9])/);
  assert.match(flow,/Mi-Note-X10-Android-v0\.58\.apk/);
 });

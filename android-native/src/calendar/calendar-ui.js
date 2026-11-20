@@ -3,7 +3,7 @@
 import {registerPlugin} from '@capacitor/core';
 import {parseReminder,calendarDraftIsValid} from './reminder-parser.mjs';
 import {autoReminderCandidate,reminderKey,createReminderLedger} from './reminder-auto.mjs';
-import {recognizeImportedPage} from './import-reminders.mjs';
+import {recognizeImportedPage,extractImportedReminders} from './import-reminders.mjs';
 import './calendar-ui.css';
 const bridge=registerPlugin('MiNoteCalendar');
 const $=id=>document.getElementById(id);
@@ -121,7 +121,7 @@ async function recognize({silent=false}={}){
   const mathMode=!!window.MiNoteMath?.enabled;
   const automatic=silent?candidates.map(x=>({text:x,event:autoReminderCandidate(x,{mathMode})}))
    .find(item=>item.event):null;
-  const selected=silent?(automatic?.text||''):(candidates.find(x=>parseReminder(x))||result.text||'');
+  const selected=silent?(result.text||automatic?.text||''):(candidates.find(x=>parseReminder(x))||result.text||'');
   if(!selected.trim()){
    if(!silent)status('No se pudo reconocer texto en la hoja. Puede escribir el recordatorio manualmente.');
    return;
@@ -129,12 +129,20 @@ async function recognize({silent=false}={}){
   if(!silent){textBox.value=selected;applyText();status('Texto reconocido. Revise el título, fecha y hora antes de continuar.');}
   else{
    const event=automatic?.event;
-   if(!event||ledger.has(event)||pendingReminder)return;
+   // Usar primero la lectura por renglones; nunca crear una propuesta mezclando títulos.
+   const contextual=extractImportedReminders(result.text||selected,{now:new Date()});
+   if(contextual.length){
+    for(const proposal of contextual)enqueueImportedSuggestion(proposal,{imported:false});
+    maybeShowNextSuggestion();
+    return;
+   }
+   if(!event||ledger.has(event)||pendingReminder){maybeShowNextSuggestion();return;}
    const signature=reminderKey(event);
    if(signature===suggestionSignature)return;
    suggestionSignature=signature;
    textBox.value=selected;applyText();
    announce(event);
+   maybeShowNextSuggestion();
   }
  }catch(error){
   if(!silent)status('No fue posible interpretar la escritura: '+error.message+'. Puede escribir el recordatorio manualmente.');
@@ -251,11 +259,11 @@ importInfo.textContent='Al recuperar hojas nuevas, Mi Note buscará reuniones y 
 const memoryStatus=$('x10MemoryProgress');
 if(memoryStatus)memoryStatus.after(importInfo);
 function importedSummary(text){importInfo.textContent=text;}
-function enqueueImportedSuggestion(event){
+function enqueueImportedSuggestion(event,{imported=true}={}){
  const key=reminderKey(event);
  if(!key||ledger.has(event)||suggestionQueue.some(x=>reminderKey(x)===key)||
   pendingReminder&&reminderKey(pendingReminder)===key)return;
- suggestionQueue.push({...event,fromImportedPage:true});
+ suggestionQueue.push({...event,fromImportedPage:imported});
 }
 function maybeShowNextSuggestion(){
  if(document.hidden||pendingReminder||dialog.open||importDialog?.open||archiveDialog?.open||
