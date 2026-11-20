@@ -2,6 +2,7 @@
  * Soporta varias fechas por página y agrupa trazos en renglones de forma conservadora.
  * No escribe en Google Calendar ni en el dispositivo Huion. */
 import {autoReminderCandidate,reminderKey} from './reminder-auto.mjs';
+import {extractContextualAgenda} from './agenda-context.mjs';
 
 const DATE=/\b(?:20\d{2}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[./-]\d{1,2}(?:[./-](?:20\d{2}|\d{2}))?|\d{1,2}\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+(?:de|del)\s+\d{2,4})?)\b/gi;
 const AFTER_TIME=/^\s*(?:a\s+las?\s+)?(?:[01]?\d|2[0-3])[:h.]?[0-5]\d(?:\s*(?:hrs?|horas?))?/i;
@@ -9,11 +10,11 @@ const MAX_BANDS=12;
 const MAX_STROKES=250;
 const MAX_POINTS=14000;
 
-export function extractImportedReminders(text,{now=new Date()}={}){
+export function extractImportedReminders(text,{now=new Date(),heading='',pageDate=null}={}){
  const input=String(text||'').replace(/\r/g,' ').trim().slice(0,3000);
  if(!input)return [];
  const found=[...input.matchAll(DATE)];
- if(!found.length)return [];
+ if(!found.length)return extractContextualAgenda(input,{now,heading,pageDate});
  const out=[],known=new Set();
  let segmentStart=0;
  for(const match of found.slice(0,30)){
@@ -29,7 +30,11 @@ export function extractImportedReminders(text,{now=new Date()}={}){
   }
   segmentStart=end;
  }
- return out;
+ for(const item of extractContextualAgenda(input,{now,heading,pageDate})){
+  const key=reminderKey(item);
+  if(key&&!known.has(key)){known.add(key);out.push(item);}
+ }
+ return out.slice(0,25);
 }
 function strokePoints(stroke){
  return (stroke?.pts||[]).filter(p=>Array.isArray(p)&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&p[0]>=0&&p[0]<=1000&&p[1]>=0&&p[1]<=1400);
@@ -86,7 +91,7 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
  if(!bands.length)return [];
  const seen=new Set(),events=[];
  const remember=text=>{
-  for(const event of extractImportedReminders(text,{now})){
+  for(const event of extractImportedReminders(text,{now,heading:page.notebookTitle||page.title||'',pageDate:page.createdAt||null})){
    const key=reminderKey(event);
    if(key&&!seen.has(key)){seen.add(key);events.push(event);}
   }
@@ -94,6 +99,7 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
  // Primero intentar leer toda la página si cabe: conserva encabezados.
  const full=compactStrokes(bands.flat());
  const requests=[];
+ const recognizedBands=[];
  if(full.length>=2&&full.length<=MAX_STROKES)requests.push(full);
  if(bands.length>1){
   for(const band of bands){
@@ -101,12 +107,14 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
    if(chunk.length>=2)requests.push(chunk);
   }
  }
- for(const strokes of requests.slice(0,MAX_BANDS+1)){
+ for(const [index,strokes] of requests.slice(0,MAX_BANDS+1).entries()){
   try{
    const result=await recognize({strokes});
    const options=[result?.text,...(Array.isArray(result?.candidates)?result.candidates:[])].filter(x=>typeof x==='string');
    for(const option of options.slice(0,4))remember(option);
+   if(index>0&&options[0])recognizedBands.push(options[0]);
   }catch{/* Una lectura fallida no impide revisar otros renglones. */}
  }
+ if(recognizedBands.length>1)remember(recognizedBands.join('\n'));
  return events.slice(0,25);
 }
