@@ -3,7 +3,7 @@
 import {registerPlugin} from '@capacitor/core';
 import {parseReminder,calendarDraftIsValid} from './reminder-parser.mjs';
 import {autoReminderCandidate,reminderKey,createReminderLedger} from './reminder-auto.mjs';
-import {recognizeImportedPage} from './import-reminders.mjs';
+import {recognizeImportedPage,extractImportedReminders} from './import-reminders.mjs';
 import './calendar-ui.css';
 const bridge=registerPlugin('MiNoteCalendar');
 const $=id=>document.getElementById(id);
@@ -129,12 +129,19 @@ async function recognize({silent=false}={}){
   if(!silent){textBox.value=selected;applyText();status('Texto reconocido. Revise el título, fecha y hora antes de continuar.');}
   else{
    const event=automatic?.event;
-   if(!event||ledger.has(event)||pendingReminder)return;
+   // Revisar toda la hoja con contexto: no limitar a la primera cita encontrada.
+   const contextual=extractImportedReminders(result.text||'',{now:new Date()});
+   for(const proposal of contextual){
+    if(event&&reminderKey(proposal)===reminderKey(event))continue;
+    enqueueImportedSuggestion(proposal,{imported:false});
+   }
+   if(!event||ledger.has(event)||pendingReminder){maybeShowNextSuggestion();return;}
    const signature=reminderKey(event);
    if(signature===suggestionSignature)return;
    suggestionSignature=signature;
    textBox.value=selected;applyText();
    announce(event);
+   maybeShowNextSuggestion();
   }
  }catch(error){
   if(!silent)status('No fue posible interpretar la escritura: '+error.message+'. Puede escribir el recordatorio manualmente.');
@@ -251,11 +258,11 @@ importInfo.textContent='Al recuperar hojas nuevas, Mi Note buscará reuniones y 
 const memoryStatus=$('x10MemoryProgress');
 if(memoryStatus)memoryStatus.after(importInfo);
 function importedSummary(text){importInfo.textContent=text;}
-function enqueueImportedSuggestion(event){
+function enqueueImportedSuggestion(event,{imported=true}={}){
  const key=reminderKey(event);
  if(!key||ledger.has(event)||suggestionQueue.some(x=>reminderKey(x)===key)||
   pendingReminder&&reminderKey(pendingReminder)===key)return;
- suggestionQueue.push({...event,fromImportedPage:true});
+ suggestionQueue.push({...event,fromImportedPage:imported});
 }
 function maybeShowNextSuggestion(){
  if(document.hidden||pendingReminder||dialog.open||importDialog?.open||archiveDialog?.open||
