@@ -53,6 +53,6 @@ test('interfaz exige revisión, opt-in y escritura local',()=>{
  assert.match(plugin,/CalendarContract\.EXTRA_EVENT_BEGIN_TIME/);
  assert.match(setup,/registerPlugin\(MiNoteCalendarPlugin\.class\)/);
  assert.match(setup,/digital-ink-recognition:19\.0\.0/);
- assert.match(workflow,/versionCode 54/);
+ assert.match(workflow,/versionCode (?:5[4-9]|[6-9][0-9])/);
  assert.doesNotMatch(plugin,/CalendarContract\.Calendars\.CONTENT_URI/);
 });

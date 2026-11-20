@@ -20,7 +20,9 @@ export function parseReminder(text,now=new Date()){
  const iso=/\b(20\d{2})[-/](0?[1-9]|1[0-2])[-/](0?[1-9]|[12]\d|3[01])\b/g;
  while((match=iso.exec(normalized))&&!found)found=dateFrom(match,match[3],match[2],match[1],now);
  if(!found){
-  const numeric=/\b(0?[1-9]|[12]\d|3[01])([\/.-])(0?[1-9]|1[0-2])\2(20\d{2}|\d{2})?\b/g;
+  // Acepta DD/MM, DD-MM y DD.MM sin año; el separador previo al año es opcional.
+  // Con año explícito exige el mismo separador que el usado entre día y mes.
+  const numeric=/\b(0?[1-9]|[12]\d|3[01])([\/.-])(0?[1-9]|1[0-2])(?:\2(20\d{2}|\d{2}))?\b(?![\/.-]\d)/g;
   while((match=numeric.exec(normalized))&&!found)found=dateFrom(match,match[1],match[3],match[4],now);
  }
  if(!found){
