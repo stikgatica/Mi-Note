@@ -2,6 +2,7 @@
  * Nunca crea eventos automáticamente; la persona confirma en Calendar Android. */
 import {registerPlugin} from '@capacitor/core';
 import {parseReminder,calendarDraftIsValid} from './reminder-parser.mjs';
+import {autoReminderCandidate,reminderKey,createReminderLedger} from './reminder-auto.mjs';
 import './calendar-ui.css';
 const bridge=registerPlugin('MiNoteCalendar');
 const $=id=>document.getElementById(id);
@@ -42,11 +43,13 @@ const status=(str)=>{$('miNoteCalendarStatus').textContent=str;};
 const auto=$('miNoteCalendarAuto'),textBox=$('miNoteCalendarText'),allDay=$('miNoteCalendarAllDay');
 const eventTitle=$('miNoteCalendarEventTitle'),date=$('miNoteCalendarDate'),time=$('miNoteCalendarTime');
 const desc=$('miNoteCalendarDescription');
-let busy=false,modelAvailable=false,detectTimer=0,lastSignature='',suggestionSignature='';
-try{auto.checked=localStorage.getItem('minote_calendar_auto_v054')==='1';}catch{}
+let busy=false,modelAvailable=false,detectTimer=0,lastSignature='',suggestionSignature='',pendingReminder=null;
+const ledger=createReminderLedger(window.localStorage);
+// Predeterminado activo cuando no existe una elección previa; desactivarlo se respeta.
+try{auto.checked=localStorage.getItem('minote_calendar_auto_v054')!=='0';}catch{auto.checked=true;}
 auto.addEventListener('change',()=>{
  try{localStorage.setItem('minote_calendar_auto_v054',auto.checked?'1':'0');}catch{}
- if(!auto.checked)clearTimeout(detectTimer);
+ if(!auto.checked){clearTimeout(detectTimer);closeSuggestion();}
  else void checkModel({silent:true});
  status(auto.checked?'Detección automática activada. Solo se proponen eventos con fechas reconocibles.':
   'Detección automática desactivada.');
@@ -110,16 +113,19 @@ async function recognize({silent=false}={}){
   const strokes=strokesForRecognition();
   const result=await bridge.recognize({strokes});
   const candidates=(result.candidates||[]).map(String);
-  const selected=candidates.find(x=>parseReminder(x))||result.text||'';
+  const mathMode=!!window.MiNoteMath?.enabled;
+  const automatic=silent?candidates.map(x=>({text:x,event:autoReminderCandidate(x,{mathMode})}))
+   .find(item=>item.event):null;
+  const selected=silent?(automatic?.text||''):(candidates.find(x=>parseReminder(x))||result.text||'');
   if(!selected.trim()){
    if(!silent)status('No se pudo reconocer texto en la hoja. Puede escribir el recordatorio manualmente.');
    return;
   }
   if(!silent){textBox.value=selected;applyText();status('Texto reconocido. Revise el título, fecha y hora antes de continuar.');}
   else{
-   const event=parseReminder(selected);
-   if(!event)return;
-   const signature=event.title+'|'+event.date+'|'+event.time;
+   const event=automatic?.event;
+   if(!event||ledger.has(event)||pendingReminder)return;
+   const signature=reminderKey(event);
    if(signature===suggestionSignature)return;
    suggestionSignature=signature;
    textBox.value=selected;applyText();
@@ -159,24 +165,71 @@ $('miNoteCalendarOpen').addEventListener('click',async()=>{
    ' en su calendario? Tendrá que confirmar el guardado en Calendar.'))return;
  try{
   await bridge.openCalendar(proposal);
+  // Se recuerda que ya se ofreció el evento; no se afirma que Calendar lo guardó.
+  ledger.mark(proposal,'opened');
+  closeSuggestion();
   status('Se abrió el formulario de Calendar. Revise la cuenta, los avisos y pulse Guardar allí.');
  }catch(err){status('No se pudo abrir Calendar: '+err.message+'. Instale o habilite una aplicación de calendario.');}
 });
+function closeSuggestion(){
+ const prompt=$('miNoteCalendarSuggestion');
+ if(prompt)prompt.hidden=true;
+ pendingReminder=null;
+ suggestionSignature='';
+}
+function formatProposal(event){
+ return event.date.split('-').reverse().join('/')+(event.time?' · '+event.time:' · Todo el día');
+}
 function announce(event){
- if(dialog.open)return;
+ if(dialog.open||ledger.has(event)||!auto.checked)return;
+ pendingReminder=event;
  let prompt=$('miNoteCalendarSuggestion');
  if(!prompt){
-  prompt=document.createElement('button');prompt.id='miNoteCalendarSuggestion';prompt.type='button';
-  prompt.addEventListener('click',()=>{prompt.hidden=true;show();});
+  prompt=document.createElement('section');
+  prompt.id='miNoteCalendarSuggestion';
+  prompt.setAttribute('role','alertdialog');
+  prompt.setAttribute('aria-label','Posible recordatorio detectado');
+  prompt.innerHTML=[
+   '<div class="minote-suggestion-title">¿Agregar este recordatorio a Calendar?</div>',
+   '<div class="minote-suggestion-event" id="miNoteCalendarSuggestionEvent"></div>',
+   '<div class="minote-suggestion-actions">',
+   '<button id="miNoteCalendarSuggestionAdd" type="button">Agregar</button>',
+   '<button id="miNoteCalendarSuggestionEdit" type="button">Editar</button>',
+   '<button id="miNoteCalendarSuggestionDismiss" type="button">Descartar</button>',
+   '</div>'
+  ].join('');
   document.body.append(prompt);
+  $('miNoteCalendarSuggestionAdd').addEventListener('click',async()=>{
+   const selected=pendingReminder;
+   if(!selected)return;
+   $('miNoteCalendarSuggestionAdd').disabled=true;
+   try{
+    // No guarda automáticamente: Android Calendar presenta el formulario.
+    await bridge.openCalendar({title:selected.title,date:selected.date,
+     time:selected.time,allDay:selected.allDay,description:''});
+    ledger.mark(selected,'opened');
+    closeSuggestion();
+   }catch(error){
+    status('No se pudo abrir Calendar: '+error.message);
+    $('miNoteCalendarSuggestionAdd').disabled=false;
+   }
+  });
+  $('miNoteCalendarSuggestionEdit').addEventListener('click',()=>{
+   if(!pendingReminder)return;
+   closeSuggestion();
+   show();
+  });
+  $('miNoteCalendarSuggestionDismiss').addEventListener('click',()=>{
+   if(pendingReminder)ledger.mark(pendingReminder,'dismissed');
+   closeSuggestion();
+  });
  }
- prompt.textContent='Posible recordatorio: '+event.title+' · '+event.date+' · Revisar';
+ $('miNoteCalendarSuggestionEvent').textContent=event.title+' · '+formatProposal(event);
+ $('miNoteCalendarSuggestionAdd').disabled=false;
  prompt.hidden=false;
- clearTimeout(announce.timeout);
- announce.timeout=setTimeout(()=>{prompt.hidden=true;},14000);
 }
 document.addEventListener('minote:stroke-finished',()=>{
- if(!auto.checked||!modelAvailable||document.hidden||dialog.open)return;
+ if(!auto.checked||!modelAvailable||document.hidden||dialog.open||window.MiNoteMath?.enabled)return;
  clearTimeout(detectTimer);
  detectTimer=setTimeout(()=>{
   const pg=snapshot();if(!pg)return;
@@ -187,7 +240,7 @@ document.addEventListener('minote:stroke-finished',()=>{
  },6500);
 });
 document.addEventListener('visibilitychange',()=>{
- if(document.hidden)clearTimeout(detectTimer);
+ if(document.hidden){clearTimeout(detectTimer);closeSuggestion();}
  else if(auto.checked)void checkModel({silent:true});
 });
 // Recuperar el estado real de ML Kit al iniciar la app; la casilla se

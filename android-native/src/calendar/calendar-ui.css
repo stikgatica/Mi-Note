@@ -20,3 +20,45 @@ body.minote-android #miNoteCalendarSuggestion[hidden]{display:none!important;}
 body.minote-android .minote-calendar-detection-feedback{font-size:12px;line-height:1.35;margin:7px 0 12px;padding:9px 11px;color:#49647c;background:#f4f8fc;border:1px solid #dce6f0;border-radius:8px;}
 body.minote-android .minote-calendar-detection-feedback[data-state="success"]{color:#24583b;background:#f0f9f2;border-color:#afd8bb;}
 body.minote-android .minote-calendar-detection-feedback[data-state="error"]{color:#8b3d29;background:#fff5f2;border-color:#e8bbb1;}
+
+/* V0.57: aviso discreto no modal. Permanece hasta agregar, editar o descartar. */
+body.minote-android #miNoteCalendarSuggestion{
+ position:fixed!important;z-index:980!important;
+ bottom:max(14px,env(safe-area-inset-bottom))!important;
+ left:max(10px,env(safe-area-inset-left))!important;
+ right:max(10px,env(safe-area-inset-right))!important;
+ width:auto!important;max-width:520px!important;margin:0 auto!important;
+ display:block!important;padding:13px!important;border-radius:16px!important;
+ background:#f8fbff!important;color:#193f61!important;
+ border:1px solid #b7cde0!important;
+ box-shadow:0 8px 35px #061d3450!important;
+ -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+ font-size:13px;line-height:1.4;
+}
+body.minote-android #miNoteCalendarSuggestion[hidden]{display:none!important;}
+body.minote-android #miNoteCalendarSuggestion .minote-suggestion-title{
+ font-weight:750;font-size:14px;margin-bottom:5px;
+}
+body.minote-android #miNoteCalendarSuggestion .minote-suggestion-event{
+ font-size:13px;color:#354c65;overflow-wrap:anywhere;margin-bottom:12px;
+}
+body.minote-android #miNoteCalendarSuggestion .minote-suggestion-actions{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;
+}
+body.minote-android #miNoteCalendarSuggestion .minote-suggestion-actions button{
+ min-width:0;min-height:44px;border:1px solid #cbd8e5;
+ border-radius:10px;background:#fff;color:#193f61;
+ padding:8px 5px;font-size:13px;font-weight:650;
+}
+body.minote-android #miNoteCalendarSuggestion #miNoteCalendarSuggestionAdd{
+ background:#1769b9;color:#fff;border-color:#1769b9;
+}
+body.minote-android #miNoteCalendarSuggestion .minote-suggestion-actions button:focus-visible{
+ outline:3px solid #53a5ef;outline-offset:2px;
+}
+@media (orientation:landscape){
+ body.minote-android #miNoteCalendarSuggestion{
+  max-width:460px!important;right:70px!important;left:auto!important;
+  bottom:max(8px,env(safe-area-inset-bottom))!important;
+ }
+}
