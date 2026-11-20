@@ -58,7 +58,7 @@ test('el reconocimiento silencioso y la bandeja están conectados en la interfaz
  assert.match(ui,/createAgendaInbox/);
  assert.match(ui,/miNoteCalendarInboxDialog/);
  assert.match(ui,/enqueueImportedSuggestion/);
- assert.match(ui,/posibleCorrection/);
+ assert.match(ui,/possibleCorrection/);
  assert.match(ui,/agendaInbox\.add/);
  assert.match(ui,/bridge\.openCalendar/);
 });
