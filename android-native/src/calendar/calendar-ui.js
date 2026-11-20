@@ -89,7 +89,7 @@ function show(){
 menuButton.addEventListener('click',show);
 $('miNoteCalendarClose').addEventListener('click',()=>dialog.close());
 dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
-dialog.addEventListener('close',()=>maybeShowNextSuggestion());
+dialog.addEventListener('close',()=>{editingInboxId=null;maybeShowNextSuggestion();});
 $('miNoteCalendarDownload').addEventListener('click',async()=>{
  if(busy)return;
  if(!confirm('¿Descargar el modelo de escritura en español (~20 MB)? Solo se descarga el modelo; sus notas no se envían.'))return;
