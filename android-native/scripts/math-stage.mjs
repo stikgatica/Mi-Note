@@ -81,6 +81,16 @@ window.MiNoteMathBridge={
  }
 };
 `;
+// Lectura de una hoja ya guardada, por IDs, sin cambiar la hoja activa.
+app+=`
+window.MiNoteCalendarImportRead=(notebookId,pageId)=>{
+ const nb=state?.notebooks?.find(n=>n.id===notebookId);
+ const pg=nb?.pages?.find(p=>p.id===pageId);
+ if(!pg)return null;
+ return {id:pg.id,title:pg.title,notebookTitle:nb.title,
+  huion:pg.huion||null,strokes:pg.strokes};
+};
+`;
 app+=`
 window.MiNoteX10DeviceInfo={
  async queryMemoryIndex(){

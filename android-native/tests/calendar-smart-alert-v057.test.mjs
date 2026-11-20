@@ -64,7 +64,7 @@ test('El aviso sólo ofrece Agregar, Editar o Descartar, sin guardar automática
 test('Versionado Android v0.57',()=>{
  const p=JSON.parse(read('../package.json'));
  const w=read('../../.github/workflows/android-release.yml');
- assert.equal(p.version,'0.57.0');
- assert.match(w,/versionCode 57/);
- assert.match(w,/Mi-Note-X10-Android-v0\.57\.apk/);
+ assert.ok(Number(p.version.split('.')[1])>=57);
+ assert.match(w,/versionCode (?:5[7-9]|[6-9][0-9])/);
+ assert.match(w,/Mi-Note-X10-Android-v0\.(?:5[7-9]|[6-9][0-9])\.apk/);
 });

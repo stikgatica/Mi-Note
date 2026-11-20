@@ -75,6 +75,12 @@ async function x10ImportOfflinePage(result,destinationId){
  render();
  // El guardado normal emitirá el evento de sincronización de Drive.
  await persist();
+ // La importación ya terminó de guardar esta hoja. Notificar solo IDs;
+ // el reconocimiento se realiza luego, sin bloquear BLE ni alterar trazos.
+ document.dispatchEvent(new CustomEvent('minote:x10-page-imported',{detail:{
+  notebookId:notebook.id,pageId:imported.id,source:'internal-memory',
+  physicalPage:result.page,partial:!!result.partial
+ }}));
  return hasPreviousVersion?'version':'imported';
 }
 function setupX10PhysicalTools(){
@@ -139,6 +145,7 @@ function setupX10PhysicalTools(){
      result=await MiNoteX10Offline.download(x10Connection,options);
     }
     notify('Importación terminada: '+result.imported+' guardadas ('+result.revised+' versiones nuevas, '+result.partialImported+' parciales), '+result.duplicate+' repetidas, '+result.incomplete+' pendientes, '+result.empty+' vacías. Sin borrado de memoria X10.');
+    document.dispatchEvent(new CustomEvent('minote:x10-import-finished',{detail:{source:'internal-memory',imported:result.imported,revised:result.revised}}));
     return result;
    }catch(err){
     notify('Importación interrumpida: '+err.message+'. Las páginas que sí se guardaron se conservan.');

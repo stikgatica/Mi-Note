@@ -3,6 +3,7 @@
 import {registerPlugin} from '@capacitor/core';
 import {parseReminder,calendarDraftIsValid} from './reminder-parser.mjs';
 import {autoReminderCandidate,reminderKey,createReminderLedger} from './reminder-auto.mjs';
+import {recognizeImportedPage} from './import-reminders.mjs';
 import './calendar-ui.css';
 const bridge=registerPlugin('MiNoteCalendar');
 const $=id=>document.getElementById(id);
@@ -44,13 +45,15 @@ const auto=$('miNoteCalendarAuto'),textBox=$('miNoteCalendarText'),allDay=$('miN
 const eventTitle=$('miNoteCalendarEventTitle'),date=$('miNoteCalendarDate'),time=$('miNoteCalendarTime');
 const desc=$('miNoteCalendarDescription');
 let busy=false,modelAvailable=false,detectTimer=0,lastSignature='',suggestionSignature='',pendingReminder=null;
+const importedPageIds=[],importSeen=new Set(),suggestionQueue=[];
+let importingScan=false,importScanSerial=0;
 const ledger=createReminderLedger(window.localStorage);
 // Predeterminado activo cuando no existe una elección previa; desactivarlo se respeta.
 try{auto.checked=localStorage.getItem('minote_calendar_auto_v054')!=='0';}catch{auto.checked=true;}
 auto.addEventListener('change',()=>{
  try{localStorage.setItem('minote_calendar_auto_v054',auto.checked?'1':'0');}catch{}
- if(!auto.checked){clearTimeout(detectTimer);closeSuggestion();}
- else void checkModel({silent:true});
+ if(!auto.checked){clearTimeout(detectTimer);closeSuggestion();suggestionQueue.length=0;}
+ else void checkModel({silent:true}).then(()=>void scanImportedPages());
  status(auto.checked?'Detección automática activada. Solo se proponen eventos con fechas reconocibles.':
   'Detección automática desactivada.');
 });
@@ -77,6 +80,7 @@ function show(){
 menuButton.addEventListener('click',show);
 $('miNoteCalendarClose').addEventListener('click',()=>dialog.close());
 dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
+dialog.addEventListener('close',()=>maybeShowNextSuggestion());
 $('miNoteCalendarDownload').addEventListener('click',async()=>{
  if(busy)return;
  if(!confirm('¿Descargar el modelo de escritura en español (~20 MB)? Solo se descarga el modelo; sus notas no se envían.'))return;
@@ -85,6 +89,7 @@ $('miNoteCalendarDownload').addEventListener('click',async()=>{
  try{
   await bridge.downloadModel();modelAvailable=true;
   $('miNoteCalendarDownload').hidden=true;
+  void scanImportedPages();
   status('Modelo descargado. Puede reconocer escritura sin conexión.');
  }catch(e){status('No fue posible descargar el modelo: '+e.message);}
  finally{busy=false;$('miNoteCalendarDownload').disabled=false;}
@@ -176,6 +181,7 @@ function closeSuggestion(){
  if(prompt)prompt.hidden=true;
  pendingReminder=null;
  suggestionSignature='';
+ queueMicrotask(()=>maybeShowNextSuggestion());
 }
 function formatProposal(event){
  return event.date.split('-').reverse().join('/')+(event.time?' · '+event.time:' · Todo el día');
@@ -216,6 +222,8 @@ function announce(event){
   });
   $('miNoteCalendarSuggestionEdit').addEventListener('click',()=>{
    if(!pendingReminder)return;
+   textBox.value=pendingReminder.source||pendingReminder.title+' '+formatProposal(pendingReminder);
+   applyText();
    closeSuggestion();
    show();
   });
@@ -224,10 +232,97 @@ function announce(event){
    closeSuggestion();
   });
  }
- $('miNoteCalendarSuggestionEvent').textContent=event.title+' · '+formatProposal(event);
+ $('miNoteCalendarSuggestionEvent').textContent=event.title+' · '+formatProposal(event)+
+  (event.fromImportedPage?' · Hoja Huion importada':'');
  $('miNoteCalendarSuggestionAdd').disabled=false;
  prompt.hidden=false;
 }
+
+/* V0.58: cada hoja física se guarda antes de revisar OCR. El análisis se
+ * ejecuta DESPUÉS de importar; nunca bloquea BLE ni elimina trazos. */
+const importDialog=$('x10MemoryDialog');
+const archiveDialog=$('x10ArchiveDialog');
+const importInfo=document.createElement('p');
+importInfo.id='miNoteImportedCalendarSummary';
+importInfo.className='minote-calendar-import-summary';
+importInfo.setAttribute('role','status');
+importInfo.setAttribute('aria-live','polite');
+importInfo.textContent='Al recuperar hojas nuevas, Mi Note buscará reuniones y recordatorios.';
+const memoryStatus=$('x10MemoryProgress');
+if(memoryStatus)memoryStatus.after(importInfo);
+function importedSummary(text){importInfo.textContent=text;}
+function enqueueImportedSuggestion(event){
+ const key=reminderKey(event);
+ if(!key||ledger.has(event)||suggestionQueue.some(x=>reminderKey(x)===key)||
+  pendingReminder&&reminderKey(pendingReminder)===key)return;
+ suggestionQueue.push({...event,fromImportedPage:true});
+}
+function maybeShowNextSuggestion(){
+ if(document.hidden||pendingReminder||dialog.open||importDialog?.open||archiveDialog?.open||
+  !auto.checked)return;
+ while(suggestionQueue.length){
+  const next=suggestionQueue.shift();
+  if(ledger.has(next))continue;
+  textBox.value=next.source||next.title+' '+next.date+(next.time?' '+next.time:'');
+  applyText();
+  announce(next);
+  break;
+ }
+}
+async function scanImportedPages(){
+ if(importingScan||!auto.checked||!importedPageIds.length)return;
+ if(!modelAvailable){
+  await checkModel({silent:true});
+  if(!modelAvailable){
+   importedSummary('Hojas guardadas. Para reconocer fechas automáticamente, descargue una vez el modelo español en Recordatorios y Calendar.');
+   return;
+  }
+ }
+ importingScan=true;
+ const serial=++importScanSerial;
+ let scanned=0,found=0,partial=0;
+ importedSummary('Revisando reuniones en las hojas importadas, sin modificar los originales…');
+ try{
+  while(importedPageIds.length&&auto.checked&&serial===importScanSerial){
+   const item=importedPageIds.shift();
+   const pg=window.MiNoteCalendarImportRead?.(item.notebookId,item.pageId);
+   if(!pg)continue;
+   if(pg.huion?.partial){partial++;continue;}
+   const events=await recognizeImportedPage(pg,args=>bridge.recognize(args));
+   scanned++;
+   for(const event of events){
+    if(ledger.has(event))continue;
+    const before=suggestionQueue.length;
+    enqueueImportedSuggestion(event);
+    if(suggestionQueue.length>before)found++;
+   }
+  }
+ }catch(error){
+  importedSummary('Revisión interrumpida: '+(error?.message||String(error))+'. Las páginas importadas se conservaron.');
+ }finally{
+  importingScan=false;
+  if(auto.checked){
+   importedSummary('Revisión local terminada: '+scanned+' hojas revisadas; '+found+
+    ' compromisos nuevos por confirmar'+(partial?'; '+partial+' hojas parciales omitidas':'')+
+    '. Cierre esta ventana para ver los avisos.');
+   maybeShowNextSuggestion();
+  }
+ }
+}
+document.addEventListener('minote:x10-page-imported',({detail})=>{
+ if(!detail?.notebookId||!detail?.pageId||!auto.checked)return;
+ const id=String(detail.notebookId)+'|'+String(detail.pageId);
+ if(importSeen.has(id))return;
+ importSeen.add(id);
+ importedPageIds.push({notebookId:detail.notebookId,pageId:detail.pageId});
+});
+document.addEventListener('minote:x10-import-finished',()=>void scanImportedPages());
+importDialog?.addEventListener('close',()=>{
+ if(importedPageIds.length)void scanImportedPages();
+ maybeShowNextSuggestion();
+});
+archiveDialog?.addEventListener('close',()=>maybeShowNextSuggestion());
+
 document.addEventListener('minote:stroke-finished',()=>{
  if(!auto.checked||!modelAvailable||document.hidden||dialog.open||window.MiNoteMath?.enabled)return;
  clearTimeout(detectTimer);
