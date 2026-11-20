@@ -12,7 +12,7 @@ test('restituye detección automática si el usuario la activó en sesión anter
 test('comprueba modelo al recuperar foco y cancela si se desactiva',()=>{
  const code=read('../src/calendar/calendar-ui.js');
  assert.match(code,/else if\(auto\.checked\)void checkModel\(\{silent:true\}\);/);
- assert.match(code,/if\(!auto\.checked\)\{clearTimeout\(detectTimer\);closeSuggestion\(\);\}/);
+ assert.match(code,/if\(!auto\.checked\)\{clearTimeout\(detectTimer\);closeSuggestion\(\);suggestionQueue\.length=0;\}/);
  assert.match(code,/if\(!auto\.checked\|\|!modelAvailable\|\|document\.hidden\|\|dialog\.open\|\|window\.MiNoteMath\?\.enabled\)return;/);
 });
 test('solo sugiere eventos tras escritura y nunca guarda sin consentimiento',()=>{
