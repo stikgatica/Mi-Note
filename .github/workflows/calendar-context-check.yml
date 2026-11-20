@@ -1,0 +1,36 @@
+name: Verificar agenda contextual
+on:
+  pull_request:
+    paths:
+      - 'android-native/**'
+      - '.github/workflows/calendar-context-check.yml'
+  push:
+    branches:
+      - feature/agenda-contextual-v059
+    paths:
+      - 'android-native/**'
+      - '.github/workflows/calendar-context-check.yml'
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dependencias
+        run: npm install --no-audit --no-fund
+      - name: Pruebas automatizadas
+        run: npm test
+      - name: Validar módulos
+        run: |
+          node --check src/calendar/agenda-context.mjs
+          node --check src/calendar/import-reminders.mjs
+          node --check src/calendar/calendar-ui.js
+      - name: Compilar interfaz web
+        run: npm run build:web
