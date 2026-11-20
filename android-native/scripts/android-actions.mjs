@@ -26,11 +26,13 @@ window.MiNoteAndroidActions.importHuionArchive=async function(archive){
  if(!incoming.pages.length||incoming.pages.length>300)throw Error('Cantidad de páginas no válida.');
  let nb=state.notebooks.find(x=>x.id===incoming.id);
  let added=0,duplicates=0;
- if(!nb){nb=clone(incoming);state.notebooks.push(nb);added=nb.pages.length;}
+ const importedPageIds=[];
+ if(!nb){nb=clone(incoming);state.notebooks.push(nb);added=nb.pages.length;
+  importedPageIds.push(...nb.pages.map(p=>p.id));}
  else{
   for(const p of incoming.pages){
    if(nb.pages.some(x=>x.id===p.id)){duplicates++;continue;}
-   nb.pages.push(clone(p));added++;
+   nb.pages.push(clone(p));added++;importedPageIds.push(p.id);
   }
   nb.updatedAt=now();
  }
@@ -39,6 +41,12 @@ window.MiNoteAndroidActions.importHuionArchive=async function(archive){
  state.activePageId=nb.pages[0].id;
  render();
  await persist();
+ for(const pageId of importedPageIds){
+  document.dispatchEvent(new CustomEvent('minote:x10-page-imported',{detail:{
+   notebookId:nb.id,pageId,source:'huion-archive'
+  }}));
+ }
+ document.dispatchEvent(new CustomEvent('minote:x10-import-finished',{detail:{source:'huion-archive',imported:added}}));
  return {added,duplicates,total:nb.pages.length};
 };
 `;
