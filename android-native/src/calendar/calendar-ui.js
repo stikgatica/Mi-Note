@@ -4,6 +4,8 @@ import {registerPlugin} from '@capacitor/core';
 import {parseReminder,calendarDraftIsValid} from './reminder-parser.mjs';
 import {autoReminderCandidate,reminderKey,createReminderLedger} from './reminder-auto.mjs';
 import {recognizeImportedPage,extractImportedReminders} from './import-reminders.mjs';
+import {incrementalStrokes,createIncrementalCursor} from './incremental-ink.mjs';
+import {createAgendaInbox} from './agenda-inbox.mjs';
 import './calendar-ui.css';
 const bridge=registerPlugin('MiNoteCalendar');
 const $=id=>document.getElementById(id);
@@ -15,6 +17,9 @@ const menuButton=document.createElement('button');
 menuButton.id='miNoteCalendarMenu';menuButton.type='button';
 menuButton.textContent='▦ Recordatorios y Google Calendar';
 buttons.append(menuButton);
+const inboxButton=document.createElement('button');inboxButton.id='miNoteCalendarInboxOpen';
+inboxButton.type='button';inboxButton.textContent='▤ Compromisos por revisar (0)';
+buttons.append(inboxButton);
 const dialog=document.createElement('dialog');
 dialog.id='miNoteCalendarDialog';dialog.className='dialog minote-calendar-dialog';
 dialog.setAttribute('aria-labelledby','miNoteCalendarTitle');
@@ -24,7 +29,7 @@ dialog.innerHTML=[
  '<p class="minote-calendar-explain">Reconozca sus notas de forma privada y revise las fechas antes de preparar el evento. Mi Note nunca guarda eventos sin su autorización.</p>',
  '<div class="minote-calendar-row"><button type="button" id="miNoteCalendarScan">Reconocer escritura de esta hoja</button>',
  '<button type="button" id="miNoteCalendarDownload">Descargar modelo español</button></div>',
- '<label class="minote-calendar-opt"><input id="miNoteCalendarAuto" type="checkbox"> Detectar posibles recordatorios automáticamente al terminar de escribir (opcional)</label>',
+ '<label class="minote-calendar-opt"><input id="miNoteCalendarAuto" type="checkbox"> Detectar compromisos y guardarlos en la bandeja de revisión (opcional)</label>',
  '<p class="minote-calendar-hint">El reconocimiento usa ML Kit en el celular. La primera descarga del modelo necesita internet; después funciona sin conexión. La tinta no se envía a Google Calendar.</p>',
  '<label class="field">Texto reconocido (puede corregirlo)<textarea id="miNoteCalendarText" rows="4" placeholder="Ej. Reunión Consejo Escolar, 25 de noviembre 15:30"></textarea></label>',
  '<button type="button" id="miNoteCalendarExtract">Detectar fecha y horario</button>',
@@ -48,6 +53,10 @@ let busy=false,modelAvailable=false,detectTimer=0,lastSignature='',suggestionSig
 const importedPageIds=[],importSeen=new Set(),suggestionQueue=[];
 let importingScan=false,importScanSerial=0;
 const ledger=createReminderLedger(window.localStorage);
+const agendaInbox=createAgendaInbox(window.localStorage);
+const inkCursor=createIncrementalCursor();
+let editingInboxId=null;
+let silentScanning=false;
 // Predeterminado activo cuando no existe una elección previa; desactivarlo se respeta.
 try{auto.checked=localStorage.getItem('minote_calendar_auto_v054')!=='0';}catch{auto.checked=true;}
 auto.addEventListener('change',()=>{
@@ -80,7 +89,7 @@ function show(){
 menuButton.addEventListener('click',show);
 $('miNoteCalendarClose').addEventListener('click',()=>dialog.close());
 dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
-dialog.addEventListener('close',()=>maybeShowNextSuggestion());
+dialog.addEventListener('close',()=>{editingInboxId=null;maybeShowNextSuggestion();});
 $('miNoteCalendarDownload').addEventListener('click',async()=>{
  if(busy)return;
  if(!confirm('¿Descargar el modelo de escritura en español (~20 MB)? Solo se descarga el modelo; sus notas no se envían.'))return;
@@ -94,9 +103,15 @@ $('miNoteCalendarDownload').addEventListener('click',async()=>{
  }catch(e){status('No fue posible descargar el modelo: '+e.message);}
  finally{busy=false;$('miNoteCalendarDownload').disabled=false;}
 });
-function strokesForRecognition(){
+function strokesForRecognition({incremental=false}={}){
  const pg=snapshot();
  if(!pg||!Array.isArray(pg.strokes))throw Error('No hay una hoja activa.');
+ if(incremental){
+  const previous=inkCursor.previous(pg);
+  const strokes=incrementalStrokes(pg,previous);
+  if(strokes.length)inkCursor.commit(pg);
+  return strokes;
+ }
  const input=pg.strokes.filter(s=>Array.isArray(s.pts)&&s.pts.length>=2).slice(-125)
   .map(s=>s.pts.filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]))
    .filter((_,i)=>i%Math.max(1,Math.ceil(s.pts.length/110))===0)
@@ -115,7 +130,8 @@ async function recognize({silent=false}={}){
  busy=true;
  if(!silent)status('Interpretando las notas escritas en esta hoja…');
  try{
-  const strokes=strokesForRecognition();
+  const strokes=strokesForRecognition({incremental:silent});
+  if(!strokes.length)return;
   const result=await bridge.recognize({strokes});
   const candidates=(result.candidates||[]).map(String);
   const mathMode=!!window.MiNoteMath?.enabled;
@@ -132,7 +148,7 @@ async function recognize({silent=false}={}){
    // Usar primero la lectura por renglones; nunca crear una propuesta mezclando títulos.
    const contextual=extractImportedReminders(result.text||selected,{now:new Date()});
    if(contextual.length){
-    for(const proposal of contextual)enqueueImportedSuggestion(proposal,{imported:false});
+    for(const proposal of contextual)enqueueImportedSuggestion(proposal,{imported:false,pageId:snapshot()?.id||''});
     maybeShowNextSuggestion();
     return;
    }
@@ -140,8 +156,7 @@ async function recognize({silent=false}={}){
    const signature=reminderKey(event);
    if(signature===suggestionSignature)return;
    suggestionSignature=signature;
-   textBox.value=selected;applyText();
-   announce(event);
+   enqueueImportedSuggestion(event,{imported:false,pageId:snapshot()?.id||''});
    maybeShowNextSuggestion();
   }
  }catch(error){
@@ -180,6 +195,7 @@ $('miNoteCalendarOpen').addEventListener('click',async()=>{
   await bridge.openCalendar(proposal);
   // Se recuerda que ya se ofreció el evento; no se afirma que Calendar lo guardó.
   ledger.mark(proposal,'opened');
+  if(editingInboxId){agendaInbox.setStatus(editingInboxId,'opened');editingInboxId=null;renderInbox();}
   closeSuggestion();
   status('Se abrió el formulario de Calendar. Revise la cuenta, los avisos y pulse Guardar allí.');
  }catch(err){status('No se pudo abrir Calendar: '+err.message+'. Instale o habilite una aplicación de calendario.');}
@@ -259,24 +275,89 @@ importInfo.textContent='Al recuperar hojas nuevas, Mi Note buscará reuniones y 
 const memoryStatus=$('x10MemoryProgress');
 if(memoryStatus)memoryStatus.after(importInfo);
 function importedSummary(text){importInfo.textContent=text;}
-function enqueueImportedSuggestion(event,{imported=true}={}){
- const key=reminderKey(event);
- if(!key||ledger.has(event)||suggestionQueue.some(x=>reminderKey(x)===key)||
-  pendingReminder&&reminderKey(pendingReminder)===key)return;
- suggestionQueue.push({...event,fromImportedPage:imported});
+function enqueueImportedSuggestion(event,{imported=true,pageId=''}={}){
+ const proposal={...event,pageId:pageId||event.pageId||'',fromImportedPage:imported};
+ if(!reminderKey(proposal)||ledger.has(proposal))return;
+ const result=agendaInbox.add(proposal);
+ if(result.added||result.updated)updateInboxCount();
 }
 function maybeShowNextSuggestion(){
- if(document.hidden||pendingReminder||dialog.open||importDialog?.open||archiveDialog?.open||
-  !auto.checked)return;
+ // Modo silencioso: no superponer avisos mientras la persona escribe.
+ // Los compromisos permanecen en una bandeja local hasta su confirmación.
  while(suggestionQueue.length){
-  const next=suggestionQueue.shift();
-  if(ledger.has(next))continue;
-  textBox.value=next.source||next.title+' '+next.date+(next.time?' '+next.time:'');
-  applyText();
-  announce(next);
-  break;
+  const item=suggestionQueue.shift();
+  enqueueImportedSuggestion(item,{imported:item.fromImportedPage!==false,pageId:item.pageId});
+ }
+ updateInboxCount();
+}
+const inboxDialog=document.createElement('dialog');
+inboxDialog.id='miNoteCalendarInboxDialog';
+inboxDialog.className='dialog minote-calendar-inbox';
+inboxDialog.innerHTML='<div class="dialog-head"><h2>Compromisos por revisar</h2>'+
+ '<button type="button" class="icon-btn" id="miNoteInboxClose" aria-label="Cerrar">✕</button></div>'+
+ '<p class="minote-calendar-hint">Sugerencias guardadas solo en este dispositivo. Nada se añade a Google Calendar sin su confirmación.</p>'+
+ '<div id="miNoteInboxList"></div>';
+document.body.append(inboxDialog);
+$('miNoteInboxClose').addEventListener('click',()=>inboxDialog.close());
+inboxDialog.addEventListener('click',e=>{if(e.target===inboxDialog)inboxDialog.close();});
+inboxButton.addEventListener('click',()=>{if(shell.open)shell.close();renderInbox();inboxDialog.showModal();});
+function updateInboxCount(){
+ const n=agendaInbox.count();
+ inboxButton.textContent='▤ Compromisos por revisar ('+n+')';
+}
+function renderInbox(){
+ updateInboxCount();
+ const holder=$('miNoteInboxList');holder.replaceChildren();
+ const items=agendaInbox.all();
+ if(!items.length){const empty=document.createElement('p');empty.textContent='Sin compromisos pendientes.';holder.append(empty);return;}
+ for(const item of items){
+  const e=item.event;
+  const card=document.createElement('section');card.className='minote-inbox-item';
+  const title=document.createElement('strong');title.textContent=e.title;card.append(title);
+  const detail=document.createElement('p');
+  detail.textContent=formatProposal(e)+(e.fromImportedPage?' · Hoja importada':'');
+  card.append(detail);
+  if(e.possibleCorrection){
+   const warning=document.createElement('p');warning.className='minote-inbox-warning';
+   warning.textContent='Posible cambio de horario: '+(e.previousTime||'todo el día')+' → '+(e.time||'todo el día')+
+    (e.previousStatus==='opened'?'. Si ya guardó el evento en Calendar, edite el original allí; Mi Note no puede modificarlo automáticamente.':'. Revise antes de agregar.');
+   card.append(warning);
+  }
+  const actions=document.createElement('div');actions.className='minote-inbox-actions';
+  const makeButton=(label,callback)=>{
+   const btn=document.createElement('button');btn.type='button';btn.textContent=label;
+   btn.addEventListener('click',callback);actions.append(btn);return btn;
+  };
+  if(e.possibleCorrection&&e.previousStatus==='opened'){
+   makeButton('Revisar cambio',()=>alert('Para evitar duplicados, abra Google Calendar y edite manualmente el evento original. Mi Note no tiene permiso para editar su calendario.'));
+  }else{
+   makeButton('Agregar',async()=>{
+    try{
+     await bridge.openCalendar({title:e.title,date:e.date,time:e.time,allDay:e.allDay,description:''});
+     agendaInbox.setStatus(item.id,'opened');ledger.mark(e,'opened');renderInbox();
+    }catch(error){alert('No se pudo abrir Calendar: '+error.message);}
+   });
+  }
+  makeButton(e.possibleCorrection&&e.previousStatus==='opened'?'Cómo actualizar':'Editar',()=>{
+   if(e.possibleCorrection&&e.previousStatus==='opened'){
+    alert('Mi Note no puede editar eventos existentes en Google Calendar. Abra el evento original en su calendario y cambie la hora manualmente. Cuando termine, pulse «Ya lo revisé» en esta bandeja.');
+    return;
+   }
+   editingInboxId=item.id;
+   inboxDialog.close();
+   show();
+   eventTitle.value=e.title;date.value=e.date;time.value=e.time||'';
+   allDay.checked=!!e.allDay;toggleTime();
+   textBox.value=e.source||'';desc.value='';
+   status('Revise la propuesta. Google Calendar debe confirmar el guardado.');
+  });
+  makeButton(e.possibleCorrection&&e.previousStatus==='opened'?'Ya lo revisé':'Descartar',()=>{
+   agendaInbox.setStatus(item.id,'dismissed');ledger.mark(e,'dismissed');renderInbox();
+  });
+  card.append(actions);holder.append(card);
  }
 }
+updateInboxCount();
 async function scanImportedPages(){
  if(importingScan||!auto.checked||!importedPageIds.length)return;
  if(!modelAvailable){
@@ -300,9 +381,9 @@ async function scanImportedPages(){
    scanned++;
    for(const event of events){
     if(ledger.has(event))continue;
-    const before=suggestionQueue.length;
-    enqueueImportedSuggestion(event);
-    if(suggestionQueue.length>before)found++;
+    const before=agendaInbox.count();
+    enqueueImportedSuggestion({...event,pageId:pg.id},{pageId:pg.id});
+    if(agendaInbox.count()>before)found++;
    }
   }
  }catch(error){
@@ -340,7 +421,7 @@ document.addEventListener('minote:stroke-finished',()=>{
   if(signature===lastSignature)return;
   lastSignature=signature;
   void recognize({silent:true});
- },6500);
+ },4200);
 });
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden){clearTimeout(detectTimer);closeSuggestion();}
