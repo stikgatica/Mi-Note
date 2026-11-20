@@ -13,6 +13,8 @@ const MAX_POINTS=14000;
 export function extractImportedReminders(text,{now=new Date(),heading='',pageDate=null}={}){
  const input=String(text||'').replace(/\r/g,' ').trim().slice(0,3000);
  if(!input)return [];
+ // Los saltos de línea marcan compromisos distintos: no unir fechas de renglones ajenos.
+ if(input.includes('\n'))return extractContextualAgenda(input,{now,heading,pageDate});
  const found=[...input.matchAll(DATE)];
  if(!found.length)return extractContextualAgenda(input,{now,heading,pageDate});
  const out=[],known=new Set();
