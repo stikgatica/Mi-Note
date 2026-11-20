@@ -124,7 +124,7 @@ async function recognize({silent=false}={}){
   if(!silent){textBox.value=selected;applyText();status('Texto reconocido. Revise el título, fecha y hora antes de continuar.');}
   else{
    const event=automatic?.event;
-   if(!event||ledger.has(event))return;
+   if(!event||ledger.has(event)||pendingReminder)return;
    const signature=reminderKey(event);
    if(signature===suggestionSignature)return;
    suggestionSignature=signature;
@@ -165,6 +165,9 @@ $('miNoteCalendarOpen').addEventListener('click',async()=>{
    ' en su calendario? Tendrá que confirmar el guardado en Calendar.'))return;
  try{
   await bridge.openCalendar(proposal);
+  // Se recuerda que ya se ofreció el evento; no se afirma que Calendar lo guardó.
+  ledger.mark(proposal,'opened');
+  closeSuggestion();
   status('Se abrió el formulario de Calendar. Revise la cuenta, los avisos y pulse Guardar allí.');
  }catch(err){status('No se pudo abrir Calendar: '+err.message+'. Instale o habilite una aplicación de calendario.');}
 });
