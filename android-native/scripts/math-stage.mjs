@@ -88,7 +88,7 @@ window.MiNoteCalendarImportRead=(notebookId,pageId)=>{
  const pg=nb?.pages?.find(p=>p.id===pageId);
  if(!pg)return null;
  return {id:pg.id,title:pg.title,notebookTitle:nb.title,
-  huion:pg.huion||null,strokes:pg.strokes};
+  huion:pg.huion||null,createdAt:pg.createdAt||null,strokes:pg.strokes};
 };
 `;
 app+=`
