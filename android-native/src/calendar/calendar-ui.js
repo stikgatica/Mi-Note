@@ -26,6 +26,7 @@ dialog.innerHTML=[
  '<p class="minote-calendar-hint">El reconocimiento usa ML Kit en el celular. La primera descarga del modelo necesita internet; después funciona sin conexión. La tinta no se envía a Google Calendar.</p>',
  '<label class="field">Texto reconocido (puede corregirlo)<textarea id="miNoteCalendarText" rows="4" placeholder="Ej. Reunión Consejo Escolar, 25 de noviembre 15:30"></textarea></label>',
  '<button type="button" id="miNoteCalendarExtract">Detectar fecha y horario</button>',
+ '<p id="miNoteCalendarDetectionFeedback" class="minote-calendar-detection-feedback" role="status" aria-live="polite">Ingrese una fecha como 15/12 o 05/01 y pulse Detectar.</p>',
  '<div class="minote-calendar-fields">',
  '<label class="field">Título del evento<input id="miNoteCalendarEventTitle" maxlength="160" placeholder="Título o motivo"></label>',
  '<div class="minote-calendar-row"><label class="field">Fecha<input id="miNoteCalendarDate" type="date"></label>',
@@ -125,15 +126,24 @@ async function recognize({silent=false}={}){
 }
 $('miNoteCalendarScan').addEventListener('click',()=>void recognize());
 function applyText(){
+ const feedback=$('miNoteCalendarDetectionFeedback');
  const parsed=parseReminder(textBox.value);
- if(!parsed){status('No se encontró una fecha válida. Incluya día, mes y año, por ejemplo «25/11/2026», o «mañana».');return;}
+ if(!parsed){
+  feedback.textContent='No se reconoció una fecha válida. Pruebe 15/12, 05/01 o 25/11/2026.';
+  feedback.dataset.state='error';
+  status(feedback.textContent);
+  return;
+ }
  eventTitle.value=parsed.title;
  date.value=parsed.date;
  time.value=parsed.time||'';
  allDay.checked=parsed.allDay;toggleTime();
  desc.value='';
- const explanation=parsed.yearExplicit?'':' El año se ha inferido: revise que sea correcto.';
- status('Fecha propuesta: '+parsed.date+(parsed.time?' a las '+parsed.time:' · todo el día')+'.'+explanation);
+ const explanation=parsed.yearExplicit?'':' Año calculado según la fecha actual del teléfono; revíselo.';
+ const message='Detectado: '+parsed.title+' · '+parsed.date+(parsed.time?' · '+parsed.time:' · todo el día')+'.'+explanation;
+ feedback.textContent=message;
+ feedback.dataset.state='success';
+ status(message);
 }
 $('miNoteCalendarExtract').addEventListener('click',applyText);
 $('miNoteCalendarOpen').addEventListener('click',async()=>{
