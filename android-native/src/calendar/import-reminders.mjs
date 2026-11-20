@@ -41,12 +41,12 @@ function median(values){
 }
 export function lineBandsFromPage(strokes){
  if(!Array.isArray(strokes))return [];
- const mapped=strokes.map(s=>{
+ const mapped=strokes.map((s,index)=>{
   const points=strokePoints(s);
   if(points.length<2)return null;
   const ys=points.map(p=>p[1]);
   const bottom=Math.max(...ys),top=Math.min(...ys);
-  return {points,center:(bottom+top)/2,height:bottom-top};
+  return {points,center:(bottom+top)/2,height:bottom-top,index};
  }).filter(Boolean);
  if(!mapped.length)return [];
  // El centro vertical de trazos de un renglón suele estar muy próximo;
@@ -62,7 +62,7 @@ export function lineBandsFromPage(strokes){
   }else bands.push({items:[entry],center:entry.center});
  }
  const result=bands.filter(b=>b.items.length>=2).slice(0,MAX_BANDS)
-  .map(b=>b.items.map(s=>s.points));
+  .map(b=>b.items.sort((a,b)=>a.index-b.index).map(s=>s.points));
  return result;
 }
 function compactStrokes(strokes){
