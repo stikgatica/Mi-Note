@@ -76,5 +76,5 @@ test('APK V0.58',()=>{
  const flow=read('../../.github/workflows/android-release.yml');
  assert.ok(Number(pkg.version.split('.')[1])>=58);
  assert.match(flow,/versionCode (?:5[8-9]|[6-9][0-9])/);
- assert.match(flow,/Mi-Note-X10-Android-v0\.58\.apk/);
+ assert.match(flow,/Mi-Note-X10-Android-v0\.(?:5[8-9]|[6-9][0-9])\.apk/);
 });
