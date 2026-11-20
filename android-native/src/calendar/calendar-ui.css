@@ -69,3 +69,22 @@ body.minote-android .minote-calendar-import-summary{
  background:#f2f8fd;color:#315773;border-radius:10px;
  font-size:12px;line-height:1.45;
 }
+
+/* V0.60: bandeja de compromisos compacta, sin interrupciones sobre el lienzo. */
+body.minote-android .minote-calendar-inbox{
+ width:min(95vw,600px);max-height:88dvh;overflow:auto;padding:15px;border-radius:16px;
+}
+body.minote-android .minote-calendar-inbox .dialog-head{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+body.minote-android .minote-inbox-item{
+ border:1px solid #cedde9;border-radius:11px;padding:11px;margin:9px 0;background:#fbfdff;
+}
+body.minote-android .minote-inbox-item strong{display:block;font-size:14px}
+body.minote-android .minote-inbox-item p{font-size:12px;line-height:1.4;margin:5px 0 10px}
+body.minote-android .minote-inbox-warning{color:#81551b;background:#fff7e7;padding:7px;border-radius:7px}
+body.minote-android .minote-inbox-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+body.minote-android .minote-inbox-actions button{min-height:42px;padding:5px;font-size:12px}
+@media (orientation:landscape){
+ body.minote-android .minote-calendar-inbox{max-height:calc(100dvh - 12px)}
+}
