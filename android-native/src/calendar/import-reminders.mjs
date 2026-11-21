@@ -4,6 +4,7 @@
 import {autoReminderCandidate,reminderKey} from './reminder-auto.mjs';
 import {extractContextualAgenda} from './agenda-context.mjs';
 import {extractNaturalMeetings} from './natural-meetings.mjs';
+import {parseReminder,calendarDraftIsValid} from './reminder-parser.mjs';
 
 const DATE=/\b(?:20\d{2}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[./-]\d{1,2}(?:[./-](?:20\d{2}|\d{2}))?|\d{1,2}\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+(?:de|del)\s+\d{2,4})?)\b/gi;
 const AFTER_TIME=/^\s*(?:a\s+las?\s+)?(?:[01]?\d|2[0-3])[:h.]?[0-5]\d(?:\s*(?:hrs?|horas?))?/i;
@@ -135,6 +136,59 @@ export function noteBlocksFromBands(bands){
  if(group.length)groups.push(group);
  return groups.map(g=>g.map(row=>row.strokes));
 }
+// Analiza filas con papeles distintos: título / fecha / hora.
+// Una lectura global de ML Kit puede intercambiar números entre bloques;
+// por ello no se crea un evento de día completo si existe un horario válido
+// en el renglón inferior, aunque el título no sea reconocible.
+const OCR_DATE_ROW=/^(?:\d{1,2}\s*[./-]\s*\d{1,2}(?:\s*[./-]\s*\d{2,4})?|20\d{2}[-/]\d{1,2}[-/]\d{1,2})$/;
+const OCR_TIME_ROW=/^(?:[01]?\d|2[0-3])\s*[:h.;]\s*[0-5]\d\s*(?:h|hrs?|horas?)?$/i;
+const OCR_TITLE=/^(?:reuni[oó]n|taller|apoderad[oa]s?|acto|consejo|entrevista|cita|ceremonia|capacitaci[oó]n|actividad)\b/i;
+const normalizeNumeric=(text,role)=> {
+ let s=String(text||'').trim();
+ if(role==='date')return s.replace(/\s*([/.-])\s*/g,'$1');
+ if(role==='time')return s.replace(/[oO]/g,'0')
+  .replace(/\s*[:h.;]\s*/g,':');
+ return s;
+};
+export function structuredRowMeeting(rowOptions,{now=new Date(),regionId=''}={}){
+ if(!Array.isArray(rowOptions)||rowOptions.length<2||rowOptions.length>4)return null;
+ const rows=rowOptions.map(row=>Array.isArray(row)?row.filter(x=>typeof x==='string').slice(0,4):[]);
+ const findDate=row=>{
+  for(const raw of row){
+   const line=normalizeNumeric(raw,'date');
+   if(!OCR_DATE_ROW.test(line))continue;
+   const parsed=parseReminder(line,now);
+   if(parsed&&calendarDraftIsValid(parsed))return {raw:line,value:parsed.date,explicit:parsed.yearExplicit};
+  }return null;
+ };
+ const findTime=row=>{
+  for(const raw of row){
+   const line=normalizeNumeric(raw,'time');
+   if(!OCR_TIME_ROW.test(line))continue;
+   const sample=parseReminder('01/12/2026 '+line,now);
+   if(sample?.time)return {raw:line,value:sample.time};
+  }return null;
+ };
+ for(let i=0;i<rows.length-1;i++){
+  const date=findDate(rows[i]),time=findTime(rows[i+1]);
+  if(!date||!time)continue;
+  // Solo el renglón INMEDIATAMENTE superior puede dar nombre a la cita.
+  const titleCandidates=i>0?rows[i-1]:[];
+  const recognized=titleCandidates.find(x=>OCR_TITLE.test(x.trim()));
+  const title=recognized?.trim()||'Recordatorio por revisar';
+  const needsTitle=!recognized;
+  const source=(titleCandidates[0]?titleCandidates[0]+'\n':'')+date.raw+'\n'+time.raw;
+  const fromTitle=recognized?autoReminderCandidate(title+' '+date.raw+' '+time.raw,{now}):null;
+  const parsed=fromTitle||parseReminder(date.raw+' '+time.raw,now);
+  if(!parsed||!calendarDraftIsValid(parsed)||!parsed.time)continue;
+  return {...parsed,title:needsTitle?'Recordatorio por revisar':title,
+   source,allDay:false,needsTitle,needsReview:true,
+   confidence:needsTitle?'date-time-only':'structured-rows',
+   regionId:regionId?regionId+'-item-0':'structured-item-0'};
+ }
+ return null;
+}
+
 export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
  if(!page||page.huion?.partial||!Array.isArray(page.strokes)||!page.strokes.length)return [];
  if(typeof recognize!=='function')return [];
@@ -185,6 +239,17 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
   }
   const primary=rowOptions.map(options=>options[0]||'').filter(Boolean);
   const oldCount=events.length;
+  const structured=structuredRowMeeting(rowOptions,{now,regionId});
+  if(structured){
+   const fingerprint=reminderKey(structured);
+   if(fingerprint&&!seen.has(fingerprint)){
+    seen.add(fingerprint);
+    events.push(structured);
+   }
+   // No aceptar una segunda hipótesis de "todo el día" cuando las filas
+   // ya sustentan fecha + hora dentro de este bloque físico.
+   continue;
+  }
   if(primary.length)remember(primary.join('\n'),regionId);
   // ML Kit puede leer un título manuscrito como otra palabra. Dar prioridad
   // a una alternativa que parezca compromiso, siempre dentro de la MISMA zona.
