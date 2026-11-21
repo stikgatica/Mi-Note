@@ -3,6 +3,7 @@
 import {propose,fingerprint} from './math-geometry.mjs';
 import {fitStrongLine,straightenContour,straightenConnectedSides} from './math-strong-geometry.mjs';
 import {recognizeInk} from './math-ink-ocr.mjs';
+import {toReadingStrokes,readingGeometryToPage} from '../ink-orientation.mjs';
 import {interpretGeometry,fitIntendedQuadrilateral,fitIntendedCircle,geometryName} from './math-intention.mjs';
 import {joinClosedStrokes} from './math-contours.mjs';
 const box=strokes=>{
@@ -17,7 +18,7 @@ const candidate=(proposal,strokes)=>proposal?{
  sources:strokes.map(s=>({id:s.id,signature:fingerprint(s)})),automatic:true
 }:null;
 const same=idList=>new Set(idList).size===idList.length;
-const fit=(strokes,kind,intention='auto')=>{
+const fit=(strokes,kind,intention='auto',orientation='portrait')=>{
  if(!strokes.length||strokes.length>9||!same(strokes.map(s=>s.id)))return null;
  const b=box(strokes);
  if(!b||extent(b)>550)return null;
@@ -25,8 +26,11 @@ const fit=(strokes,kind,intention='auto')=>{
  if(kind==='text'){
   if(intention!=='auto')return null;
   // Los números y unidades nunca se infieren a partir de líneas grandes o figuras.
-  if(extent(b)>150||b.maxY-b.minY>115)return null;
-  result=recognizeInk(strokes);
+  const readable=toReadingStrokes(strokes,orientation);
+  const textBox=box(readable);
+  if(!textBox||extent(textBox)>150||textBox.maxY-textBox.minY>115)return null;
+  const recognized=recognizeInk(readable);
+  result=recognized?{...recognized,geometry:readingGeometryToPage(recognized.geometry,orientation)}:null;
  }else if(kind==='shape'){
   // Prioridad absoluta a la figura elegida; el ajuste de un círculo no
   // debe convertirse en un polígono, y un cuadrado no debe quedar trapezoidal.
@@ -95,7 +99,7 @@ const fit=(strokes,kind,intention='auto')=>{
  }
  return candidate(result,strokes);
 };
-export function recognizeAutomatic(strokes,intention='auto'){
+export function recognizeAutomatic(strokes,intention='auto',orientation='portrait'){
  if(!Array.isArray(strokes)||strokes.length<1||strokes.length>9)return null;
  // Cuando el usuario escoge figura, nunca interpretar sus lados como números
  // ni guardar una línea aislada antes de cerrar un cuadrado/triángulo.
@@ -122,13 +126,13 @@ export function recognizeAutomatic(strokes,intention='auto'){
   if(result?.geometry.kind==='polygon'||result?.geometry.kind==='circle')return result;
  }
  for(let n=Math.min(strokes.length,9);n>=2;n--){
-  const subset=strokes.slice(-n),text=fit(subset,'text',intention);
+  const subset=strokes.slice(-n),text=fit(subset,'text',intention,orientation);
   if(text)return text;
  }
  const last=strokes.at(-1);
  const shape=fit([last],'shape',intention);
  if(shape)return shape;
- const text=fit([last],'text',intention);
+ const text=fit([last],'text',intention,orientation);
  if(text)return text;
  return null;
 }
