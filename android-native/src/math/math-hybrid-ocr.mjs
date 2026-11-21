@@ -106,26 +106,52 @@ export function fuseMathCandidates({mlCandidates=[],localText='',localConfidence
 /** Grupos de tinta por renglón, respetando las posiciones originales.
  * Descarta trazos extremadamente altos para evitar figuras cerradas grandes.
  */
+/** Cluster tall digit strokes into horizontal rows, then attach tiny
+ * punctuation (+, colon dots, minus, equals) to the nearest row.
+ * Previously tiny points often became their own row, causing ML Kit to
+ * read "24:7=" as fragments or drop it entirely. */
 export function mathematicalLines(strokes,{maxStrokes=160}={}){
  const entries=(strokes||[]).slice(-maxStrokes).map((stroke,i)=>{
   const b=bounds([stroke]);
   if(!stroke?.id||!b||b.height>150||b.width>180||b.width+b.height<3)return null;
   return {stroke,b,i,mid:(b.y+b.bottom)/2};
- }).filter(Boolean).sort((a,b)=>a.mid-b.mid);
- const lines=[];
- for(const entry of entries){
-  const line=lines.find(line=>Math.abs(entry.mid-line.mid)<Math.max(14,Math.min(37,line.maxHeight*.47))&&
-    entry.b.y<=line.bottom+14&&entry.b.bottom>=line.top-14);
-  if(!line){
-   lines.push({items:[entry],mid:entry.mid,top:entry.b.y,bottom:entry.b.bottom,maxHeight:entry.b.height});
-  }else{
-   line.items.push(entry);line.mid=line.items.reduce((acc,x)=>acc+x.mid,0)/line.items.length;
-   line.top=Math.min(line.top,entry.b.y);line.bottom=Math.max(line.bottom,entry.b.bottom);
-   line.maxHeight=Math.max(line.maxHeight,entry.b.height);
+ }).filter(Boolean);
+ if(!entries.length)return [];
+ const heights=entries.map(x=>x.b.height).filter(x=>x>=10).sort((a,b)=>a-b);
+ const medianHeight=heights[Math.floor(heights.length/2)]||25;
+ const dotThreshold=Math.max(5,Math.min(13,medianHeight*.28));
+ const anchors=entries.filter(x=>x.b.height>dotThreshold||x.b.width>dotThreshold*1.8)
+  .sort((a,b)=>a.mid-b.mid);
+ const tiny=entries.filter(x=>!anchors.includes(x));
+ const rows=[];
+ const tolerance=Math.max(22,Math.min(57,medianHeight*.92));
+ for(const entry of anchors){
+  const row=rows.find(r=>Math.abs(entry.mid-r.center)<=tolerance&&
+    entry.b.y<=r.bottom+tolerance&&entry.b.bottom>=r.top-tolerance);
+  if(!row)rows.push({items:[entry],center:entry.mid,top:entry.b.y,bottom:entry.b.bottom});
+  else{
+   row.items.push(entry);
+   const tall=row.items.filter(x=>x.b.height>dotThreshold);
+   row.center=tall.reduce((acc,x)=>acc+x.mid,0)/tall.length;
+   row.top=Math.min(row.top,entry.b.y);row.bottom=Math.max(row.bottom,entry.b.bottom);
   }
  }
- return lines.map(line=>{
-  const items=line.items.sort((a,b)=>a.i-b.i),part=items.map(x=>x.stroke);
+ // A dot or a short dash is not a new expression. Preserve its original
+ // order within the row when submitting the complete ink to ML Kit.
+ for(const entry of tiny){
+  const row=rows.reduce((best,cur)=>{
+   const distance=entry.mid<cur.top?cur.top-entry.mid:
+    entry.mid>cur.bottom?entry.mid-cur.bottom:0;
+   return !best||distance<best.distance?{row:cur,distance}:best;
+  },null);
+  if(row&&row.distance<=tolerance){
+   row.row.items.push(entry);
+   row.row.top=Math.min(row.row.top,entry.b.y);
+   row.row.bottom=Math.max(row.row.bottom,entry.b.bottom);
+  }
+ }
+ return rows.map(r=>{
+  const items=r.items.sort((a,b)=>a.i-b.i),part=items.map(x=>x.stroke);
   return {strokes:part,box:bounds(part),strokeIds:items.map(x=>x.stroke.id),
    lastIndex:Math.max(...items.map(x=>x.i))};
  }).filter(line=>line.strokes.length<=80&&line.box.width<=700&&line.box.height<=155)
@@ -140,6 +166,39 @@ export function sampledMathStrokes(strokes){
   budget-=out.length;return out;
  }).filter(p=>p.length>=2);
 }
+/** Conservatively detect a trailing equals sign drawn with two short
+ * horizontal strokes. This does not fabricate a numerical answer or correct
+ * digits; it only restores a clearly drawn punctuation symbol. */
+export function hasHandwrittenEquals(strokes){
+ const entries=(strokes||[]).map(stroke=>({stroke,b:bounds([stroke])})).filter(x=>x.b);
+ if(entries.length<3)return false;
+ const all=bounds(strokes),minimum=all.x+all.width*.68;
+ const horizontal=entries.filter(x=>{
+  const b=x.b,pts=x.stroke.pts||[];
+  return b.x>=minimum&&b.width>=10&&b.width<=80&&b.height<=Math.max(8,b.width*.32)&&
+   pts.length>=2;
+ });
+ for(let i=0;i<horizontal.length;i++)for(let j=i+1;j<horizontal.length;j++){
+  const a=horizontal[i].b,b=horizontal[j].b;
+  const vertical=Math.abs((a.y+a.bottom)/2-(b.y+b.bottom)/2),overlap=Math.max(0,Math.min(a.right,b.right)-Math.max(a.x,b.x));
+  if(vertical>=5&&vertical<=24&&overlap>=Math.min(a.width,b.width)*.58)return true;
+ }
+ return false;
+}
+/** Small digits can be confused by ML Kit. Candidate 0/8 changes are shown
+ * as explicitly unverified alternatives, never used for automatic conversion. */
+export function reviewDigitAmbiguities(text){
+ const parsed=normalizeArithmetic(text);
+ if(!parsed||!hasBinaryArithmetic(text))return [];
+ const token=/\d+(?:[.,]\d+)?/g;
+ const matches=[...parsed.text.matchAll(token)];
+ const last=matches.at(-1);if(!last)return [];
+ const i=last.index+last[0].length-1,terminal=parsed.text[i];
+ if(terminal!=='0'&&terminal!=='8')return [];
+ const alternate=parsed.text.slice(0,i)+(terminal==='0'?'8':'0')+parsed.text.slice(i+1);
+ return normalizeArithmetic(alternate)?[alternate]:[];
+}
+
 export async function recognizeHybridLine(strokes,recognizeNative){
  const box=bounds(strokes);
  if(!box||box.width>700||box.height>155||strokes.length>80||
@@ -155,7 +214,22 @@ export async function recognizeHybridLine(strokes,recognizeNative){
  const fused=fuseMathCandidates({mlCandidates:candidates,localText:local?.geometry?.text,
   localConfidence:local?.confidence||0});
  if(!fused)return null;
- return {...fused,geometry:{kind:'text',text:fused.text,
+ // If the equals sign is physically present but was omitted by ML Kit,
+ // preserve the visible sign as a suggestion only; do not auto-accept it.
+ const drawnEquals=hasHandwrittenEquals(strokes);
+ let suggestion=fused;
+ if(drawnEquals&&!fused.text.includes('=')){
+  const complete=normalizeArithmetic(fused.text+'=');
+  if(complete&&hasBinaryArithmetic(complete.text)){
+   suggestion={...fused,text:complete.text,alternatives:[complete.text,...fused.alternatives],
+    confidence:'review',autoAccept:false,needsReview:true};
+  }
+ }
+ const ambiguities=reviewDigitAmbiguities(suggestion.text);
+ return {...suggestion,
+  alternatives:[...new Set([...suggestion.alternatives,...ambiguities])].slice(0,6),
+  uncertainDigits:ambiguities.length>0,
+  geometry:{kind:'text',text:suggestion.text,
   x:(box.x+box.right)/2,y:box.bottom,size:Math.max(18,Math.min(55,box.height||26))},
   style:{color:strokes[0]?.color||'#111827',width:2.5},strokeIds:strokes.map(x=>x.id)};
 }
