@@ -20,6 +20,11 @@ export function extractImportedReminders(text,{now=new Date(),heading='',pageDat
   const contextual=extractContextualAgenda(input,{now,heading,pageDate});
   const known=new Set(meetings.map(reminderKey));
   for(const item of contextual){
+   // Si ya se extrajo un evento por sus propios renglones, no heredar la
+   // fecha de un encabezado anterior para crear otro de día completo.
+   const normalizedTitle=x=>x.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+   if(item.dateInferred&&meetings.some(m=>
+    normalizedTitle(m.title)===normalizedTitle(item.title)&&m.time))continue;
    // Un encabezado numérico entre el título y la hora no es una nueva reunión
    // de día completo cuando ya existe ese mismo compromiso con hora.
    const alreadyTimed=meetings.some(m=>m.date===item.date&&
