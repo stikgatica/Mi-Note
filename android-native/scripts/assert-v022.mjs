@@ -25,7 +25,7 @@ assert(ble.includes('this.notifyBattery(null)'),'No resetea batería al desconec
 assert(bootstrap.includes("import './battery-ui-v022.css'"),'Faltan estilos batería');
 assert(bootstrap.includes("import('./battery-ui-v022.js')"),'Falta interfaz batería');
 assert(ui.includes("level+'%'"),'No presenta porcentaje confirmado');
-assert(ui.includes('Batería: no disponible'),'No avisa cuando hardware carece de servicio');
+assert(ui.includes('Batería Huion: esperando lectura válida'),'No avisa cuando la X10 no entrega una lectura válida');
 assert(batteryCss.includes('background:transparent!important'),'La tinta superior no es transparente');
 
 console.log('V0.22 OK: tinta visible sobre fondo transparente y persistencia de trazos.');
