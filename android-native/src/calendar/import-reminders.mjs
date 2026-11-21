@@ -153,25 +153,35 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
     .filter(x=>typeof x==='string'&&x.trim()).slice(0,3);
   }catch{return [];}
  }
- // OCR por bloque y renglón: soporta "Reunión" / "11/12" / "14:00"
- // y otra reunión en otra zona de la misma página, incluso si está inclinada.
+ // Leer primero renglones individuales, ordenados de arriba a abajo.
+ // ML Kit puede combinar la hora de otra nota cuando recibe toda la hoja.
+ // Nunca superponer una hipótesis de OCR global a una lectura válida por filas.
  for(const [i,group] of groups.slice(0,MAX_BANDS).entries()){
   const regionId='region-'+i;
-  const combined=await read(group.flat());
-  for(const text of combined)remember(text,regionId);
-  if(group.length>1){
-   const rows=[];
-   for(const line of group.slice(0,MAX_BANDS)){
-    const options=await read(line);
-    if(options.length)rows.push(options[0]);
-   }
-   if(rows.length)remember(rows.join('\n'),regionId);
+  const rowOptions=[];
+  for(const line of group.slice(0,MAX_BANDS)){
+   rowOptions.push(await read(line));
+  }
+  const primary=rowOptions.map(options=>options[0]||'').filter(Boolean);
+  const oldCount=events.length;
+  if(primary.length)remember(primary.join('\n'),regionId);
+  // Si el OCR por filas aún no compone un compromiso, probar sus alternativas
+  // sin emparejar títulos/fechas/horas de grupos físicos distintos.
+  if(events.length===oldCount&&rowOptions.some(x=>x.length>1)){
+   const candidates=rowOptions.map(options=>options.find(x=>/^(?:acto|reuni[oó]n|cita|consejo|ceremonia|entrevista)/i.test(x.trim()))||options[0]||'').filter(Boolean);
+   if(candidates.length)remember(candidates.join('\n'),regionId);
+  }
+  if(events.length===oldCount){
+   const combined=await read(group.flat());
+   for(const text of combined)remember(text,regionId);
   }
  }
- // Fallback conservador para encabezados contextuales cuando no hubo OCR útil por bloques.
- if(!events.length){
+ // La lectura global puede entrecruzar renglones de compromisos distintos.
+ // Se permite solamente cuando no existe ningún resultado por regiones y
+ // la página contiene un único bloque; de otro modo se omite.
+ if(!events.length&&groups.length===1){
   const full=await read(bands.flat());
-  for(const text of full)remember(text);
+  for(const text of full)remember(text,'region-0');
  }
  return events.slice(0,25);
 }
