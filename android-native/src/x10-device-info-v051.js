@@ -42,34 +42,45 @@ status.before(root);
 const $=id=>document.getElementById(id);
 let connected=false,level=null,lastIndex=null,queryTimer=0,queryReceived=false,clearing=false;
 let batteryAt=null,batterySource='gatt-2a19',batteryCompare=null,sessionReference=null;
+let vendorBattery=null,vendorMemory=null,vendorReadAt=null,vendorBusy=false;
 const asNumber=input=>input?.value?.trim()!==''&&Number.isInteger(Number(input.value))?Number(input.value):null;
 function paint(){
  const meter=$('x10BatteryMeter'),memoryMeter=$('x10MemoryMeter');
  const battery=batteryFromGatt({connected,level,readAt:batteryAt,source:batterySource});
  const memory=connected?memoryFromIndex(lastIndex,{reference:sessionReference}):memoryFromIndex(null);
- const valid=battery.available;
- $('x10BatteryValue').textContent=valid?battery.level+'%':'—';
- meter.style.setProperty('--x10-progress',valid?battery.level+'%':'0%');
+ const activeVendor=connected&&vendorReadAt&&Date.now()-vendorReadAt<180000;
+ const mainBattery=activeVendor? vendorBattery : null;
+ const mainMemory=activeVendor? vendorMemory : null;
+ const valid=!!mainBattery||battery.available;
+ $('x10BatteryValue').textContent=mainBattery?mainBattery.percent+'%':battery.available?battery.level+'%':'—';
+ meter.style.setProperty('--x10-progress',mainBattery?mainBattery.percent+'%':battery.available?battery.level+'%':'0%');
  meter.dataset.known=String(valid);
- meter.setAttribute('aria-label',valid?'Lectura GATT '+battery.level+' por ciento':'Sin lectura de batería vigente');
- $('x10BatteryExplanation').textContent=valid?
-  'GATT 2A19 · '+new Date(battery.readAt).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})+
-   ' · no corroborado con Huion Note'+(batteryCompare?.batteryMismatch?' · DISCREPANCIA':''):
-  'Batería: '+battery.reason+'. Pulse Consultar información.';
- $('x10MemoryValue').textContent=memory.available?'≈'+memory.free+'/50':'—';
- memoryMeter.style.setProperty('--x10-progress',memory.available?(memory.free/50*100)+'%':'0%');
- memoryMeter.setAttribute('aria-label',memory.available?'Estimación de memoria libre: '+memory.free+' de 50':'Memoria libre no disponible');
- $('x10MemoryExplanation').textContent=memory.available?
-  'Estimación no verificada · índice '+memory.index+' (0x85). '+(memory.verified?'Coincide con la app oficial en esta sesión.':'No equivale a espacio libre confirmado.'):
-  'Sin lectura de capacidad libre. El índice NO equivale a espacio libre.';
+ meter.setAttribute('aria-label',mainBattery?'Lectura Huion '+mainBattery.percent+' por ciento':battery.available?'Lectura GATT '+battery.level+' por ciento no corroborada':'Sin lectura de batería vigente');
+ $('x10BatteryExplanation').textContent=mainBattery?
+  'Huion 0x8E · lectura directa · '+new Date(vendorReadAt).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}):
+  battery.available?'GATT 2A19 (alternativo, sin corroborar) · '+
+   new Date(battery.readAt).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}):
+   'Batería: '+battery.reason+'. Pulse Consultar información.';
+ $('x10MemoryValue').textContent=mainMemory?mainMemory.free+'/'+mainMemory.total:
+  memory.available?'≈'+memory.free+'/50':'—';
+ const memFree=mainMemory?mainMemory.free:memory.available?memory.free:null;
+ const memTotal=mainMemory?mainMemory.total:memory.capacity;
+ memoryMeter.style.setProperty('--x10-progress',memFree!==null?(memFree/memTotal*100)+'%':'0%');
+ memoryMeter.setAttribute('aria-label',mainMemory?
+  'Huion informa '+mainMemory.free+' espacios disponibles de '+mainMemory.total:
+  memory.available?'Memoria estimada '+memory.free+' de 50':'Memoria libre no disponible');
+ $('x10MemoryExplanation').textContent=mainMemory?
+   'Huion 0x8F · lectura directa · '+(mainMemory.unknownTailHex||''):
+   memory.available?'Estimación no verificada · índice '+memory.index+' (0x85). No equivale a espacio libre confirmado.':
+   'Sin lectura de memoria 0x8F. El índice 0x85 NO equivale a espacio libre.';
  $('x10DeviceRefresh').disabled=!connected;
  $('x10DeviceClearCache').disabled=!connected||clearing;
  $('x10CompareMetrics').disabled=!connected;
- $('x10ProbeVendorStatus').disabled=!connected;
+ $('x10ProbeVendorStatus').disabled=!connected||vendorBusy;
 }
 function refreshConnection(){
  connected=!!document.getElementById('x10OpenBtn')?.classList.contains('is-connected');
- if(!connected){level=null;lastIndex=null;batteryAt=null;sessionReference=null;batteryCompare=null;}
+ if(!connected){level=null;lastIndex=null;batteryAt=null;sessionReference=null;batteryCompare=null;vendorBattery=null;vendorMemory=null;vendorReadAt=null;}
  paint();
 }
 window.addEventListener('minote:x10-battery',event=>{
@@ -77,7 +88,7 @@ window.addEventListener('minote:x10-battery',event=>{
  level=Number.isInteger(event.detail?.level)?event.detail.level:null;
  batteryAt=Number.isInteger(event.detail?.readAt)?event.detail.readAt:null;
  batterySource=event.detail?.source||'gatt-2a19';
- if(!connected){lastIndex=null;sessionReference=null;batteryCompare=null;}
+ if(!connected){lastIndex=null;sessionReference=null;batteryCompare=null;vendorBattery=null;vendorMemory=null;vendorReadAt=null;}
  paint();
 });
 window.addEventListener('minote:x10-memory-index',event=>{
@@ -131,9 +142,18 @@ $('x10ProbeVendorStatus').addEventListener('click',async()=>{
  try{
   const response=await window.MiNoteX10DeviceInfo?.queryVendorStatus?.();
   if(!response?.results)throw Error('La consulta de diagnóstico no está disponible.');
+  vendorBattery=response.battery||null;
+  vendorMemory=response.memory||null;
+  vendorReadAt=response.readAt||Date.now();
+  if(vendorBattery)window.dispatchEvent(new CustomEvent('minote:x10-vendor-battery',{detail:{
+   level:vendorBattery.percent,readAt:vendorReadAt,connected:true,source:'huion-0x8e'}}));
   out.textContent=response.results.map(item=>
    item.opcode+' '+item.name+': '+(item.received?item.response.hex:'sin respuesta en el plazo de lectura')
-  ).join(' | ')+' · Bytes originales sin interpretar; no se han modificado las páginas.';
+  ).join(' | ')+
+   (vendorBattery?' · Batería '+vendorBattery.percent+'%':' · Batería no disponible')+
+   (vendorMemory?' · Memoria '+vendorMemory.free+'/'+vendorMemory.total:' · Memoria no disponible')+
+   ' · Los datos desconocidos permanecen sin interpretar.';
+  paint();
  }catch(error){
   out.textContent='No se pudo consultar: '+(error?.message||String(error))+
    '. No se envió ninguna orden de borrado.';
@@ -147,8 +167,18 @@ $('x10DeviceRefresh').addEventListener('click',async()=>{
  if(!connected)return;
  const hint=$('x10DeviceHint');
  queryReceived=false;
- hint.textContent='Consultando batería GATT 2A19 e índice 0x85 sin borrar contenido…';
+ hint.textContent='Consultando los indicadores propios de Huion (0x8E y 0x8F)…';
  try{
+  const status=await window.MiNoteX10DeviceInfo?.queryVendorStatus?.();
+  if(status?.battery||status?.memory){
+   vendorBattery=status.battery||null;vendorMemory=status.memory||null;vendorReadAt=status.readAt||Date.now();
+   if(vendorBattery)window.dispatchEvent(new CustomEvent('minote:x10-vendor-battery',{detail:{
+    level:vendorBattery.percent,readAt:vendorReadAt,connected:true,source:'huion-0x8e'}}));
+   paint();
+   hint.textContent='Datos obtenidos directamente de Huion por 0x8E/0x8F; no se modificaron las páginas.';
+   return;
+  }
+  hint.textContent='Sin respuesta Huion 0x8E/0x8F: consultando indicadores alternativos no corroborados…';
   if(typeof window.MiNoteX10BatteryRefresh==='function')
    void Promise.resolve(window.MiNoteX10BatteryRefresh()).catch(()=>{batteryAt=null;paint();});
   const api=window.MiNoteX10DeviceInfo;
