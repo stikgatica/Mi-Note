@@ -180,7 +180,7 @@ export function hasHandwrittenEquals(strokes){
  });
  for(let i=0;i<horizontal.length;i++)for(let j=i+1;j<horizontal.length;j++){
   const a=horizontal[i].b,b=horizontal[j].b;
-  const vertical=Math.abs(a.cy-b.cy),overlap=Math.max(0,Math.min(a.right,b.right)-Math.max(a.x,b.x));
+  const vertical=Math.abs((a.y+a.bottom)/2-(b.y+b.bottom)/2),overlap=Math.max(0,Math.min(a.right,b.right)-Math.max(a.x,b.x));
   if(vertical>=5&&vertical<=24&&overlap>=Math.min(a.width,b.width)*.58)return true;
  }
  return false;
