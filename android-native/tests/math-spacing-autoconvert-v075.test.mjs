@@ -33,7 +33,7 @@ test('el selector solo autoriza autoconversión si está activado y la operació
  assert.equal(primary.autoAccept,false);
  assert.equal(canAutoConvertMath(primary,false),false);
  assert.equal(canAutoConvertMath(primary,true),true);
- assert.equal(canAutoConvertMath({...primary,text:'7+5'},true),true);
+ assert.equal(canAutoConvertMath({...primary,text:'7+5'},true),false);
  assert.equal(canAutoConvertMath({...primary,uncertainDigits:true},true),false);
  assert.equal(canAutoConvertMath({source:'mlkit-es',text:'55'},true),false);
  const agreed=fuseMathCandidates({mlCandidates:['36÷6='],localText:'36÷6=',localConfidence:.93});
