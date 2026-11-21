@@ -24,7 +24,7 @@ root.innerHTML=[
  '<button type="button" class="subtle minote-device-danger" id="x10DeviceClearCache">Limpiar caché de la Huion X10</button>',
  '</div>',
  '<div class="minote-metrics-compare"><strong>Diagnóstico de protocolo Huion (experimental)</strong>',
- '<p>Consultar respuestas 0x8E (batería) y 0x8F (memoria) sin borrar datos. Hasta verificar su formato, no se muestran como porcentajes.</p>',
+ '<p>Consulta directa 0x8E (batería) y 0x8F (memoria). Los demás bytes siguen sin interpretar.</p>',
  '<button type="button" id="x10ProbeVendorStatus">Leer estado Huion 0x8E/0x8F</button>',
  '<p id="x10VendorStatusOutput" role="status" aria-live="polite"></p></div>',
  '<div class="minote-metrics-compare"><strong>Comparar con Huion Note (opcional)</strong>', 
