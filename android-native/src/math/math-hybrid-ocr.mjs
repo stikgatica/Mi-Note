@@ -48,6 +48,35 @@ export function normalizeArithmetic(value){
  if(operators===0&&nums===1&&compact.replace(/[.,]/g,'').length<2)return null;
  return {text:compact,hasOperator:operators>0,numbers:nums,terminalEquals:tokens.at(-1)==='='};
 }
+/** Espaciado de lectura. No altera la expresión matemática ni calcula el
+ * resultado. Conserva el signo negativo unario junto a su operando. */
+export function formatMathDisplay(value){
+ const parsed=normalizeArithmetic(value);
+ if(!parsed)return String(value??'');
+ const tokens=parsed.text.match(/\d+(?:[.,]\d+)?|[()+\-×÷=]/g)||[];
+ let result='',expectsOperand=true;
+ for(const token of tokens){
+  if(token==='-'&&expectsOperand){result+='-';continue;}
+  if(['+','-','×','÷','='].includes(token)){
+   result=result.trimEnd()+' '+token+' ';
+   expectsOperand=true;
+  }else if(token==='('){result+='(';expectsOperand=true;}
+  else if(token===')'){result+=')';expectsOperand=false;}
+  else{result+=token;expectsOperand=false;}
+ }
+ return result.replace(/\s{2,}/g,' ').trim();
+}
+/** El selector explícito autoriza usar la lectura principal de ML Kit aunque
+ * no coincida con las plantillas locales. La tinta original sigue almacenada
+ * y el texto puede corregirse. No convertir fragmentos sin "=" final. */
+export function canAutoConvertMath(proposal,enabled=false){
+ if(!enabled||!proposal||proposal.uncertainDigits||!hasBinaryArithmetic(proposal.text))return false;
+ const parsed=normalizeArithmetic(proposal.text);
+ if(!parsed?.terminalEquals)return false;
+ return proposal.source==='mlkit-es'||proposal.source==='hybrid-consensus'||
+  (proposal.source==='local-templates'&&proposal.autoAccept===true);
+}
+
 /** Only real binary arithmetic is promoted to a conversion proposal.
  * A standalone number, a minus sign alone, or an equals sign alone
  * can occur as part of geometry and must not become digital ink.
