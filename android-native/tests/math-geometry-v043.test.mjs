@@ -4,9 +4,9 @@ import {readFileSync} from 'node:fs';
 import {AXES,propose,hitStroke,fingerprint,validObject} from '../src/math/math-geometry.mjs';
 
 const stroke=(id,pts)=>({id,color:'#000000',width:3,pts:pts.map(p=>[p[0],p[1],.5])});
-test('cuatro ejes; solo Geometría está habilitada inicialmente',()=>{
+test('cuatro ejes; Geometría y Números y operaciones están habilitados',()=>{
  assert.deepEqual(AXES.map(x=>x.id),['numbers','algebra','geometry','data']);
- assert.deepEqual(AXES.filter(x=>x.ready).map(x=>x.id),['geometry']);
+ assert.deepEqual(AXES.filter(x=>x.ready).map(x=>x.id),['numbers','geometry']);
 });
 test('línea recta local conserva extremos y no modifica el trazo original',()=>{
  const ink=stroke('a',[[100,300],[130,302],[180,299],[230,300],[300,301]]);
