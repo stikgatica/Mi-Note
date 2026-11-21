@@ -27,11 +27,11 @@ dialog.innerHTML=`
  <label class="field">Eje<select id="mathAxis"></select></label>
  <p class="math-hint">Mi Note mejora automáticamente figuras y propone texto digital al terminar de escribir en la Huion. El original permanece intacto.</p>
  <section id="mathNumbersControls" hidden>
-  <label class="math-switch"><input id="mathAutoDigital" type="checkbox" checked> Convertir automáticamente las operaciones reconocidas (=)</label>
+  <label class="math-switch"><input id="mathAutoDigital" type="checkbox" checked> Convertir automáticamente números y operaciones reconocidas</label>
   <label class="math-switch"><input id="mathNumbersShowLayer" type="checkbox" checked> Mostrar texto matemático digital</label>
   <div class="math-actions"><button type="button" id="mathDownloadModel">Preparar ML Kit</button>
   <button type="button" id="mathScanNumbers">Reconocer operaciones de esta hoja</button></div>
-  <p class="math-hint">Con este selector activo, las operaciones completas reconocidas se convierten en texto digital con espacios, sin pulsar Confirmar. Las lecturas dudosas entre 0 y 8 requieren revisión. Puede desactivar la conversión automática. La tinta original permanece guardada y no se calculan resultados.</p>
+  <p class="math-hint">Con el selector activo, las operaciones reconocidas se convierten tras una pausa, incluso si ML Kit omite el signo igual. Las lecturas dudosas entre 0 y 8 requieren revisión. La tinta original se conserva y no se calculan resultados.</p>
   <div id="mathHybridCandidates" class="math-hybrid-candidates" aria-live="polite"></div>
  </section>
  <section id="mathGeometryControls" hidden>
@@ -264,17 +264,30 @@ async function scanHybridMath(all=false){
   let found=0;
   for(const line of active.slice(all?0:-1).slice(0,18)){
    if(serial!==hybridScanSerial||epoch!==intentionEpoch||activeMathPage()!==pg.id)break;
-   if(line.strokeIds.length>80||storedMathObject(get(),line.strokeIds))continue;
+   if(line.strokeIds.length>80)continue;
+   if(storedMathObject(get(),line.strokeIds)){
+    mathSuggestions.delete(mathProposalKey(pg.id,line.strokeIds));
+    continue;
+   }
    const key=mathProposalKey(pg.id,line.strokeIds);
-   if(rejectedMath.has(key)||(!all&&mathSuggestions.has(key)))continue;
+   if(rejectedMath.has(key))continue;
+   // Volver a evaluar propuestas que quedaron pendientes antes de activar
+   // la conversión automática, sin exigir que el usuario pulse Convertir.
+   const previous=mathSuggestions.get(key);
+   if(!all&&previous&&!$('mathAutoDigital').checked)continue;
    const recognized=await recognizeHybridLine(line.strokes,mathModelReady?
     args=>mlkitMath.recognize(args):null);
    if(!recognized)continue;
    const fingerprints=Object.fromEntries(line.strokes.map(stroke=>[stroke.id,fingerprint(stroke)]));
    const proposal={...recognized,pageId:pg.id,fingerprints};
    if(canAutoConvertMath(recognized,$('mathAutoDigital').checked)){
-    try{await acceptMath(proposal);found++;continue;}
-    catch(error){tell('Lectura por confirmar: '+error.message);}
+    try{
+     const converted=await acceptMath(proposal);
+     if(converted||storedMathObject(get(),line.strokeIds)){
+      mathSuggestions.delete(key);
+      found++;continue;
+     }
+    }catch(error){tell('Lectura por confirmar: '+error.message);}
    }
    mathSuggestions.set(key,proposal);found++;
   }
@@ -490,7 +503,7 @@ async function scanRecent(all=false){
 function scheduleScan(){
  if(!enabled)return;
  clearTimeout(scanTimer);
- scanTimer=setTimeout(()=>void scanRecent(false),numbersSelected()?1300:650);
+ scanTimer=setTimeout(()=>void scanRecent(false),numbersSelected()?2350:650);
 }
 function editFields(){
  const obj=selectedObject(),editor=$('mathCoordinateEditor');editor.replaceChildren();$('mathLabels').replaceChildren();
@@ -564,8 +577,9 @@ $('mathDownloadModel').addEventListener('click',async()=>{
 $('mathAutoDigital').addEventListener('change',event=>{
  try{localStorage.setItem('minote:math-auto-convert',event.target.checked?'1':'0');}catch{}
  tell(event.target.checked?
-  'Conversión automática activada para operaciones completas que terminan en =. Los dígitos dudosos requieren revisión.':
+  'Conversión automática activada: al terminar de escribir, se mostrarán números y operaciones como texto digital. Los dígitos dudosos requieren revisión.':
   'Conversión automática desactivada. Las operaciones se mostrarán para revisar y convertir manualmente.');
+ if(event.target.checked&&enabled&&numbersSelected())void scanHybridMath(true);
 });
 try{
  const savedAuto=localStorage.getItem('minote:math-auto-convert');
