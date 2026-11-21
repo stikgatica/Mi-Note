@@ -177,6 +177,106 @@ function renderOverlay(pg){
  }
  overlay.append(group);
 }
+let mathModelReady=false;
+const rejectedMath=new Set();
+const activeMathPage=()=>get()?.id||'';
+function mathProposalKey(pageId,strokeIds){
+ return pageId+':'+strokeIds.join('|');
+}
+function storedMathObject(pg,ids){
+ const key=new Set(ids);
+ return (layerOf(pg).objects||[]).some(o=>o.geometry?.kind==='text'&&
+  (o.sources||[]).length===ids.length&&o.sources.every(x=>key.has(x.id)));
+}
+function renderMathSuggestions(){
+ const root=$('mathHybridCandidates');
+ root.replaceChildren();
+ if(!mathSuggestions.size){
+  root.append(elm('p',{class:'math-hint'},'Escriba un número u operación y deje de escribir un instante. Los resultados dudosos se mostrarán aquí.'));
+  return;
+ }
+ for(const [key,proposal] of mathSuggestions){
+  if(proposal.pageId!==activeMathPage())continue;
+  const item=elm('div',{class:'math-hybrid-item'});
+  item.append(elm('small',{},proposal.autoAccept?'Coincidencia de dos reconocedores':
+    proposal.source==='mlkit-es'?'ML Kit · confirmar lectura':'Plantillas locales · confirmar lectura'));
+  const field=elm('input',{type:'text',maxlength:'60',value:proposal.text,'aria-label':'Editar operación matemática'});
+  field.value=proposal.text;
+  const buttons=elm('div',{class:'math-actions'});
+  const confirm=elm('button',{type:'button'},'Convertir a texto');
+  const discard=elm('button',{type:'button',class:'subtle'},'Conservar manuscrito');
+  confirm.addEventListener('click',()=>{
+   const parsed=normalizeArithmetic(field.value);
+   if(!parsed){tell('Operación no válida. Revise números, comas y signos + − × ÷ =.');return;}
+   void acceptMath({...proposal,text:parsed.text,geometry:{...proposal.geometry,text:parsed.text}})
+    .then(()=>{mathSuggestions.delete(key);renderMathSuggestions();})
+    .catch(e=>tell(e.message));
+  });
+  discard.addEventListener('click',()=>{rejectedMath.add(key);mathSuggestions.delete(key);renderMathSuggestions();});
+  buttons.append(confirm,discard);item.append(field,buttons);root.append(item);
+ }
+}
+async function acceptMath(proposal){
+ const pg=get();if(!pg||pg.id!==proposal.pageId||!enabled||!numbersSelected())
+  throw Error('Abra la página original en el modo Números y operaciones.');
+ const ids=new Set(proposal.strokeIds),selected=(pg.strokes||[]).filter(stroke=>ids.has(stroke.id));
+ if(selected.length!==ids.size)throw Error('La escritura cambió; vuelva a reconocerla.');
+ if(selected.some(stroke=>fingerprint(stroke)!==proposal.fingerprints[stroke.id]))
+  throw Error('Los trazos cambiaron desde su lectura. Vuelva a reconocer.');
+ const sources=selected.map(stroke=>({id:stroke.id,signature:fingerprint(stroke)}));
+ if(storedMathObject(pg,proposal.strokeIds))return false;
+ const candidate={type:'text',label:'Texto matemático',geometry:proposal.geometry,
+  style:proposal.style,sources,automatic:true};
+ const prior=layerOf(pg).objects||[];
+ const merge=mergeAutomatic(prior,candidate);
+ if(!merge)throw Error('Hay una corrección manual sobre esos trazos; no se reemplazará.');
+ const object={id:globalThis.crypto?.randomUUID?.()||'math-'+Date.now()+'-'+(++sequence),
+  accepted:true,automatic:true,type:'text',label:'Texto matemático',
+  geometry:copy(candidate.geometry),style:copy(candidate.style),sources:copy(candidate.sources),labels:[]};
+ await saveLayer([...merge.objects,object],layerOf(pg).visible!==false);
+ tell('Texto digital: '+proposal.geometry.text+'. Los trazos originales están conservados; puede volver al manuscrito.');
+ return true;
+}
+async function scanHybridMath(all=false){
+ if(!enabled||!numbersSelected()||hybridScanBusy)return;
+ const pg=get();if(!pg?.strokes?.length)return;
+ hybridScanBusy=true;const serial=++hybridScanSerial,epoch=intentionEpoch;
+ try{
+  const lines=mathematicalLines(pg.strokes,{maxStrokes:all?160:85});
+  const lastId=pg.strokes.at(-1)?.id;
+  const active=all?lines:lines.filter(line=>line.strokeIds.includes(lastId));
+  let found=0;
+  for(const line of active.slice(all?0:-1).slice(0,18)){
+   if(serial!==hybridScanSerial||epoch!==intentionEpoch||activeMathPage()!==pg.id)break;
+   if(line.strokeIds.length>80||storedMathObject(get(),line.strokeIds))continue;
+   const key=mathProposalKey(pg.id,line.strokeIds);
+   if(rejectedMath.has(key)||mathSuggestions.has(key))continue;
+   const recognized=await recognizeHybridLine(line.strokes,mathModelReady?
+    args=>mlkitMath.recognize(args):null);
+   if(!recognized)continue;
+   const fingerprints=Object.fromEntries(line.strokes.map(stroke=>[stroke.id,fingerprint(stroke)]));
+   const proposal={...recognized,pageId:pg.id,fingerprints};
+   if(recognized.autoAccept&&$('mathAutoDigital').checked){
+    try{await acceptMath(proposal);found++;continue;}
+    catch(error){tell('Lectura por confirmar: '+error.message);}
+   }
+   mathSuggestions.set(key,proposal);found++;
+  }
+  renderMathSuggestions();
+  if(all)tell('Análisis matemático: '+found+' lectura(s) nueva(s). Revise las propuestas; los trazos originales permanecen intactos.');
+ }catch(error){tell('Reconocimiento matemático: '+(error.message||String(error)));}
+ finally{hybridScanBusy=false;}
+}
+async function checkMathModel(){
+ try{
+  const status=await mlkitMath.modelStatus();
+  mathModelReady=!!status?.downloaded;
+  $('mathDownloadModel').textContent=mathModelReady?'ML Kit preparado ✓':'Descargar modelo de escritura ML Kit';
+ }catch{
+  mathModelReady=false;
+  $('mathDownloadModel').textContent='ML Kit no disponible (usar plantillas)';
+ }
+}
 function selectedObject(){
  const pg=get(),id=$('mathSavedObjects').value;
  return (layerOf(pg).objects||[]).find(obj=>obj.id===id)||null;
@@ -347,7 +447,12 @@ async function mutate(edit){
 function readGeometry(geometry){
  const vals={};
  for(const input of $('mathCoordinateEditor').querySelectorAll('input')){
-  if(input.dataset.key==='text'){const text=input.value.trim();if(!text||text.length>40||!/^[\dcm°., -]+$/i.test(text))throw Error('Texto de medida inválido.');vals.text=text;continue;}
+  if(input.dataset.key==='text'){
+    const text=input.value.trim();
+    if(!text||text.length>60||(!normalizeArithmetic(text)&&!/^[\dcm°., -]+$/i.test(text)))
+     throw Error('Texto matemático o medida inválidos.');
+    vals.text=normalizeArithmetic(text)?.text||text;continue;
+   }
   if(!input.value.trim()||!Number.isFinite(Number(input.value)))throw Error('Coordenada inválida.');
   vals[input.dataset.key]=Number(input.value);
   if(vals[input.dataset.key]<0||vals[input.dataset.key]>1400)throw Error('Coordenada fuera de la hoja.');
@@ -360,6 +465,33 @@ function readGeometry(geometry){
  else if(result.kind==='segments')result.segments=result.segments.map((seg,i)=>seg.map((_,j)=>p('s'+i+j+'x','s'+i+j+'y')));
  return result;
 }
+$('mathAxis').addEventListener('change',()=>{
+ clearTimeout(scanTimer);intentionEpoch++;
+ mathSuggestions.clear();renderMathSuggestions();
+ const page=get();if(page)intentCutoffs.set(page.id,page.strokes?.length||0);
+ updateInterface();
+ if(numbersSelected()){
+  void checkMathModel();
+  tell('Modo números y operaciones activo. Escriba una expresión, espere un instante y confirme las lecturas dudosas.');
+ }else tell('Modo geometría activo. Los trazos originales permanecen intactos.');
+});
+$('mathDownloadModel').addEventListener('click',async()=>{
+ const button=$('mathDownloadModel');
+ button.disabled=true;tell('Comprobando modelo de escritura ML Kit…');
+ try{
+  await mlkitMath.downloadModel();mathModelReady=true;
+  button.textContent='ML Kit preparado ✓';
+  tell('Modelo de escritura preparado. Reconocimiento local disponible sin conexión.');
+ }catch(error){tell('Modelo no preparado: '+(error?.message||String(error)));}
+ finally{button.disabled=false;}
+});
+$('mathScanNumbers').addEventListener('click',()=>void scanHybridMath(true));
+$('mathNumbersShowLayer').addEventListener('change',async e=>{
+ const pg=get();if(!pg)return;
+ try{await saveLayer(copy(layerOf(pg).objects||[]),e.target.checked);}
+ catch(error){tell(error.message);}
+});
+renderMathSuggestions();
 $('mathMode').addEventListener('change',e=>setEnabled(e.target.checked));
 menuToggle.addEventListener('change',e=>setEnabled(e.target.checked));
 $('mathClose').addEventListener('click',()=>dialog.close());
@@ -414,7 +546,7 @@ document.addEventListener('minote:stroke-finished',({detail})=>{
  scheduleScan();
 });
 document.addEventListener('minote:statechange',()=>{
- const pg=get();if(pg?.id!==lastPage){lastPage=pg?.id||'';clearTimeout(scanTimer);}
+ const pg=get();if(pg?.id!==lastPage){lastPage=pg?.id||'';clearTimeout(scanTimer);mathSuggestions.clear();renderMathSuggestions();}
  refresh();
 });
 document.addEventListener('minote:page-rendered',refresh);
