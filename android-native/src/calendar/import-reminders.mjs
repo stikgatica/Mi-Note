@@ -31,6 +31,10 @@ export function extractImportedReminders(text,{now=new Date(),heading='',pageDat
     m.title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()===
     item.title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()&&m.time);
    if(!item.time&&alreadyTimed)continue;
+   // La fecha y hora ya documentadas no necesitan además una propuesta
+   // contextual de día completo sin un título identificable.
+   if(!item.time&&meetings.some(m=>m.date===item.date&&m.time&&
+      (m.needsTitle||item.dateInferred)))continue;
    if(!known.has(reminderKey(item))){
     meetings.push({...item,regionId:regionId||item.regionId||''});known.add(reminderKey(item));
    }
@@ -144,9 +148,21 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
   for(const item of list){
    const event={...item,regionId:item.regionId||regionId||''};
    const fingerprint=reminderKey(event);
-   if(fingerprint&&!seen.has(fingerprint)){
-    seen.add(fingerprint);events.push(event);
+   if(!fingerprint||seen.has(fingerprint))continue;
+   // Un evento con nombre y la sugerencia sin nombre corresponden al mismo
+   // par fecha/hora únicamente dentro de la misma región física.
+   const pairIndex=events.findIndex(previous=>previous.regionId===event.regionId&&
+     previous.date===event.date&&previous.time===event.time);
+   if(pairIndex>=0){
+    const previous=events[pairIndex];
+    if(previous.needsTitle&&!event.needsTitle){
+      seen.delete(reminderKey(previous));
+      events[pairIndex]=event;
+      seen.add(fingerprint);
+    }
+    continue;
    }
+   seen.add(fingerprint);events.push(event);
   }
  }
  async function read(strokes){
