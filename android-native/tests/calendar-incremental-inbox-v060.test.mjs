@@ -7,7 +7,7 @@ import {readFileSync} from 'node:fs';
 const storage=()=>{const store=new Map();return {
  getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)};};
 const stroke=(y,x=20)=>({pts:[[x,y],[x+20,y+2],[x+40,y+4]]});
-const event=(time='09:30')=>({title:'Reunión equipo PIE',date:'2026-11-24',time,allDay:false,pageId:'hoja-1'});
+const event=(time='09:30')=>({title:'Reunión equipo PIE',date:'2026-11-24',time,allDay:false,pageId:'hoja-1',regionId:'region-0'});
 test('el OCR incremental selecciona solamente el bloque reciente y su contexto cercano',()=>{
  const page={id:'a',strokes:[stroke(120),stroke(122),stroke(450),stroke(452),stroke(900)]};
  const selected=incrementalStrokes(page,4);
