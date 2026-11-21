@@ -16,7 +16,7 @@ test('Se mantienen detalles y acción física con doble confirmación',()=>{
  const pkg=JSON.parse(read('../package.json'));
  assert.match(details,/Batería restante/);
  assert.match(details,/Memoria restante/);
- assert.match(details,/Limpiar caché de la Huion X10/);
+ assert.match(details,/Borrar páginas guardadas en la Huion X10/);
  assert.match(details,/typed!=='LIMPIAR'/);
  assert.ok(Number(pkg.version.split('.')[1])>=53);
 });
