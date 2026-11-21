@@ -19,8 +19,16 @@ export function extractImportedReminders(text,{now=new Date(),heading='',pageDat
   const meetings=extractNaturalMeetings(input,{now,regionId});
   const contextual=extractContextualAgenda(input,{now,heading,pageDate});
   const known=new Set(meetings.map(reminderKey));
-  for(const item of contextual)if(!known.has(reminderKey(item))){
-   meetings.push({...item,regionId:regionId||item.regionId||''});known.add(reminderKey(item));
+  for(const item of contextual){
+   // Un encabezado numérico entre el título y la hora no es una nueva reunión
+   // de día completo cuando ya existe ese mismo compromiso con hora.
+   const alreadyTimed=meetings.some(m=>m.date===item.date&&
+    m.title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()===
+    item.title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()&&m.time);
+   if(!item.time&&alreadyTimed)continue;
+   if(!known.has(reminderKey(item))){
+    meetings.push({...item,regionId:regionId||item.regionId||''});known.add(reminderKey(item));
+   }
   }
   return meetings.slice(0,25);
  }
