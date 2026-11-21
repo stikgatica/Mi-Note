@@ -29,8 +29,17 @@ body.minote-android .minote-device-meter::before{
 }
 body.minote-android .minote-device-meter span{position:relative;font-size:16px;font-weight:700;}
 body.minote-android .minote-device-memory{
- background:conic-gradient(#dce5ee 0 100%);
+ background:conic-gradient(#6fa6d6 0 var(--x10-progress),#dce5ee var(--x10-progress) 100%);
 }
+body.minote-android .minote-device-memory span{font-size:14px}
+body.minote-android .minote-metrics-compare{margin-top:12px;padding:10px;border:1px solid #dce6ed;border-radius:10px;background:#fff}
+body.minote-android .minote-metrics-compare strong{font-size:12px}
+body.minote-android .minote-metrics-compare p{font-size:11px;line-height:1.45;margin:6px 0;color:#52677a}
+body.minote-android .minote-metrics-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:7px 0}
+body.minote-android .minote-metrics-fields label{display:flex;flex-direction:column;gap:4px;font-size:11px}
+body.minote-android .minote-metrics-fields input{width:100%;min-width:0;padding:8px;border:1px solid #c8d6e0;border-radius:7px}
+body.minote-android #x10CompareMetrics{min-height:41px;width:100%}
+body.minote-android #x10MetricsComparison{font-weight:600;color:#365773}
 body.minote-android .minote-device-actions{
  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px;
 }
