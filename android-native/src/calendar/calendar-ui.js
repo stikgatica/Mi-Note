@@ -130,6 +130,22 @@ async function recognize({silent=false}={}){
  busy=true;
  if(!silent)status('Interpretando las notas escritas en esta hoja…');
  try{
+  // La nota puede ser "Reunión" / "11/12" / "14:00" en tres renglones.
+  // Procesar bloques físicos completos antes de intentar el OCR global anterior.
+  const active=snapshot();
+  if(active?.strokes?.length){
+   const extracted=await recognizeImportedPage(active,args=>bridge.recognize(args));
+   for(const proposal of extracted)enqueueImportedSuggestion(proposal,{imported:false,pageId:active.id});
+   if(extracted.length){
+    if(!silent){
+     textBox.value=extracted[0].source||'';
+     applyText();
+     status(extracted.length+' compromiso(s) detectado(s) en esta hoja y añadidos a la bandeja de revisión.');
+    }else maybeShowNextSuggestion();
+    return;
+   }
+   if(silent)return; // No inventar eventos de OCR global de una nota incompleta.
+  }
   const strokes=strokesForRecognition({incremental:silent});
   if(!strokes.length)return;
   const result=await bridge.recognize({strokes});
@@ -421,7 +437,7 @@ document.addEventListener('minote:stroke-finished',()=>{
   if(signature===lastSignature)return;
   lastSignature=signature;
   void recognize({silent:true});
- },4200);
+ },6500);
 });
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden){clearTimeout(detectTimer);closeSuggestion();}
