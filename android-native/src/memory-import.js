@@ -2,37 +2,6 @@
 const $=id=>document.getElementById(id);
 const modal=$('x10MemoryDialog'),open=$('x10MemoryOpen'),select=$('x10MemoryNotebook');
 const message=$('x10MemoryProgress'),run=$('x10MemoryRun'),cancel=$('x10MemoryCancel');
-const exportDiagnostic=$('x10MemoryDiagnosticExport');
-function diagnostic(){
- return window.MiNoteX10Offline?.getLastDiagnostic?.(false)||null;
-}
-let exportingDiagnostic=false;
-async function saveDiagnostic(){
- if(exportingDiagnostic||active)return;
- const overview=diagnostic();
- if(!overview){info('Todavía no hay diagnóstico. Conecte la X10 y ejecute Importar memoria; luego exporte el resultado.',true);return;}
- if(!window.MiNotePrivateBackup?.saveDiagnostic){
-  info('El selector de archivos Android no está disponible en esta instalación. Compruebe que usa Mi Note V0.28.',true);return;
- }
- const raw=window.confirm('¿Incluir muestras HEX de los paquetes X10? Podrían revelar contenido manuscrito. Aceptar: incluir muestras. Cancelar: solo estadísticas.');
- const data=window.MiNoteX10Offline.getLastDiagnostic(raw);
- exportingDiagnostic=true;
- exportDiagnostic.disabled=true;
- try{
-  info('Seleccione una carpeta y confirme el nombre del archivo JSON en Android.');
-  const result=await window.MiNotePrivateBackup.saveDiagnostic({content:JSON.stringify(data,null,2)});
-  if(result?.cancelled){info('Se canceló el guardado. Ningún archivo fue creado.',true);return;}
-  if(!result?.saved)throw Error('Android no confirmó la escritura del archivo.');
-  info('Diagnóstico guardado por Android: '+(result.name||'MiNote_X10_diagnostico_local.json')+' ('+(result.bytes||0)+' bytes).');
- }catch(error){
-  info('No se pudo guardar el diagnóstico: '+(error?.message||String(error)),true);
- }finally{
-  exportingDiagnostic=false;
-  exportDiagnostic.disabled=active;
- }
-}
-exportDiagnostic?.addEventListener('click',()=>void saveDiagnostic());
-
 let active=false;
 const info=(value,warn=false)=>{if(message){message.textContent=value;message.dataset.warning=warn?'true':'false';}};
 function engine(){return window.MiNoteX10Import;}
@@ -64,7 +33,6 @@ function busy(flag){
  $('x10MemoryName').disabled=flag;
  $('x10MemoryPin').disabled=flag;
  cancel.disabled=!flag;
- if(exportDiagnostic)exportDiagnostic.disabled=flag||exportingDiagnostic;
  $('x10MemoryClose').disabled=flag;
 }
 async function importMemory(){
@@ -95,6 +63,55 @@ async function importMemory(){
    :'';
   info('Lectura finalizada: '+result.imported+' páginas guardadas ('+(result.revised||0)+' versiones nuevas, '+result.partialImported+' MUESTRAS PARCIALES), '+result.duplicate+' repetidas, '+(result.incomplete||0)+' pendientes, '+result.empty+' vacías.'+pending+' Datos guardados en Mi Note; memoria X10 intacta.',!!result.incomplete);
   $('x10MemoryPin').value='';
+  // Importación y copia local NO autorizan por sí solas a borrar la X10.
+  // El respaldo debe estar cifrado, releído y cotejado, y el usuario debe
+  // confirmar que Drive terminó la sincronización en la nube.
+  const eligible=result.eligiblePages||[];
+  if(!eligible.length){
+   info('Importación guardada en Mi Note. No hay páginas completas verificadas para borrar; la Huion permanece intacta.');
+  }else if(result.partialImported||result.incomplete||result.undecodable||result.pendingIndices?.length){
+   info('Importación guardada, pero hay páginas parciales, ilegibles o pendientes. Por seguridad NO se borrará ninguna página física.',true);
+  }else{
+   info('Importación guardada. Actualizando automáticamente el respaldo cifrado de Drive y verificando su contenido…');
+   try{
+    const backup=await window.MiNoteDriveBackup?.prepareForPhysicalDelete?.(eligible);
+    if(!backup?.verified||!backup.driveProvider)
+     throw Error('El respaldo verificado en Google Drive no está disponible.');
+    // Primera confirmación: SAF solo garantiza la copia del proveedor,
+    // no que la nube de Google ya haya recibido el archivo.
+    const first=window.confirm(
+     'Mi Note guardó y volvió a leer la copia cifrada «'+backup.name+'» desde Google Drive. '+
+     'Google Drive puede estar sincronizando en segundo plano. ¿Comprobó en Drive que '+
+     'la copia ya está disponible en la nube y desea borrar SOLO las '+eligible.length+
+     ' páginas importadas y verificadas de la agenda física?');
+    if(!first){
+     info('Respaldo cifrado actualizado. Borrado físico cancelado: las páginas permanecen en la Huion.');
+    }else{
+     const typed=window.prompt('Segunda confirmación: escriba BORRAR '+eligible.length+
+      ' para eliminar de la Huion únicamente las páginas completas importadas.','');
+     if(typed!=='BORRAR '+eligible.length){
+      info('Segunda confirmación cancelada. No se borró ninguna página física.');
+     }else{
+      info('Respaldo verificado. Eliminando '+eligible.length+' páginas de la Huion, de mayor a menor índice…');
+      const deletion=await api.deleteImported({pages:eligible,
+       proof:{...backup,cloudUserConfirmed:true},onProgress:message=>info(message)});
+      info('Huion confirmó el borrado de '+deletion.deleted.length+' páginas importadas. '+
+       'Actualizando el estado de memoria…');
+      try{
+       const status=await window.MiNoteX10LiveStatusRefresh?.({force:true});
+       info('Borrado confirmado: '+deletion.deleted.length+' páginas. Memoria X10: '+
+        (status?.memory?status.memory.free+'/'+status.memory.total:'sin respuesta de la Huion')+
+        '. Las copias locales y el respaldo cifrado permanecen conservados.');
+      }catch{
+       info('Borrado de '+deletion.deleted.length+' páginas confirmado. No fue posible leer la nueva memoria: vuelva a conectar la Huion.',true);
+      }
+     }
+    }
+   }catch(error){
+    info('No se ha completado el borrado seguro: '+(error?.message||String(error))+
+     '. Revise la memoria física y el respaldo antes de intentar de nuevo.',true);
+   }
+  }
   // Refrescar la lista de cuadernos sin ocultar el mensaje.
   const list=api.notebooks();
   select.replaceChildren();
