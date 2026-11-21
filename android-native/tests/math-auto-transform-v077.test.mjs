@@ -4,10 +4,10 @@ import {readFileSync} from 'node:fs';
 import {fuseMathCandidates,canAutoConvertMath,recognizeHybridLine,formatMathDisplay} from '../src/math/math-hybrid-ocr.mjs';
 const controller=readFileSync(new URL('../src/math/math-controller.js',import.meta.url),'utf8');
 const stroke=(id,x,y,w=15,h=36)=>({id,pts:[[x,y],[x+w/2,y+h/2],[x+w,y+h]]});
-test('captura: ML Kit reconoce 7+5 pero omite =, con selector activado sí debe convertir',()=>{
+test('captura: no convertir 7+5 hasta reconocer los trazos del signo igual',()=>{
  const proposal=fuseMathCandidates({mlCandidates:['7+5'],localText:''});
  assert.equal(proposal.text,'7+5');
- assert.equal(canAutoConvertMath(proposal,true),true);
+ assert.equal(canAutoConvertMath(proposal,true),false);
  assert.equal(canAutoConvertMath(proposal,false),false);
  assert.equal(formatMathDisplay(proposal.text),'7 + 5');
 });
@@ -31,7 +31,7 @@ test('no convierte números sueltos, texto o signos aislados a operaciones',()=>
  }
 });
 test('controlador espera final de la escritura, reintenta propuestas y retira tarjeta convertida',()=>{
- assert.match(controller,/numbersSelected\(\)\?2350:650/);
+ assert.match(controller,/numbersSelected\(\)\?1900:650/);
  assert.match(controller,/void scanHybridMath\(true\)/);
  assert.match(controller,/mathSuggestions\.delete\(key\)/);
  assert.match(controller,/canAutoConvertMath\(recognized,\$\('mathAutoDigital'\)\.checked\)/);
