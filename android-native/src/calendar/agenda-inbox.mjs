@@ -8,7 +8,7 @@ const id=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 const publicEvent=e=>({title:String(e.title||'').slice(0,150),date:e.date,
  time:e.time||'',allDay:!!e.allDay,source:String(e.source||'').slice(0,350),
  pageId:String(e.pageId||''),regionId:String(e.regionId||''),fromImportedPage:!!e.fromImportedPage,
- needsReview:!!e.needsReview});
+ needsReview:!!e.needsReview,needsTitle:!!e.needsTitle});
 export function createAgendaInbox(storage){
  let rows=[];
  try{
