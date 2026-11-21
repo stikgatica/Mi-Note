@@ -6,6 +6,7 @@ import {extractContextualAgenda} from './agenda-context.mjs';
 import {extractNaturalMeetings} from './natural-meetings.mjs';
 import {parseReminder,calendarDraftIsValid} from './reminder-parser.mjs';
 import {starredPageGroups} from './star-layout.mjs';
+import {toReadingStrokes} from '../ink-orientation.mjs';
 
 const DATE=/\b(?:20\d{2}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[./-]\d{1,2}(?:[./-](?:20\d{2}|\d{2}))?|\d{1,2}\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+(?:de|del)\s+\d{2,4})?)\b/gi;
 const AFTER_TIME=/^\s*(?:a\s+las?\s+)?(?:[01]?\d|2[0-3])[:h.]?[0-5]\d(?:\s*(?:hrs?|horas?))?/i;
@@ -223,9 +224,12 @@ export function structuredRowMeeting(rowOptions,options={}){
 export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
  if(!page||page.huion?.partial||!Array.isArray(page.strokes)||!page.strokes.length)return [];
  if(typeof recognize!=='function')return [];
- const bands=lineBandsFromPage(page.strokes);
+ // Analiza en el sentido legible de la pantalla, independientemente de si
+ // la hoja se encuentra vertical u horizontal. No modificar tinta física X10.
+ const readable=toReadingStrokes(page.strokes,page.orientation||'landscape-cw');
+ const bands=lineBandsFromPage(readable);
  if(!bands.length)return [];
- const marked=starredPageGroups(page.strokes);
+ const marked=starredPageGroups(readable);
  // Asterisk marks create strong spatial boundaries even when the gaps
  // between lines are small. Keep the geometric fallback for unmarked pages.
  const groups=marked.length>=2?marked.map(item=>noteBlocksFromBands(lineBandsFromPage(item.strokes)).flat()):noteBlocksFromBands(bands);
