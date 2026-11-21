@@ -138,3 +138,12 @@ Se incorporaron pruebas de líneas onduladas, triángulos con lados curvos, rect
 **Matemática:** al activar Geometría se presenta el selector **Figura que voy a dibujar**: Automática, Cuadrado, Rectángulo, Triángulo o Cuadrilátero libre. Al elegir Cuadrado, el reconocimiento de una figura de cuatro vértices ajusta automáticamente los cuatro ángulos a 90° y los lados a igual longitud, conservando aproximadamente posición, tamaño y giro. Rectángulo endereza ángulos manteniendo lados opuestos iguales. No transforma un triángulo en cuadrilátero ni modifica los trazos físicos originales; el ajuste permanece reversible en `mathLayer`. La detección automática no fuerza un cuadrado para evitar modificar un trapecio intencional.
 
 **Valide en el teléfono:** Compartir → PDF/PNG/SVG, envío a otra app, guardar en Descargas y los dibujos cuadrados hechos en papel X10. Conserve respaldo antes de instalar.
+
+
+## V0.78 — reconocimiento de escritura en vertical y horizontal
+
+La orientación de lectura de la hoja se aplica ahora de manera coherente al OCR local de **Números y operaciones** y a la detección de letras, fechas y horarios de **Recordatorios y Calendar**. Los puntos físicos A5 de la Huion X10 se conservan siempre: el motor usa copias transformadas solo al reconocer y devuelve la posición del texto matemático al sistema de coordenadas original. Al dibujar las mejoras, las etiquetas digitales aparecen horizontales respecto de la pantalla, incluso si la hoja se muestra apaisada.
+
+El reconocedor matemático puede agrupar operaciones de mayor anchura en horizontal; las notas a la derecha de la hoja ya no se descartan por el límite de 1000 puntos propio de la hoja vertical. También se incluyen pruebas del giro de 90° en ambos sentidos y de separación de renglones. Esto no convierte automáticamente toda la escritura libre: las operaciones seguras siguen las reglas de Modo Matemática y las lecturas de agenda se proponen para revisión antes de abrir Google Calendar.
+
+**Versión Android V0.78**: [Consultar compilaciones y APK](https://github.com/stikgatica/Mi-Note/releases/tag/android-v0.78). El APK se publica solo si las comprobaciones de GitHub Actions finalizan correctamente. Realice un respaldo privado antes de cambiar de compilación y pruebe el reconocimiento con la X10 real.
