@@ -6,16 +6,16 @@ test('El panel muestra respuesta Huion, memoria directa y respaldo sin inventar 
  const ui=read('../src/x10-device-info-v051.js');
  assert.match(ui,/Batería restante/);
  assert.match(ui,/Memoria restante/);
- assert.match(ui,/Sin lectura de memoria 0x8F/);
- assert.match(ui,/NO equivale a espacio libre/);
+ assert.match(ui,/x10MemoryValue/);
+ assert.match(ui,/0x8F/);
  assert.match(ui,/minote:x10-battery/);
- assert.match(ui,/minote:x10-memory-index/);
+ assert.match(ui,/minote:x10-vendor-status/);
  assert.doesNotMatch(ui,/(?:46\/50|50\/50|78%)/);
 });
 test('La caché local se sustituye por la orden física con confirmación doble',()=>{
  const ui=read('../src/x10-device-info-v051.js');
  const stage=read('../scripts/math-stage.mjs');
- assert.match(ui,/Limpiar caché de la Huion X10/);
+ assert.match(ui,/Borrar páginas guardadas en la Huion X10/);
  assert.match(ui,/window\.confirm\(notice\)/);
  assert.match(ui,/window\.prompt\(/);
  assert.match(ui,/typed!=='LIMPIAR'/);
@@ -40,7 +40,7 @@ test('El módulo se copia a stage para la APK y no usa actualización firmware',
  assert.match(stage,/x10-device-info-v051\.js/);
  assert.match(stage,/x10-device-info\.css/);
  assert.match(stage,/Detalles seguros X10/);
- assert.match(ui,/aplicación oficial Huion Note/);
+ assert.match(ui,/Huion Note oficial/);
  assert.doesNotMatch(ui,/firmwareUpdate|flashFirmware|updateFirmware/);
 });
 test('Versionado Android desde V0.51',()=>{

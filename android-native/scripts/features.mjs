@@ -4,6 +4,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 const stage=path.resolve('stage');
+await fs.copyFile(path.join(process.cwd(),'src','x10-import-cleanup.mjs'),path.join(stage,'x10-import-cleanup.mjs'));
 const index=path.join(stage,'index.html');
 const app=path.join(stage,'app.js');
 let html=await fs.readFile(index,'utf8');
@@ -105,6 +106,21 @@ function setupX10PhysicalTools(){
    return nb.id;
   },
   cancel(){if(x10DownloadController)x10DownloadController.abort();},
+  async deleteImported({pages,proof,onProgress=()=>{}}={}){
+   if(x10DownloadController)throw Error('Termine primero la importación.');
+   if(!x10Connection?.connected)throw Error('Conecte la X10.');
+   const module=await import('./x10-import-cleanup.mjs');
+   if(!module.validEligiblePages(pages))throw Error('La lista de páginas no es válida.');
+   // Comprobar en IndexedDB que los mismos digest quedaron guardados localmente.
+   const saved=await getSaved();
+   for(const item of pages){
+    const stored=saved?.notebooks?.some(n=>n.pages?.some(p=>
+      p.huion?.source==='internal-memory'&&p.huion?.physicalPage===item.index&&
+      p.huion?.digest===item.digest&&p.huion?.partial!==true));
+    if(!stored)throw Error('La página física '+(item.index+1)+' no se confirmó en el almacenamiento local.');
+   }
+   return module.deleteVerifiedPages(x10Connection,pages,{proof,onProgress});
+  },
   async start({notebookId,pin:pinCode='',onProgress=()=>{}}={}){
    if(!x10Connection?.connected)throw Error('Primero conecte la Huion X10 desde el botón superior.');
    if(!window.MiNoteX10Offline)throw Error('El lector de memoria física X10 no está disponible.');
@@ -121,11 +137,17 @@ function setupX10PhysicalTools(){
     // autenticación y no envía comandos de tableta.
     if(controller.signal.aborted)throw Error('Descarga cancelada por el usuario.');
     notify('Comprobando memoria interna; no se borrará ningún dato físico…');
+    const eligiblePages=[];
     const options={
      pin:pinCode,signal:controller.signal,maxPages:64,
      officialHandshake:true, // Único método validado: agenda oficial completa
      onProgress:notify,
-     onPage:async result=>x10ImportOfflinePage(result,notebookId)
+     onPage:async page=>{
+      const outcome=await x10ImportOfflinePage(page,notebookId);
+      if(!page.partial&&['imported','version','duplicate'].includes(outcome))
+       eligiblePages.push({index:page.page,digest:page.digest});
+      return outcome;
+     }
     };
     let result;
     try{
@@ -146,7 +168,7 @@ function setupX10PhysicalTools(){
     }
     notify('Importación terminada: '+result.imported+' guardadas ('+result.revised+' versiones nuevas, '+result.partialImported+' parciales), '+result.duplicate+' repetidas, '+result.incomplete+' pendientes, '+result.empty+' vacías. Sin borrado de memoria X10.');
     document.dispatchEvent(new CustomEvent('minote:x10-import-finished',{detail:{source:'internal-memory',imported:result.imported,revised:result.revised}}));
-    return result;
+    return {...result,eligiblePages};
    }catch(err){
     notify('Importación interrumpida: '+err.message+'. Las páginas que sí se guardaron se conservan.');
     throw err;

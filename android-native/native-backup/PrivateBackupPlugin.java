@@ -64,6 +64,10 @@ public class PrivateBackupPlugin extends Plugin {
     Uri uri=linked();
     result.put("linked",uri!=null);
     if(uri!=null){
+      // SAF puede almacenar en caché archivos remotos; esto identifica el proveedor,
+      // pero nunca demuestra por sí mismo la sincronización con la nube.
+      String authority=uri.getAuthority();
+      result.put("driveProvider","com.google.android.apps.docs.storage".equals(authority));
       result.put("name",label(uri));
       try{result.put("fingerprint",digest(uri.toString().getBytes(StandardCharsets.UTF_8)));}catch(Exception ignored){}
       result.put("canRead",getContext().getContentResolver().getPersistedUriPermissions().stream().anyMatch(p->p.getUri().equals(uri)&&p.isReadPermission()));

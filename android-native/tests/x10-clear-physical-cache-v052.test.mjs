@@ -58,7 +58,7 @@ test('caché física requiere confirmación de respaldo y teclear LIMPIAR',()=>{
  assert.match(ui,/window\.prompt\(/);
  assert.match(ui,/typed!=='LIMPIAR'/);
  assert.match(ui,/api\.clearDeviceCache\(\)/);
- assert.match(ui,/El repositorio de ingeniería inversa lo clasifica como destructivo/);
+ assert.match(ui,/elimina las páginas guardadas en la memoria física/);
  assert.match(stage,/x10-device-cache\.mjs/);
  assert.doesNotMatch(stage,/clearLocalDiagnostics/);
  assert.doesNotMatch(stage,/clearDeviceCache\(\)\s*;/);

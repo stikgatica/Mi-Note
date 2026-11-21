@@ -21,11 +21,11 @@ test('descarta respuestas incorrectas y fuera de rango',()=>{
 test('la lectura del proveedor prevalece en panel y botón de consulta',()=>{
  const panel=read('../src/x10-device-info-v051.js');
  const top=read('../src/battery-ui-v022.js');
- assert.match(panel,/vendorBattery=status\.battery/);
- assert.match(panel,/vendorMemory=status\.memory/);
- assert.match(panel,/mainBattery\?mainBattery\.percent/);
- assert.match(panel,/mainMemory\?mainMemory\.free/);
- assert.match(panel,/minote:x10-vendor-battery/);
+ assert.match(panel,/lastBattery=event\.detail\.battery/);
+ assert.match(panel,/lastMemory=event\.detail\.memory/);
+ assert.match(panel,/battery\?battery\.percent/);
+ assert.match(panel,/memory\?memory\.free/);
+ assert.match(panel,/minote:x10-vendor-status/);
  assert.match(top,/minote:x10-vendor-battery/);
  assert.match(top,/validVendor\?vendorLevel/);
 });

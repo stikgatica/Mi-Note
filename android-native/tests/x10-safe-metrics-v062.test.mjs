@@ -50,10 +50,10 @@ test('el build copia las métricas, registra fuente 2A19 y conserva lectura 0x85
  assert.match(stage,/0xcd,0x85,0x08,0,0,0,0,0xed/);
  assert.match(battery,/batteryReadAt/);
  assert.match(battery,/gatt-2a19/);
- assert.match(ui,/x10OfficialBattery/);
- assert.match(ui,/x10OfficialMemory/);
- assert.match(ui,/Estimación no verificada/);
- assert.match(ui,/Limpiar caché de la Huion X10/);
+ assert.doesNotMatch(ui,/x10OfficialBattery/);
+ assert.doesNotMatch(ui,/x10OfficialMemory/);
+ assert.match(ui,/0x8F/);
+ assert.match(ui,/Borrar páginas guardadas en la Huion X10/);
  assert.doesNotMatch(ui,/fetch\(|https?:\/\//);
 });
 
