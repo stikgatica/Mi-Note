@@ -18,7 +18,7 @@ test('comprueba modelo al recuperar foco y cancela si se desactiva',()=>{
 test('solo sugiere eventos tras escritura y nunca guarda sin consentimiento',()=>{
  const code=read('../src/calendar/calendar-ui.js');
  assert.match(code,/minote:stroke-finished/);
- assert.match(code,/\},4200\);/);
+ assert.match(code,/\},6500\);/);
  assert.match(code,/announce\(event\)/);
  assert.match(code,/bridge\.openCalendar\(proposal\)/);
  assert.match(code,/if\(!confirm\('¿Abrir la propuesta/);
