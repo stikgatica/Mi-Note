@@ -166,6 +166,39 @@ export function sampledMathStrokes(strokes){
   budget-=out.length;return out;
  }).filter(p=>p.length>=2);
 }
+/** Conservatively detect a trailing equals sign drawn with two short
+ * horizontal strokes. This does not fabricate a numerical answer or correct
+ * digits; it only restores a clearly drawn punctuation symbol. */
+export function hasHandwrittenEquals(strokes){
+ const entries=(strokes||[]).map(stroke=>({stroke,b:bounds([stroke])})).filter(x=>x.b);
+ if(entries.length<3)return false;
+ const all=bounds(strokes),minimum=all.x+all.width*.68;
+ const horizontal=entries.filter(x=>{
+  const b=x.b,pts=x.stroke.pts||[];
+  return b.x>=minimum&&b.width>=10&&b.width<=80&&b.height<=Math.max(8,b.width*.32)&&
+   pts.length>=2;
+ });
+ for(let i=0;i<horizontal.length;i++)for(let j=i+1;j<horizontal.length;j++){
+  const a=horizontal[i].b,b=horizontal[j].b;
+  const vertical=Math.abs(a.cy-b.cy),overlap=Math.max(0,Math.min(a.right,b.right)-Math.max(a.x,b.x));
+  if(vertical>=5&&vertical<=24&&overlap>=Math.min(a.width,b.width)*.58)return true;
+ }
+ return false;
+}
+/** Small digits can be confused by ML Kit. Candidate 0/8 changes are shown
+ * as explicitly unverified alternatives, never used for automatic conversion. */
+export function reviewDigitAmbiguities(text){
+ const parsed=normalizeArithmetic(text);
+ if(!parsed||!hasBinaryArithmetic(text))return [];
+ const token=/\d+(?:[.,]\d+)?/g;
+ const matches=[...parsed.text.matchAll(token)];
+ const last=matches.at(-1);if(!last)return [];
+ const i=last.index+last[0].length-1,terminal=parsed.text[i];
+ if(terminal!=='0'&&terminal!=='8')return [];
+ const alternate=parsed.text.slice(0,i)+(terminal==='0'?'8':'0')+parsed.text.slice(i+1);
+ return normalizeArithmetic(alternate)?[alternate]:[];
+}
+
 export async function recognizeHybridLine(strokes,recognizeNative){
  const box=bounds(strokes);
  if(!box||box.width>700||box.height>155||strokes.length>80||
@@ -181,7 +214,22 @@ export async function recognizeHybridLine(strokes,recognizeNative){
  const fused=fuseMathCandidates({mlCandidates:candidates,localText:local?.geometry?.text,
   localConfidence:local?.confidence||0});
  if(!fused)return null;
- return {...fused,geometry:{kind:'text',text:fused.text,
+ // If the equals sign is physically present but was omitted by ML Kit,
+ // preserve the visible sign as a suggestion only; do not auto-accept it.
+ const drawnEquals=hasHandwrittenEquals(strokes);
+ let suggestion=fused;
+ if(drawnEquals&&!fused.text.includes('=')){
+  const complete=normalizeArithmetic(fused.text+'=');
+  if(complete&&hasBinaryArithmetic(complete.text)){
+   suggestion={...fused,text:complete.text,alternatives:[complete.text,...fused.alternatives],
+    confidence:'review',autoAccept:false,needsReview:true};
+  }
+ }
+ const ambiguities=reviewDigitAmbiguities(suggestion.text);
+ return {...suggestion,
+  alternatives:[...new Set([...suggestion.alternatives,...ambiguities])].slice(0,6),
+  uncertainDigits:ambiguities.length>0,
+  geometry:{kind:'text',text:suggestion.text,
   x:(box.x+box.right)/2,y:box.bottom,size:Math.max(18,Math.min(55,box.height||26))},
   style:{color:strokes[0]?.color||'#111827',width:2.5},strokeIds:strokes.map(x=>x.id)};
 }
