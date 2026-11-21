@@ -267,7 +267,8 @@ async function scanHybridMath(all=false){
   // Analizar según la orientación de lectura visible, sin girar la tinta original.
   const orientation=pg.orientation||'landscape-cw';
   const originals=new Map(pg.strokes.map(stroke=>[stroke.id,stroke]));
-  const lines=mathematicalLines(toReadingStrokes(pg.strokes,orientation),{maxStrokes:all?160:85});
+  const maxMathWidth=orientation==='portrait'?700:1150;
+  const lines=mathematicalLines(toReadingStrokes(pg.strokes,orientation),{maxStrokes:all?160:85,maxWidth:maxMathWidth});
   const lastId=pg.strokes.at(-1)?.id;
   const active=all?lines:lines.filter(line=>line.strokeIds.includes(lastId));
   let found=0;
@@ -285,7 +286,7 @@ async function scanHybridMath(all=false){
    const previous=mathSuggestions.get(key);
    if(!all&&previous&&!$('mathAutoDigital').checked)continue;
    const recognized=await recognizeHybridLine(line.strokes,mathModelReady?
-    args=>mlkitMath.recognize(args):null);
+    args=>mlkitMath.recognize(args):null,{maxWidth:maxMathWidth});
    if(!recognized)continue;
    const fingerprints=Object.fromEntries(line.strokes.map(stroke=>
     [stroke.id,fingerprint(originals.get(stroke.id))]));
