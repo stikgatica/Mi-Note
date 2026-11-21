@@ -48,6 +48,39 @@ export function normalizeArithmetic(value){
  if(operators===0&&nums===1&&compact.replace(/[.,]/g,'').length<2)return null;
  return {text:compact,hasOperator:operators>0,numbers:nums,terminalEquals:tokens.at(-1)==='='};
 }
+/** Only real binary arithmetic is promoted to a conversion proposal.
+ * A standalone number, a minus sign alone, or an equals sign alone
+ * can occur as part of geometry and must not become digital ink.
+ */
+export function hasBinaryArithmetic(value){
+ const parsed=normalizeArithmetic(value);
+ if(!parsed)return false;
+ const t=parsed.text.match(/\d+(?:[.,]\d+)?|[()+\-×÷=]/g)||[];
+ let previous='start',binary=0;
+ for(const token of t){
+  if(['+','-','×','÷'].includes(token)&&
+     (previous==='number'||previous===')'))binary++;
+  previous=/^\d/.test(token)?'number':token;
+ }
+ return binary>0&&parsed.numbers>=2;
+}
+/** Reject a large enclosing contour with a number written inside,
+ * for example a circled "5". The ink is still available as geometry.
+ */
+export function enclosedMathAnnotation(strokes){
+ const boxes=(strokes||[]).map(stroke=>({stroke,box:bounds([stroke])})).filter(item=>item.box);
+ for(const item of boxes){
+  const pts=item.stroke.pts||[],b=item.box;
+  if(pts.length<12||b.width<52||b.height<52||b.width/b.height<.55||b.width/b.height>1.85)continue;
+  const start=pts[0],end=pts[pts.length-1];
+  if(Math.hypot(start[0]-end[0],start[1]-end[1])>Math.max(15,.23*Math.max(b.width,b.height)))continue;
+  if(boxes.some(other=>other!==item&&other.box.width<.72*b.width&&other.box.height<.72*b.height&&
+    other.box.x>=b.x+.06*b.width&&other.box.right<=b.right-.06*b.width&&
+    other.box.y>=b.y+.06*b.height&&other.box.bottom<=b.bottom-.06*b.height))return true;
+ }
+ return false;
+}
+
 const same=(a,b)=>a?.text===b?.text;
 
 /** Cruza resultados sin falsificar probabilidades propias de ML Kit.
@@ -55,9 +88,11 @@ const same=(a,b)=>a?.text===b?.text;
  * Solo consenso de dos fuentes se autoconvierte; una fuente requiere revisión. */
 export function fuseMathCandidates({mlCandidates=[],localText='',localConfidence=0}={}){
  const options=[...new Set((Array.isArray(mlCandidates)?mlCandidates:[])
-  .map(s=>normalizeArithmetic(s)?.text).filter(Boolean))].slice(0,4);
- const local=normalizeArithmetic(localText);
- const ml=options[0]||null;
+  .map(s=>normalizeArithmetic(s)?.text).filter(s=>s&&hasBinaryArithmetic(s)))].slice(0,5);
+ const local=hasBinaryArithmetic(localText)?normalizeArithmetic(localText):null;
+ // An actual handwritten equals sign is a strong signal; prefer that
+ // complete candidate over a weaker partial transcription.
+ const ml=options.find(s=>s.endsWith('=')||/=[0-9]/.test(s))||options[0]||null;
  if(!ml&&!local)return null;
  const agreement=!!local&&options.includes(local.text);
  const chosen=agreement?local.text:ml||local?.text||null;
@@ -107,7 +142,8 @@ export function sampledMathStrokes(strokes){
 }
 export async function recognizeHybridLine(strokes,recognizeNative){
  const box=bounds(strokes);
- if(!box||box.width>700||box.height>155||strokes.length>80)return null;
+ if(!box||box.width>700||box.height>155||strokes.length>80||
+    enclosedMathAnnotation(strokes))return null;
  const local=strokes.length<=16?recognizeInk(strokes):null;
  let candidates=[];
  if(typeof recognizeNative==='function'){
