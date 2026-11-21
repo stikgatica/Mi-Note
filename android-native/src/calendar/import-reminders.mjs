@@ -137,7 +137,7 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
  function remember(text,regionId=''){
   const list=extractImportedReminders(text,{now,heading,pageDate,regionId});
   for(const item of list){
-   const event={...item,regionId:regionId||item.regionId||''};
+   const event={...item,regionId:item.regionId||regionId||''};
    const fingerprint=reminderKey(event);
    if(fingerprint&&!seen.has(fingerprint)){
     seen.add(fingerprint);events.push(event);
