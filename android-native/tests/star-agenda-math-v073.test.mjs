@@ -31,7 +31,7 @@ test('detecta tres asteriscos manuscritos sin OCR del símbolo',()=>{
 });
 test('título, fecha y hora en la misma fila se detectan por separado',()=>{
  const events=structuredRowMeetings([['* Reunión Apoderados 12/12 14:00']],{now,starred:true});
- assert.equal(events.length,0,'una fila sola sigue exigiendo al menos dos filas por seguridad');
+ assert.deepEqual(events.map(e=>[e.title,e.date,e.time]),[['Reunión Apoderados','2026-12-12','14:00']]);
  const two=structuredRowMeetings([['* Reunión Apoderados 12/12'],['14:00']],{now,starred:true});
  assert.deepEqual(two.map(e=>[e.title,e.date,e.time]),[['Reunión Apoderados','2026-12-12','14:00']]);
  const side=structuredRowMeetings([['Taller 1'],['15/12   16:00']],{now,starred:true});
