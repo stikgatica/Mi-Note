@@ -24,7 +24,7 @@ const menu=[
 '<button type="button" data-action="renameNotebookBtn">Renombrar cuaderno</button>',
 '</div>',
 '<label class="field">Papel<select id="mobilePaperSelect"><option value="grid">Cuadrícula</option><option value="ruled">Rayas</option><option value="plain">Blanco</option></select></label>',
-'<label class="field">Grosor del lápiz <output id="mobileWidthValue">3</output><input id="mobilePenWidth" type="range" min="1" max="15" value="3"></label>',
+'<label class="field">Grosor del lápiz <output id="mobileWidthValue">2.5</output><input id="mobilePenWidth" type="range" min="1" max="15" step="0.5" value="2.5"></label>',
 '</dialog>'
 ].join('\n');
 
