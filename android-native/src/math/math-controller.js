@@ -202,6 +202,17 @@ function renderMathSuggestions(){
     proposal.source==='mlkit-es'?'ML Kit · confirmar lectura':'Plantillas locales · confirmar lectura'));
   const field=elm('input',{type:'text',maxlength:'60',value:proposal.text,'aria-label':'Editar operación matemática'});
   field.value=proposal.text;
+  if((proposal.alternatives||[]).length>1){
+   const label=elm('label',{class:'math-hint'},'Otras lecturas posibles (revise con su escritura): ');
+   const selector=elm('select',{'aria-label':'Alternativas de lectura matemática'});
+   for(const text of proposal.alternatives)selector.append(elm('option',{value:text},text));
+   selector.value=proposal.text;
+   selector.addEventListener('change',()=>{field.value=selector.value;});
+   label.append(selector);item.append(label);
+  }
+  if(proposal.uncertainDigits){
+   item.append(elm('small',{},'Dígito final dudoso: compruebe si escribió 0 u 8. Mi Note no decidirá automáticamente.'));
+  }
   const buttons=elm('div',{class:'math-actions'});
   const confirm=elm('button',{type:'button'},'Convertir a texto');
   const discard=elm('button',{type:'button',class:'subtle'},'Conservar manuscrito');
@@ -250,7 +261,7 @@ async function scanHybridMath(all=false){
    if(serial!==hybridScanSerial||epoch!==intentionEpoch||activeMathPage()!==pg.id)break;
    if(line.strokeIds.length>80||storedMathObject(get(),line.strokeIds))continue;
    const key=mathProposalKey(pg.id,line.strokeIds);
-   if(rejectedMath.has(key)||mathSuggestions.has(key))continue;
+   if(rejectedMath.has(key)||(!all&&mathSuggestions.has(key)))continue;
    const recognized=await recognizeHybridLine(line.strokes,mathModelReady?
     args=>mlkitMath.recognize(args):null);
    if(!recognized)continue;
@@ -263,7 +274,11 @@ async function scanHybridMath(all=false){
    mathSuggestions.set(key,proposal);found++;
   }
   renderMathSuggestions();
-  if(all)tell('Análisis matemático: '+found+' lectura(s) nueva(s). Revise las propuestas; los trazos originales permanecen intactos.');
+  if(all){
+   const pending=[...mathSuggestions.values()].filter(x=>x.pageId===pg.id).length;
+   tell('Análisis matemático: '+pending+' propuesta(s) pendientes de revisión ('+found+
+    ' lectura(s) obtenidas en este análisis). Los trazos originales permanecen intactos.');
+  }
  }catch(error){tell('Reconocimiento matemático: '+(error.message||String(error)));}
  finally{hybridScanBusy=false;}
 }
