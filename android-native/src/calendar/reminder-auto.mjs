@@ -3,7 +3,7 @@
  * No se lee Google Calendar: evita duplicar SUGERENCIAS locales, no eventos remotos. */
 import {parseReminder,calendarDraftIsValid} from './reminder-parser.mjs';
 
-const signal=/\b(recordatorio|recordar|recuerda|reunion|reunirme|cita|consulta|medica|medico|control|doctor|dentista|entrevista|consejo escolar|capacitacion|ceremonia|acto escolar|evento|cumpleanos|aniversario|evaluacion de desempeno|vencimiento|plazo|entregar|entrega|presentacion|audiencia|tramite|turno|pago|pagar|matricula|inscripcion|agendar|agenda|reservar|reserva)\b/;
+const signal=/\b(recordatorio|recordar|recuerda|reunion|reunirme|acto|actividad escolar|cita|consulta|medica|medico|control|doctor|dentista|entrevista|consejo escolar|capacitacion|ceremonia|acto escolar|evento|cumpleanos|aniversario|evaluacion de desempeno|vencimiento|plazo|entregar|entrega|presentacion|audiencia|tramite|turno|pago|pagar|matricula|inscripcion|agendar|agenda|reservar|reserva)\b/;
 const mathVocabulary=/\b(ejercicio|matematica|calcular|resuelve|resolver|ecuacion|fraccion|porcentaje|cuartil|percentil|grafico|problema|triangulo|cuadrado|perimetro|area|division|multiplicacion|potencia|factorizar|probabilidad|datos)\b/;
 const mathSymbols=/[=×÷∑√≠≤≥±]|\b\d+\s*[-+*]\s*\d+\s*=/;
 const yearsOrDatesOnly=/^(?:fecha|dia|hoy)?\s*[:\-]?\s*\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?\s*(?:\d{1,2}:\d{2})?\s*$/;
@@ -24,7 +24,7 @@ export function autoReminderCandidate(text,{now=new Date(),mathMode=false}={}){
  if(!result||!calendarDraftIsValid(result))return null;
  if(!signal.test(source))return null;
  const title=normalizedTitle(result.title);
- if(title.length<5||!/\p{L}/u.test(title)||/^(?:fecha|dia|hoy|manana|pendiente)$/i.test(title))return null;
+ if((title.length<5&&title!=='acto')||!/\p{L}/u.test(title)||/^(?:fecha|dia|hoy|manana|pendiente)$/i.test(title))return null;
  return result;
 }
 const STORE='minote_calendar_suggestions_v057';
