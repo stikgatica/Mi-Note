@@ -66,13 +66,15 @@ export function formatMathDisplay(value){
  }
  return result.replace(/\s{2,}/g,' ').trim();
 }
-/** El selector explícito autoriza usar la lectura principal de ML Kit aunque
- * no coincida con las plantillas locales. La tinta original sigue almacenada
- * y el texto puede corregirse. No convertir fragmentos sin "=" final. */
+/** Con el selector ACTIVADO se puede digitalizar una expresión binaria
+ * reconocida aunque ML Kit omita el "=" manuscrito. El control temporal se
+ * hace en el controlador (pausa de escritura), no aquí. Una lectura insegura
+ * de 0/8 u otras expresiones incompletas siempre se deja para revisión.
+ */
 export function canAutoConvertMath(proposal,enabled=false){
  if(!enabled||!proposal||proposal.uncertainDigits||!hasBinaryArithmetic(proposal.text))return false;
  const parsed=normalizeArithmetic(proposal.text);
- if(!parsed?.terminalEquals)return false;
+ if(!parsed||parsed.numbers<2)return false;
  return proposal.source==='mlkit-es'||proposal.source==='hybrid-consensus'||
   (proposal.source==='local-templates'&&proposal.autoAccept===true);
 }
@@ -204,13 +206,14 @@ export function hasHandwrittenEquals(strokes){
  const all=bounds(strokes),minimum=all.x+all.width*.68;
  const horizontal=entries.filter(x=>{
   const b=x.b,pts=x.stroke.pts||[];
-  return b.x>=minimum&&b.width>=10&&b.width<=80&&b.height<=Math.max(8,b.width*.32)&&
+  return b.right>=minimum&&b.width>=8&&b.width<=90&&b.height<=Math.max(10,b.width*.38)&&
    pts.length>=2;
  });
  for(let i=0;i<horizontal.length;i++)for(let j=i+1;j<horizontal.length;j++){
   const a=horizontal[i].b,b=horizontal[j].b;
   const vertical=Math.abs((a.y+a.bottom)/2-(b.y+b.bottom)/2),overlap=Math.max(0,Math.min(a.right,b.right)-Math.max(a.x,b.x));
-  if(vertical>=5&&vertical<=24&&overlap>=Math.min(a.width,b.width)*.58)return true;
+  if(vertical>=4&&vertical<=28&&overlap>=Math.min(a.width,b.width)*.50&&
+     Math.max(a.x,b.x)>=minimum-35)return true;
  }
  return false;
 }
@@ -258,6 +261,7 @@ export async function recognizeHybridLine(strokes,recognizeNative){
  return {...suggestion,
   alternatives:[...new Set([...suggestion.alternatives,...ambiguities])].slice(0,6),
   uncertainDigits:ambiguities.length>0,
+  drawnEquals,
   geometry:{kind:'text',text:suggestion.text,
   x:(box.x+box.right)/2,y:box.bottom,size:Math.max(18,Math.min(55,box.height||26))},
   style:{color:strokes[0]?.color||'#111827',width:2.5},strokeIds:strokes.map(x=>x.id)};
