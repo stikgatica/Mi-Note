@@ -5,6 +5,7 @@ import {parseReminder,calendarDraftIsValid} from './reminder-parser.mjs';
 import {autoReminderCandidate,reminderKey,createReminderLedger} from './reminder-auto.mjs';
 import {recognizeImportedPage,extractImportedReminders} from './import-reminders.mjs';
 import {incrementalStrokes,createIncrementalCursor} from './incremental-ink.mjs';
+import {toReadingPaths} from '../ink-orientation.mjs';
 import {createAgendaInbox} from './agenda-inbox.mjs';
 import './calendar-ui.css';
 const bridge=registerPlugin('MiNoteCalendar');
@@ -111,7 +112,7 @@ function strokesForRecognition({incremental=false}={}){
   const previous=inkCursor.previous(pg);
   const strokes=incrementalStrokes(pg,previous);
   if(strokes.length)inkCursor.commit(pg);
-  return strokes;
+  return toReadingPaths(strokes,pg.orientation||'landscape-cw');
  }
  const input=pg.strokes.filter(s=>Array.isArray(s.pts)&&s.pts.length>=2).slice(-125)
   .map(s=>s.pts.filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]))
@@ -120,7 +121,7 @@ function strokesForRecognition({incremental=false}={}){
  if(!input.length)throw Error('La hoja no contiene escritura suficiente.');
  const count=input.reduce((sum,p)=>sum+p.length,0);
  if(count>14000)throw Error('La hoja es demasiado extensa. Use un cuaderno con menos notas para el reconocimiento.');
- return input;
+ return toReadingPaths(input,pg.orientation||'landscape-cw');
 }
 function showDetectedEvents(events){
  const holder=$('miNoteCalendarDetectedList');
