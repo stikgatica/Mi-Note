@@ -6,7 +6,7 @@ const root=process.cwd(),stage=path.join(root,'stage');
 await fs.cp(path.join(root,'src','math'),path.join(stage,'math'),{recursive:true});
 await fs.cp(path.join(root,'src','calendar'),path.join(stage,'calendar'),{recursive:true});
 // Indicador de proximidad: módulo y estilos exclusivos de Android.
-for(const file of ['x10-device-info-v051.js','x10-device-info.css','x10-device-cache.mjs'])
+for(const file of ['x10-device-info-v051.js','x10-device-info.css','x10-device-cache.mjs','x10-metrics.mjs'])
  await fs.copyFile(path.join(root,'src',file),path.join(stage,file));
 for(const file of ['pen-hover.js','pen-hover.css','pen-hover-geometry.mjs'])
  await fs.copyFile(path.join(root,'src',file),path.join(stage,file));
