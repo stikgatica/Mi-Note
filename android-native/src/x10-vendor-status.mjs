@@ -16,6 +16,34 @@ export function parseStatusFrame(bytes,expectedOpcode){
  return {opcode:expectedOpcode,hex:HEX(b),length:b.length,payloadHex:HEX(b.slice(3)),
   payloadBytes:[...b.slice(3)]};
 }
+/**
+ * Formatos corroborados con la respuesta de una X10 firmware 230819:
+ * cd 8e 04 47 => 0x47 = 71 % batería
+ * cd 8f 08 2e 32 03 00 01 => 46 libres de 50
+ * Los tres últimos bytes de ROM se conservan SIN interpretar.
+ * No asumir otros formatos en firmwares diferentes.
+ */
+export function decodeVendorBattery(frame){
+ if(frame?.opcode!==0x8e||frame.length!==4||frame.payloadBytes?.length!==1)return null;
+ const percentage=frame.payloadBytes[0];
+ if(!Number.isInteger(percentage)||percentage<0||percentage>100)return null;
+ return {percent:percentage,source:'huion-0x8e'};
+}
+export function decodeVendorMemory(frame){
+ if(frame?.opcode!==0x8f||frame.length!==8||frame.payloadBytes?.length!==5)return null;
+ const [free,total,...unknownBytes]=frame.payloadBytes;
+ if(!Number.isInteger(total)||total<1||total>200||free>total)return null;
+ return {free,total,used:total-free,source:'huion-0x8f',
+  unknownTailHex:HEX(unknownBytes)};
+}
+export function decodeVendorStatus(results,readAt=Date.now()){
+ const batteryFrame=results.find(x=>x.opcode==='0x8E')?.response;
+ const memoryFrame=results.find(x=>x.opcode==='0x8F')?.response;
+ const battery=decodeVendorBattery(batteryFrame);
+ const memory=decodeVendorMemory(memoryFrame);
+ return {battery,memory,readAt,interpreted:!!battery||!!memory};
+}
+
 export async function queryVendorStatus(connection,{timeoutMs=2400}={}){
  if(!connection?.connected||connection.offlineReading||connection.sessionKind!=='agenda-pura')
   throw Error('Conecte la X10 en modo agenda y termine la sincronización antes de consultar.');
@@ -46,6 +74,7 @@ export async function queryVendorStatus(connection,{timeoutMs=2400}={}){
   results.push({name:request.name,opcode:'0x'+request.op.toString(16).toUpperCase(),
    received:!!response,response:response||null});
  }
- return {results,interpreted:false,
-  explanation:'Respuestas BLE en hexadecimal. Las posiciones de los datos todavía no están validadas con el firmware X10.'};
+ const decoded=decodeVendorStatus(results);
+ return {...decoded,results,
+  explanation:'0x8E: porcentaje. 0x8F: espacios libres y totales. Bytes adicionales sin interpretar. Validado con un dispositivo X10 fw 230819.'};
 }
