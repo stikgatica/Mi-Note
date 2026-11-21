@@ -133,17 +133,17 @@ function showDetectedEvents(events){
  for(const event of events){
   const button=document.createElement('button');
   button.type='button';button.className='minote-calendar-detected-item';
-  button.textContent=event.title+' · '+event.date+(event.time?' · '+event.time:' · todo el día')+
+  button.textContent=(event.needsTitle?'Motivo por completar':event.title)+' · '+event.date+(event.time?' · '+event.time:' · todo el día')+
    (event.needsReview?' · Año inferido: confirmar':'');
   button.addEventListener('click',()=>{
    textBox.value=event.source||event.title+' '+event.date+' '+event.time;
-   eventTitle.value=event.title;
+   eventTitle.value=event.needsTitle?'':event.title;
    date.value=event.date;
    time.value=event.time||'';
    allDay.checked=event.allDay;toggleTime();
    desc.value='';
    const feedback=$('miNoteCalendarDetectionFeedback');
-   feedback.textContent='Seleccionado: '+button.textContent+'. Revise antes de abrir Google Calendar.';
+   feedback.textContent='Seleccionado: '+button.textContent+(event.needsTitle?'. Escriba el motivo antes de abrir Calendar.':'. Revise antes de abrir Google Calendar.');
    feedback.dataset.state='success';
   });
   holder.append(button);
@@ -168,7 +168,7 @@ async function recognize({silent=false}={}){
    if(extracted.length){
     if(!silent){
      textBox.value=extracted[0].source||'';
-     eventTitle.value=extracted[0].title;
+     eventTitle.value=extracted[0].needsTitle?'':extracted[0].title;
      date.value=extracted[0].date;
      time.value=extracted[0].time||'';
      allDay.checked=!!extracted[0].allDay;toggleTime();
@@ -367,7 +367,7 @@ function renderInbox(){
   const card=document.createElement('section');card.className='minote-inbox-item';
   const title=document.createElement('strong');title.textContent=e.title;card.append(title);
   const detail=document.createElement('p');
-  detail.textContent=formatProposal(e)+(e.fromImportedPage?' · Hoja importada':'');
+  detail.textContent=formatProposal(e)+(e.fromImportedPage?' · Hoja importada':'')+(e.needsTitle?' · Motivo pendiente de identificar':'');
   card.append(detail);
   if(e.possibleCorrection){
    const warning=document.createElement('p');warning.className='minote-inbox-warning';
@@ -380,7 +380,14 @@ function renderInbox(){
    const btn=document.createElement('button');btn.type='button';btn.textContent=label;
    btn.addEventListener('click',callback);actions.append(btn);return btn;
   };
-  if(e.possibleCorrection&&e.previousStatus==='opened'){
+  if(e.needsTitle){
+   makeButton('Completar motivo',()=>{
+    editingInboxId=item.id;inboxDialog.close();show();
+    eventTitle.value='';date.value=e.date;time.value=e.time||'';
+    allDay.checked=!!e.allDay;toggleTime();textBox.value=e.source||'';desc.value='';
+    status('Se detectaron fecha y hora. Escriba el motivo del recordatorio y revise los datos.');
+   });
+  }else if(e.possibleCorrection&&e.previousStatus==='opened'){
    makeButton('Revisar cambio',()=>alert('Para evitar duplicados, abra Google Calendar y edite manualmente el evento original. Mi Note no tiene permiso para editar su calendario.'));
   }else{
    makeButton('Agregar',async()=>{
@@ -398,7 +405,7 @@ function renderInbox(){
    editingInboxId=item.id;
    inboxDialog.close();
    show();
-   eventTitle.value=e.title;date.value=e.date;time.value=e.time||'';
+   eventTitle.value=e.needsTitle?'':e.title;date.value=e.date;time.value=e.time||'';
    allDay.checked=!!e.allDay;toggleTime();
    textBox.value=e.source||'';desc.value='';
    status('Revise la propuesta. Google Calendar debe confirmar el guardado.');
