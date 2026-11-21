@@ -5,6 +5,7 @@ import {autoReminderCandidate,reminderKey} from './reminder-auto.mjs';
 import {extractContextualAgenda} from './agenda-context.mjs';
 import {extractNaturalMeetings} from './natural-meetings.mjs';
 import {parseReminder,calendarDraftIsValid} from './reminder-parser.mjs';
+import {starredPageGroups} from './star-layout.mjs';
 
 const DATE=/\b(?:20\d{2}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[./-]\d{1,2}(?:[./-](?:20\d{2}|\d{2}))?|\d{1,2}\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+(?:de|del)\s+\d{2,4})?)\b/gi;
 const AFTER_TIME=/^\s*(?:a\s+las?\s+)?(?:[01]?\d|2[0-3])[:h.]?[0-5]\d(?:\s*(?:hrs?|horas?))?/i;
@@ -150,45 +151,70 @@ const normalizeNumeric=(text,role)=> {
   .replace(/\s*[:h.;]\s*/g,':');
  return s;
 };
-export function structuredRowMeetings(rowOptions,{now=new Date(),regionId=''}={}){
- if(!Array.isArray(rowOptions)||rowOptions.length<2)return [];
- const rows=rowOptions.map(row=>Array.isArray(row)?row.filter(x=>typeof x==='string').slice(0,4):[]);
- const findDate=row=>{
+const OCR_DATE_INLINE=/\b(?:20\d{2}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}\s*[/.-]\s*\d{1,2}(?:\s*[/.-]\s*\d{2,4})?)\b/;
+const OCR_TIME_INLINE=/\b(?:[01]?\d|2[0-3])\s*[:h;.]\s*[0-5]\d\b/i;
+const TITLE_SIGNAL=/^(?:reuni[oó]n|taller|apoderad[oa]s?|acto|consejo|entrevista|cita|ceremonia|capacitaci[oó]n|actividad|m[eé]dico|consulta|control)\b/i;
+const wordTitle=x=>{
+ const s=String(x||'').replace(/^\s*[*•✳✱-]\s*/,'').trim()
+  .replace(/\s{2,}/g,' ');
+ if(!s||s.length>90||!/[\p{L}]{3,}/u.test(s)||/[=×÷√∑]/.test(s))return '';
+ return s;
+};
+export function structuredRowMeetings(rowOptions,{now=new Date(),regionId='',starred=false}={}){
+ if(!Array.isArray(rowOptions)||!rowOptions.length||(!starred&&rowOptions.length<2))return [];
+ const rows=rowOptions.map(row=>Array.isArray(row)?row.filter(x=>typeof x==='string').slice(0,5):[]);
+ const readPart=(row,kind)=>{
+  const regex=kind==='date'?OCR_DATE_INLINE:OCR_TIME_INLINE;
   for(const raw of row){
-   const line=normalizeNumeric(raw,'date');
-   if(!OCR_DATE_ROW.test(line))continue;
-   const parsed=parseReminder(line,now);
-   if(parsed&&calendarDraftIsValid(parsed))return {raw:line,value:parsed.date,explicit:parsed.yearExplicit};
-  }return null;
+   const normalized=normalizeNumeric(raw,kind);
+   const match=regex.exec(normalized);
+   if(!match)continue;
+   const value=match[0].replace(/\s+/g,'');
+   // Confirm the date/time using the existing parser rather than guessing.
+   const draft=parseReminder(kind==='date'?value:value+' 01/12/2026',now);
+   if(draft&&calendarDraftIsValid(draft)&&(kind!=='time'||draft.time))
+    return {raw:normalized,value,offset:match.index,finish:match.index+match[0].length};
+  }
+  return null;
  };
- const findTime=row=>{
-  for(const raw of row){
-   const line=normalizeNumeric(raw,'time');
-   if(!OCR_TIME_ROW.test(line))continue;
-   const sample=parseReminder('01/12/2026 '+line,now);
-   if(sample?.time)return {raw:line,value:sample.time};
-  }return null;
- };
- const result=[];
- for(let i=0;i<rows.length-1;i++){
-  const date=findDate(rows[i]),time=findTime(rows[i+1]);
-  if(!date||!time)continue;
-  // Solo el renglón INMEDIATAMENTE superior puede dar nombre a la cita.
-  const titleCandidates=i>0?rows[i-1]:[];
-  const recognized=titleCandidates.find(x=>OCR_TITLE.test(x.trim()));
-  const title=recognized?.trim()||'Recordatorio por revisar';
-  const needsTitle=!recognized;
-  const source=(titleCandidates[0]?titleCandidates[0]+'\n':'')+date.raw+'\n'+time.raw;
-  const fromTitle=recognized?autoReminderCandidate(title+' '+date.raw+' '+time.raw,{now}):null;
-  const parsed=fromTitle||parseReminder(date.raw+' '+time.raw,now);
-  if(!parsed||!calendarDraftIsValid(parsed)||!parsed.time)continue;
-  result.push({...parsed,title:needsTitle?'Recordatorio por revisar':title,
-   source,allDay:false,needsTitle,needsReview:true,
+ const results=[];
+ for(let i=0;i<rows.length;i++){
+  const date=readPart(rows[i],'date');
+  if(!date)continue;
+  let time=readPart(rows[i],'time'),timeRow=i;
+  if(!time&&i+1<rows.length){time=readPart(rows[i+1],'time');timeRow=i+1;}
+  if(!time&&i>0){time=readPart(rows[i-1],'time');timeRow=i-1;}
+  if(!time)continue;
+  // Reject mixed numeric fragments unless a complete validated date+time exists.
+  const parsed=parseReminder(date.value+' '+time.value,now);
+  if(!parsed?.time||!calendarDraftIsValid(parsed))continue;
+  let title='';
+  // Date on the right of a handwritten title, e.g. * Reunión 12/12.
+  for(const raw of rows[i]){
+   const clean=normalizeNumeric(raw,'date');
+   const match=OCR_DATE_INLINE.exec(clean);
+   if(!match)continue;
+   const left=wordTitle(clean.slice(0,match.index));
+   const right=wordTitle(clean.slice(match.index+match[0].length).replace(OCR_TIME_INLINE,''));
+   const choice=[left,right].find(t=>TITLE_SIGNAL.test(t))||
+      (starred?[left,right].find(Boolean):'');
+   if(choice){title=choice;break;}
+  }
+  // Alternatively, the title is the row directly above the date.
+  if(!title&&i>0){
+   const options=rows[i-1].map(raw=>wordTitle(raw.replace(OCR_DATE_INLINE,'').replace(OCR_TIME_INLINE,'')));
+   title=options.find(t=>TITLE_SIGNAL.test(t))||(starred?options.find(Boolean):'')||'';
+  }
+  const needsTitle=!title;
+  const source=(title?title+'\n':'')+date.value+'\n'+time.value;
+  const item={...parsed,title:title||'Recordatorio por revisar',source,
+   allDay:false,needsTitle,needsReview:true,
    confidence:needsTitle?'date-time-only':'structured-rows',
-   regionId:regionId?regionId+'-item-'+result.length:'structured-item-'+result.length});
-  i++; // Evitar reutilizar el renglón de hora como nueva fecha.
+   regionId:regionId?regionId+'-item-'+results.length:'structured-item-'+results.length};
+  if(!results.some(e=>e.date===item.date&&e.time===item.time))results.push(item);
+  if(timeRow>i)i=timeRow;
  }
- return result;
+ return results;
 }
 export function structuredRowMeeting(rowOptions,options={}){
  return structuredRowMeetings(rowOptions,options)[0]||null;
@@ -199,7 +225,11 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
  if(typeof recognize!=='function')return [];
  const bands=lineBandsFromPage(page.strokes);
  if(!bands.length)return [];
- const groups=noteBlocksFromBands(bands);
+ const marked=starredPageGroups(page.strokes);
+ // Asterisk marks create strong spatial boundaries even when the gaps
+ // between lines are small. Keep the geometric fallback for unmarked pages.
+ const groups=marked.length>=2?marked.map(item=>noteBlocksFromBands(lineBandsFromPage(item.strokes)).flat()):noteBlocksFromBands(bands);
+ const usingStars=marked.length>=2;
  const events=[],seen=new Set();
  const heading=page.notebookTitle||page.title||'',pageDate=page.createdAt||null;
  function remember(text,regionId=''){
@@ -237,14 +267,22 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
  // ML Kit puede combinar la hora de otra nota cuando recibe toda la hoja.
  // Nunca superponer una hipótesis de OCR global a una lectura válida por filas.
  for(const [i,group] of groups.slice(0,MAX_BANDS).entries()){
-  const regionId='region-'+i;
+  const regionId=usingStars?marked[i]?.regionId||'star-'+i:'region-'+i;
   const rowOptions=[];
   for(const line of group.slice(0,MAX_BANDS)){
    rowOptions.push(await read(line));
   }
+  // ML Kit puede devolver dos citas completas en un mismo resultado OCR,
+  // incluso cuando se consultó un solo renglón. No truncar esos eventos
+  // convirtiendo la respuesta multilineal en una sola pareja numérica.
+  const multiline=[...new Set(rowOptions.flat().filter(text=>text.includes('\n')))];
+  if(multiline.length){
+   for(const text of multiline)remember(text,regionId);
+   if(events.length)continue;
+  }
   const primary=rowOptions.map(options=>options[0]||'').filter(Boolean);
   const oldCount=events.length;
-  const structured=structuredRowMeetings(rowOptions,{now,regionId});
+  const structured=structuredRowMeetings(rowOptions,{now,regionId,starred:usingStars});
   if(structured.length){
    for(const event of structured){
     const fingerprint=reminderKey(event);
