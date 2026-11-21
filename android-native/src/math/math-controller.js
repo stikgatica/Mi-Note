@@ -169,8 +169,14 @@ function renderOverlay(pg){
  for(const object of activeObjects(pg)){
   const g=object.geometry;
   if(g?.kind==='text'){
-   const label=svg('text',{...upright(clamp(g.x,0,1000),clamp(g.y,0,1400)),x:clamp(g.x,0,1000),y:clamp(g.y,0,1400),'text-anchor':'middle',
-    'font-family':'sans-serif','font-size':Math.max(15,Number(g.size)||28),
+   // Igualar la altura y anchura del texto digital al manuscrito real.
+   const size=Math.max(15,Number(g.size)||28);
+   const inkWidth=Number(g.inkWidth);
+   const fitted=Number.isFinite(inkWidth)&&inkWidth>15&&String(g.text||'').length>=2;
+   const label=svg('text',{...upright(clamp(g.x,0,1000),clamp(g.y,0,1400)),
+    x:clamp(g.x,0,1000),y:clamp(g.y,0,1400),'text-anchor':'middle',
+    'font-family':'sans-serif','font-size':size,
+    ...(fitted?{'textLength':inkWidth,'lengthAdjust':'spacingAndGlyphs'}:{}),
     fill:object.style?.color||'#000000'});
    label.textContent=formatMathDisplay(g.text);group.append(label);
   }else{const node=shapeNode(g,object.style);if(node)group.append(node);}
@@ -519,7 +525,7 @@ async function scanRecent(all=false){
 function scheduleScan(){
  if(!enabled)return;
  clearTimeout(scanTimer);
- scanTimer=setTimeout(()=>void scanRecent(false),numbersSelected()?2350:650);
+ scanTimer=setTimeout(()=>void scanRecent(false),numbersSelected()?1900:650);
 }
 function editFields(){
  const obj=selectedObject(),editor=$('mathCoordinateEditor');editor.replaceChildren();$('mathLabels').replaceChildren();
