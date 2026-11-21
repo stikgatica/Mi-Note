@@ -4,6 +4,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 const stage=path.resolve('stage');
+await fs.copyFile(path.join(process.cwd(),'src','x10-import-cleanup.mjs'),path.join(stage,'x10-import-cleanup.mjs'));
 const index=path.join(stage,'index.html');
 const app=path.join(stage,'app.js');
 let html=await fs.readFile(index,'utf8');
