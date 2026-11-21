@@ -74,7 +74,8 @@ export function formatMathDisplay(value){
 export function canAutoConvertMath(proposal,enabled=false){
  if(!enabled||!proposal||proposal.uncertainDigits||!hasBinaryArithmetic(proposal.text))return false;
  const parsed=normalizeArithmetic(proposal.text);
- if(!parsed||parsed.numbers<2)return false;
+ // Mantener la tinta hasta que la igualdad esté completa.
+ if(!parsed||parsed.numbers<2||!parsed.text.includes('='))return false;
  return proposal.source==='mlkit-es'||proposal.source==='hybrid-consensus'||
   (proposal.source==='local-templates'&&proposal.autoAccept===true);
 }
@@ -151,7 +152,12 @@ export function mathematicalLines(strokes,{maxStrokes=160,maxWidth=700}={}){
  const heights=entries.map(x=>x.b.height).filter(x=>x>=10).sort((a,b)=>a-b);
  const medianHeight=heights[Math.floor(heights.length/2)]||25;
  const dotThreshold=Math.max(5,Math.min(13,medianHeight*.28));
- const anchors=entries.filter(x=>x.b.height>dotThreshold||x.b.width>dotThreshold*1.8)
+ // Un '=' o '-' es ancho pero de altura pequeña: adjuntarlo al renglón
+ // numérico en vez de agruparlo como una línea independiente.
+ const isShortBar=e=>e.b.height<Math.max(12,medianHeight*.43)
+  &&e.b.width<=Math.max(95,medianHeight*1.6);
+ const anchors=entries.filter(x=>!isShortBar(x)&&
+  (x.b.height>dotThreshold||x.b.width>dotThreshold*1.8))
   .sort((a,b)=>a.mid-b.mid);
  const tiny=entries.filter(x=>!anchors.includes(x));
  const rows=[];
@@ -175,7 +181,7 @@ export function mathematicalLines(strokes,{maxStrokes=160,maxWidth=700}={}){
     entry.mid>cur.bottom?entry.mid-cur.bottom:0;
    return !best||distance<best.distance?{row:cur,distance}:best;
   },null);
-  if(row&&row.distance<=tolerance){
+  if(row&&row.distance<=Math.max(tolerance,medianHeight*.55)){
    row.row.items.push(entry);
    row.row.top=Math.min(row.row.top,entry.b.y);
    row.row.bottom=Math.max(row.row.bottom,entry.b.bottom);
@@ -203,17 +209,22 @@ export function sampledMathStrokes(strokes){
 export function hasHandwrittenEquals(strokes){
  const entries=(strokes||[]).map(stroke=>({stroke,b:bounds([stroke])})).filter(x=>x.b);
  if(entries.length<3)return false;
- const all=bounds(strokes),minimum=all.x+all.width*.68;
+ const all=bounds(strokes);
+ if(!all)return false;
+ const minimum=all.x+all.width*.65;
  const horizontal=entries.filter(x=>{
   const b=x.b,pts=x.stroke.pts||[];
-  return b.right>=minimum&&b.width>=8&&b.width<=90&&b.height<=Math.max(10,b.width*.38)&&
-   pts.length>=2;
+  return b.right>=minimum&&b.width>=8&&b.width<=110&&
+   b.height<=Math.max(15,b.width*.42)&&pts.length>=2;
  });
  for(let i=0;i<horizontal.length;i++)for(let j=i+1;j<horizontal.length;j++){
   const a=horizontal[i].b,b=horizontal[j].b;
   const vertical=Math.abs((a.y+a.bottom)/2-(b.y+b.bottom)/2),overlap=Math.max(0,Math.min(a.right,b.right)-Math.max(a.x,b.x));
-  if(vertical>=4&&vertical<=28&&overlap>=Math.min(a.width,b.width)*.50&&
-     Math.max(a.x,b.x)>=minimum-35)return true;
+  // Permitir trazos levemente inclinados y separación real de la Huion.
+  const gap=Math.max(0,Math.max(a.y,b.y)-Math.min(a.bottom,b.bottom));
+  if(vertical>=5&&vertical<=Math.max(52,Math.min(a.width,b.width)*.8)&&
+     overlap>=Math.min(a.width,b.width)*.55&&gap<=48&&
+     Math.max(a.x,b.x)>=minimum-40)return true;
  }
  return false;
 }
@@ -263,6 +274,8 @@ export async function recognizeHybridLine(strokes,recognizeNative,{maxWidth=700}
   uncertainDigits:ambiguities.length>0,
   drawnEquals,
   geometry:{kind:'text',text:suggestion.text,
-  x:(box.x+box.right)/2,y:box.bottom,size:Math.max(18,Math.min(55,box.height||26))},
+  x:(box.x+box.right)/2,y:box.bottom,
+   size:Math.max(24,Math.min(210,(box.height||26)*1.25)),
+   inkWidth:Math.max(20,box.width),inkHeight:box.height},
   style:{color:strokes[0]?.color||'#111827',width:2.5},strokeIds:strokes.map(x=>x.id)};
 }
