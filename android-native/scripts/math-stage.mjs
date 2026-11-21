@@ -5,6 +5,8 @@ import path from 'node:path';
 const root=process.cwd(),stage=path.join(root,'stage');
 await fs.cp(path.join(root,'src','math'),path.join(stage,'math'),{recursive:true});
 await fs.cp(path.join(root,'src','calendar'),path.join(stage,'calendar'),{recursive:true});
+// Transformación visual común para OCR de Matemática y Calendar.
+await fs.copyFile(path.join(root,'src','ink-orientation.mjs'),path.join(stage,'ink-orientation.mjs'));
 // Indicador de proximidad: módulo y estilos exclusivos de Android.
 for(const file of ['x10-device-info-v051.js','x10-device-info.css','x10-device-cache.mjs','x10-metrics.mjs','x10-vendor-status.mjs','x10-import-cleanup.mjs'])
  await fs.copyFile(path.join(root,'src',file),path.join(stage,file));
