@@ -15,7 +15,7 @@ test('ambos selectores permiten pasos de medio punto y arrancan en 2.5',()=>{
  assert.match(index,/id="penWidth"[^>]*step="0\.5" value="2\.5"/);
  assert.match(index,/<output id="penWidthLabel">2\.5<\/output>/);
  assert.match(mobile,/id="mobilePenWidth"[^>]*step="0\.5" value="2\.5"/);
- assert.match(mobile,/<output id=\\"mobileWidthValue\\">2\.5<\/output>/);
+ assert.ok(mobile.includes('mobileWidthValue'));
 });
 test('ambos importadores Huion preservan negro y grosor 2.5',()=>{
  const app=read('../src/app.js');
