@@ -1,7 +1,7 @@
 /* Geometría de tinta A5 local. Nunca modifica las muestras de origen.
  * El resultado es una PROPUESTA: la docente debe aceptarla para mostrarla. */
 export const AXES=Object.freeze([
- {id:'numbers',label:'Números y operaciones',ready:false},
+ {id:'numbers',label:'Números y operaciones',ready:true},
  {id:'algebra',label:'Álgebra y funciones',ready:false},
  {id:'geometry',label:'Geometría y medición',ready:true},
  {id:'data',label:'Datos y probabilidades',ready:false}
