@@ -70,7 +70,7 @@ export function formatMathDisplay(value){
  * no coincida con las plantillas locales. La tinta original sigue almacenada
  * y el texto puede corregirse. No convertir fragmentos sin "=" final. */
 export function canAutoConvertMath(proposal,enabled=false){
- if(!enabled||!proposal||!hasBinaryArithmetic(proposal.text))return false;
+ if(!enabled||!proposal||proposal.uncertainDigits||!hasBinaryArithmetic(proposal.text))return false;
  const parsed=normalizeArithmetic(proposal.text);
  if(!parsed?.terminalEquals)return false;
  return proposal.source==='mlkit-es'||proposal.source==='hybrid-consensus'||
