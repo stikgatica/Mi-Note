@@ -402,7 +402,8 @@ function recognize(strokes){
  return new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>{jobs.delete(id);reject(Error('El reconocedor local tardó demasiado.'));},3500);
   jobs.set(id,{resolve,reject,timer});
-  service.postMessage({id,action:'automatic',strokes,intention:intendedShape});
+  service.postMessage({id,action:'automatic',strokes,intention:intendedShape,
+    orientation:get()?.orientation||'landscape-cw'});
  });
 }
 const sigsMatch=(candidate,pg)=>{
