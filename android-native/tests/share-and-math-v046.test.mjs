@@ -77,5 +77,7 @@ test('El selector de figura es explícito y se envía al worker; Bluetooth no se
  const ui=read('../src/math/math-controller.js'),worker=read('../src/math/math-worker.js');
  assert.match(ui,/id="mathIntention"/);
  assert.match(ui,/intention:intendedShape/);
- assert.match(worker,/recognizeAutomatic\(strokes,intention\)/);
+ assert.match(ui,/orientation:get\(\)\?\.orientation/);
+ assert.match(worker,/recognizeAutomatic\(strokes,intention,orientation\)/);
+ assert.match(worker,/orientation='portrait'/);
 });
