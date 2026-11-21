@@ -23,6 +23,10 @@ root.innerHTML=[
  '<button type="button" class="subtle" id="x10DeviceRefresh">↻ Consultar información</button>',
  '<button type="button" class="subtle minote-device-danger" id="x10DeviceClearCache">Limpiar caché de la Huion X10</button>',
  '</div>',
+ '<div class="minote-metrics-compare"><strong>Diagnóstico de protocolo Huion (experimental)</strong>',
+ '<p>Consultar respuestas 0x8E (batería) y 0x8F (memoria) sin borrar datos. Hasta verificar su formato, no se muestran como porcentajes.</p>',
+ '<button type="button" id="x10ProbeVendorStatus">Leer estado Huion 0x8E/0x8F</button>',
+ '<p id="x10VendorStatusOutput" role="status" aria-live="polite"></p></div>',
  '<div class="minote-metrics-compare"><strong>Comparar con Huion Note (opcional)</strong>', 
  '<p>Ingrese los valores que muestre la app oficial en esta misma sesión. No modifica ni borra páginas.</p>',
  '<div class="minote-metrics-fields"><label>Batería oficial (%)<input id="x10OfficialBattery" type="number" min="0" max="100" step="1" placeholder="0–100"></label>',
@@ -61,6 +65,7 @@ function paint(){
  $('x10DeviceRefresh').disabled=!connected;
  $('x10DeviceClearCache').disabled=!connected||clearing;
  $('x10CompareMetrics').disabled=!connected;
+ $('x10ProbeVendorStatus').disabled=!connected;
 }
 function refreshConnection(){
  connected=!!document.getElementById('x10OpenBtn')?.classList.contains('is-connected');
@@ -117,6 +122,22 @@ $('x10CompareMetrics').addEventListener('click',()=>{
  }
  $('x10MetricsComparison').textContent=lines.join(' ');
  paint();
+});
+$('x10ProbeVendorStatus').addEventListener('click',async()=>{
+ if(!connected)return;
+ const button=$('x10ProbeVendorStatus'),out=$('x10VendorStatusOutput');
+ button.disabled=true;
+ out.textContent='Consultando los dos indicadores propios de Huion...';
+ try{
+  const response=await window.MiNoteX10DeviceInfo?.queryVendorStatus?.();
+  if(!response?.results)throw Error('La consulta de diagnóstico no está disponible.');
+  out.textContent=response.results.map(item=>
+   item.opcode+' '+item.name+': '+(item.received?item.response.hex:'sin respuesta en el plazo de lectura')
+  ).join(' | ')+' · Bytes originales sin interpretar; no se han modificado las páginas.';
+ }catch(error){
+  out.textContent='No se pudo consultar: '+(error?.message||String(error))+
+   '. No se envió ninguna orden de borrado.';
+ }finally{button.disabled=!connected;}
 });
 const deviceButton=$('x10OpenBtn');
 if(deviceButton)new MutationObserver(refreshConnection).observe(deviceButton,{attributes:true,attributeFilter:['class']});
