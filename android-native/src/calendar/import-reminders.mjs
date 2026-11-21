@@ -161,7 +161,7 @@ const wordTitle=x=>{
  return s;
 };
 export function structuredRowMeetings(rowOptions,{now=new Date(),regionId='',starred=false}={}){
- if(!Array.isArray(rowOptions)||rowOptions.length<2)return [];
+ if(!Array.isArray(rowOptions)||!rowOptions.length||(!starred&&rowOptions.length<2))return [];
  const rows=rowOptions.map(row=>Array.isArray(row)?row.filter(x=>typeof x==='string').slice(0,5):[]);
  const readPart=(row,kind)=>{
   const regex=kind==='date'?OCR_DATE_INLINE:OCR_TIME_INLINE;
