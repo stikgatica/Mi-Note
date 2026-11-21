@@ -133,7 +133,8 @@ function showDetectedEvents(events){
  for(const event of events){
   const button=document.createElement('button');
   button.type='button';button.className='minote-calendar-detected-item';
-  button.textContent=event.title+' · '+event.date+(event.time?' · '+event.time:' · todo el día');
+  button.textContent=event.title+' · '+event.date+(event.time?' · '+event.time:' · todo el día')+
+   (event.needsReview?' · Año inferido: confirmar':'');
   button.addEventListener('click',()=>{
    textBox.value=event.source||event.title+' '+event.date+' '+event.time;
    eventTitle.value=event.title;
@@ -172,7 +173,8 @@ async function recognize({silent=false}={}){
      time.value=extracted[0].time||'';
      allDay.checked=!!extracted[0].allDay;toggleTime();
      const feedback=$('miNoteCalendarDetectionFeedback');
-     feedback.textContent='Reconocido: '+extracted[0].title+' · '+extracted[0].date+' · '+(extracted[0].time||'todo el día')+'.';
+     feedback.textContent='Reconocido: '+extracted[0].title+' · '+extracted[0].date+' · '+(extracted[0].time||'todo el día')+'.'+
+      (extracted[0].needsReview?' Año inferido por la fecha del teléfono; revíselo antes de guardar.':'');
      feedback.dataset.state='success';
      status(extracted.length+' compromiso(s) detectado(s) en esta hoja y añadidos a la bandeja de revisión.');
     }else maybeShowNextSuggestion();
