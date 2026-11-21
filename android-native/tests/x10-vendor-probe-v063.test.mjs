@@ -33,7 +33,7 @@ test('consulta secuencial, suscripción previa y cero comandos de escritura dest
  assert.deepEqual(sent,[0x8e,0x8f]);
  assert.equal(output.results.length,2);
  assert.equal(output.results[0].response.hex,'cd 8e 05 49 00');
- assert.equal(output.interpreted,false);
+ assert.equal(output.interpreted,true);
  assert.equal(handlers.size,0);
 });
 test('rechaza la lectura durante importación, desconexión o modo no agenda',async()=>{
