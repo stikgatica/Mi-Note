@@ -272,6 +272,14 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
   for(const line of group.slice(0,MAX_BANDS)){
    rowOptions.push(await read(line));
   }
+  // ML Kit puede devolver dos citas completas en un mismo resultado OCR,
+  // incluso cuando se consultó un solo renglón. No truncar esos eventos
+  // convirtiendo la respuesta multilineal en una sola pareja numérica.
+  const multiline=[...new Set(rowOptions.flat().filter(text=>text.includes('\n')))];
+  if(multiline.length){
+   for(const text of multiline)remember(text,regionId);
+   if(events.length)continue;
+  }
   const primary=rowOptions.map(options=>options[0]||'').filter(Boolean);
   const oldCount=events.length;
   const structured=structuredRowMeetings(rowOptions,{now,regionId,starred:usingStars});
