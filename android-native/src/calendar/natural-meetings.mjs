@@ -27,7 +27,7 @@ export function extractNaturalMeetings(text,{now=new Date(),regionId=''}={}){
   if(!fingerprint||keys.has(fingerprint))return;
   keys.add(fingerprint);
   out.push({...event,source,needsReview:!event.yearExplicit,
-   regionId:regionId||'line-'+entryIndex++});
+   regionId:regionId?regionId+'-item-'+entryIndex++:'line-'+entryIndex++});
  }
  function flush(){
   if(pending){
