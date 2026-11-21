@@ -68,7 +68,7 @@ export function extractImportedReminders(text,{now=new Date(),heading='',pageDat
  return out.slice(0,25);
 }
 function strokePoints(stroke){
- return (stroke?.pts||[]).filter(p=>Array.isArray(p)&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&p[0]>=0&&p[0]<=1000&&p[1]>=0&&p[1]<=1400);
+ return (stroke?.pts||[]).filter(p=>Array.isArray(p)&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&p[0]>=0&&p[0]<=1400&&p[1]>=0&&p[1]<=1400);
 }
 function median(values){
  if(!values.length)return 0;
