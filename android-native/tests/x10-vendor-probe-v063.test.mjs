@@ -25,14 +25,19 @@ test('consulta secuencial, suscripción previa y cero comandos de escritura dest
   async send(payload){
    const op=payload[1];sent.push(op);
    assert.equal(handlers.size,1);
-   const answer=Uint8Array.from([0xcd,op,0x05,0x49,0]);
+   const answer=op===0x8e?Uint8Array.from([0xcd,op,0x04,0x47]):
+    Uint8Array.from([0xcd,op,0x08,0x2e,0x32,0x03,0x00,0x01]);
    for(const listener of handlers)listener(answer);
   }
  };
  const output=await queryVendorStatus(connection,{timeoutMs:500});
  assert.deepEqual(sent,[0x8e,0x8f]);
  assert.equal(output.results.length,2);
- assert.equal(output.results[0].response.hex,'cd 8e 05 49 00');
+ assert.equal(output.results[0].response.hex,'cd 8e 04 47');
+ assert.equal(output.battery.percent,71);
+ assert.equal(output.memory.free,46);
+ assert.equal(output.memory.total,50);
+ assert.equal(output.memory.unknownTailHex,'03 00 01');
  assert.equal(output.interpreted,true);
  assert.equal(handlers.size,0);
 });
