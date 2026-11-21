@@ -50,7 +50,7 @@ test('normalization retains operator without solving it',()=>{
 test('re-scan and visible pending counter prevent misleading 0 new message',()=>{
  const ui=readFileSync(new URL('../src/math/math-controller.js',import.meta.url),'utf8');
  assert.match(ui,/propuesta\(s\) pendientes de revisión/);
- assert.match(ui,/!all&&mathSuggestions\.has\(key\)/);
+ assert.match(ui,/!all&&previous&&!\$\('mathAutoDigital'\)\.checked/);
  assert.match(ui,/Dígito final dudoso/);
  assert.match(ui,/selector\.addEventListener\('change'/);
 });
