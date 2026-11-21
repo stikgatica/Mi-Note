@@ -66,7 +66,7 @@ test('Modo Matemática se procesa al levantar el lápiz, sin selector ni IA remo
  assert.match(stage,/minote:stroke-finished/);
  assert.match(stage,/source:'huion'/);
  assert.match(stage,/source:'touch'/);
- assert.match(controller,/setTimeout\(\(\)=>void scanRecent\(false\),650\)/);
+ assert.match(controller,/setTimeout\(\(\)=>void scanRecent\(false\),numbersSelected\(\)\?1300:650\)/);
  assert.match(controller,/new Worker\(new URL\('\.\/math-worker\.js'/);
  assert.doesNotMatch(controller,/mathImprove|mathSelectMode|captureSelection\(/);
  assert.match(worker,/recognizeAutomatic/);
