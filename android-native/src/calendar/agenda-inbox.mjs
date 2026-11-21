@@ -7,7 +7,7 @@ const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLo
 const id=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 const publicEvent=e=>({title:String(e.title||'').slice(0,150),date:e.date,
  time:e.time||'',allDay:!!e.allDay,source:String(e.source||'').slice(0,350),
- pageId:String(e.pageId||''),fromImportedPage:!!e.fromImportedPage,
+ pageId:String(e.pageId||''),regionId:String(e.regionId||''),fromImportedPage:!!e.fromImportedPage,
  needsReview:!!e.needsReview});
 export function createAgendaInbox(storage){
  let rows=[];
@@ -24,8 +24,10 @@ export function createAgendaInbox(storage){
   if(!fingerprint)return {added:false};
   const match=rows.find(x=>reminderKey(x.event)===fingerprint);
   if(match)return {added:false,duplicate:true,item:match};
-  // Solo igual título, misma página y misma fecha: distinta hora es POSIBLE corrección.
-  const same=rows.slice().reverse().find(x=>x.event.pageId&&x.event.pageId===event.pageId&&
+  // Reuniones iguales en dos zonas de una hoja son eventos distintos.
+  // Proponer corrección SOLO si ambas lecturas proceden del mismo bloque físico.
+  const same=rows.slice().reverse().find(x=>event.regionId&&x.event.regionId===event.regionId&&
+   x.event.pageId&&x.event.pageId===event.pageId&&
    fold(x.event.title)===fold(event.title)&&x.event.date===event.date);
   const normalized=publicEvent(event);
   if(same){
