@@ -88,3 +88,9 @@ body.minote-android .minote-inbox-actions button{min-height:42px;padding:5px;fon
 @media (orientation:landscape){
  body.minote-android .minote-calendar-inbox{max-height:calc(100dvh - 12px)}
 }
+
+/* Dos o más compromisos de una misma hoja: elegir sin volver a reconocer. */
+.minote-calendar-detected-list{display:flex;flex-direction:column;gap:7px;margin:9px 0 12px}
+.minote-calendar-detected-list[hidden]{display:none!important}
+.minote-calendar-detected-list p{margin:0 0 3px;font-size:13px;color:#526677}
+.minote-calendar-detected-item{display:block;text-align:left;padding:9px 11px;border:1px solid #b9cedb;border-radius:9px;background:#f6faff;color:#173b56;min-height:40px;white-space:normal}

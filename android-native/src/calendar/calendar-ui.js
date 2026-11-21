@@ -32,6 +32,7 @@ dialog.innerHTML=[
  '<label class="minote-calendar-opt"><input id="miNoteCalendarAuto" type="checkbox"> Detectar compromisos y guardarlos en la bandeja de revisión (opcional)</label>',
  '<p class="minote-calendar-hint">El reconocimiento usa ML Kit en el celular. La primera descarga del modelo necesita internet; después funciona sin conexión. La tinta no se envía a Google Calendar.</p>',
  '<label class="field">Texto reconocido (puede corregirlo)<textarea id="miNoteCalendarText" rows="4" placeholder="Ej. Reunión Consejo Escolar, 25 de noviembre 15:30"></textarea></label>',
+ '<div id="miNoteCalendarDetectedList" class="minote-calendar-detected-list" aria-live="polite" hidden></div>',
  '<button type="button" id="miNoteCalendarExtract">Detectar fecha y horario</button>',
  '<p id="miNoteCalendarDetectionFeedback" class="minote-calendar-detection-feedback" role="status" aria-live="polite">Ingrese una fecha como 15/12 o 05/01 y pulse Detectar.</p>',
  '<div class="minote-calendar-fields">',
@@ -121,6 +122,32 @@ function strokesForRecognition({incremental=false}={}){
  if(count>14000)throw Error('La hoja es demasiado extensa. Use un cuaderno con menos notas para el reconocimiento.');
  return input;
 }
+function showDetectedEvents(events){
+ const holder=$('miNoteCalendarDetectedList');
+ holder.replaceChildren();
+ holder.hidden=!events.length;
+ if(!events.length)return;
+ const intro=document.createElement('p');
+ intro.textContent=events.length+' compromiso(s) reconocido(s). Seleccione uno para revisar sus datos:';
+ holder.append(intro);
+ for(const event of events){
+  const button=document.createElement('button');
+  button.type='button';button.className='minote-calendar-detected-item';
+  button.textContent=event.title+' · '+event.date+(event.time?' · '+event.time:' · todo el día');
+  button.addEventListener('click',()=>{
+   textBox.value=event.source||event.title+' '+event.date+' '+event.time;
+   eventTitle.value=event.title;
+   date.value=event.date;
+   time.value=event.time||'';
+   allDay.checked=event.allDay;toggleTime();
+   desc.value='';
+   const feedback=$('miNoteCalendarDetectionFeedback');
+   feedback.textContent='Seleccionado: '+button.textContent+'. Revise antes de abrir Google Calendar.';
+   feedback.dataset.state='success';
+  });
+  holder.append(button);
+ }
+}
 async function recognize({silent=false}={}){
  if(busy)return;
  if(!modelAvailable){
@@ -135,11 +162,18 @@ async function recognize({silent=false}={}){
   const active=snapshot();
   if(active?.strokes?.length){
    const extracted=await recognizeImportedPage(active,args=>bridge.recognize(args));
+   if(!silent)showDetectedEvents(extracted);
    for(const proposal of extracted)enqueueImportedSuggestion(proposal,{imported:false,pageId:active.id});
    if(extracted.length){
     if(!silent){
      textBox.value=extracted[0].source||'';
-     applyText();
+     eventTitle.value=extracted[0].title;
+     date.value=extracted[0].date;
+     time.value=extracted[0].time||'';
+     allDay.checked=!!extracted[0].allDay;toggleTime();
+     const feedback=$('miNoteCalendarDetectionFeedback');
+     feedback.textContent='Reconocido: '+extracted[0].title+' · '+extracted[0].date+' · '+(extracted[0].time||'todo el día')+'.';
+     feedback.dataset.state='success';
      status(extracted.length+' compromiso(s) detectado(s) en esta hoja y añadidos a la bandeja de revisión.');
     }else maybeShowNextSuggestion();
     return;
