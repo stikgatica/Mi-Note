@@ -226,7 +226,7 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
  if(typeof recognize!=='function')return [];
  // Analiza en el sentido legible de la pantalla, independientemente de si
  // la hoja se encuentra vertical u horizontal. No modificar tinta física X10.
- const readable=toReadingStrokes(page.strokes,page.orientation||'landscape-cw');
+ const readable=toReadingStrokes(page.strokes,page.orientation||'portrait');
  const bands=lineBandsFromPage(readable);
  if(!bands.length)return [];
  const marked=starredPageGroups(readable);
