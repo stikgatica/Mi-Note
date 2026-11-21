@@ -58,7 +58,7 @@ export function starredPageGroups(strokes){
  const stars=detectStarMarkers(strokes);
  if(!stars.length)return [];
  return stars.map((star,i)=>{
-  const start=star.cy-23,end=stars[i+1]?.cy-23??Infinity;
+  const start=star.cy-23,end=stars[i+1]?stars[i+1].cy-23:Infinity;
   const group=(strokes||[]).filter(s=>{
    const b=box(s);return b&&b.cy>=start&&b.cy<end&&
     !(b.cx<star.right+5&&Math.abs(b.cy-star.cy)<27);
