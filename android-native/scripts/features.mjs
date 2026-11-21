@@ -60,7 +60,7 @@ async function x10ImportOfflinePage(result,destinationId){
    }
   }
   if(points.length>=1)imported.strokes.push({
-   id:uid(),color:'#173f7a',width:3,pts:points,
+   id:uid(),color:'#111827',width:2.5,pts:points,
    x10:{device:'Huion Note X10',mode:'offline',rotation:0,limits:clone(limits),raw}
   });
  }

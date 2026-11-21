@@ -23,10 +23,10 @@ test('Bluetooth usa icono propio y LED azul en modo conectado',()=>{
 test('Lápiz negro y selector de color después de grosor',()=>{
  const app=read('../src/app.js'),html=read('../src/index.html');
  const float=read('../src/floating-ui.js');
- assert.match(app,/let currentColor = '#000000'/);
- assert.match(html,/type="color" value="#000000"/);
+ assert.match(app,/let currentColor = '#111827'/);
+ assert.match(html,/type="color" value="#111827"/);
  assert.match(float,/widthField\.after\(colorLabel\)/);
- assert.match(float,/\|\|'#000000'/);
+ assert.match(float,/\|\|'#111827'/);
 });
 test('Ambos giros horizontales usan landscape-cw y barra vertical; vertical usa A5',()=>{
  const page=read('../src/landscape-ui.js');

@@ -56,7 +56,7 @@ const lockButton=menuButton('floatingLockMenu','◌ Bloquear posición de la bar
 const colorLabel=document.createElement('label');colorLabel.className='floating-color-label field';
 colorLabel.textContent='Color del lápiz';
 const color=document.createElement('input');color.type='color';color.id='floatingPenColor';
-color.value=$('penColor')?.value||'#000000';
+color.value=$('penColor')?.value||'#111827';
 color.setAttribute('aria-label','Color del lápiz');colorLabel.append(color);
 // Ajuste visible justo debajo del grosor, fuera de cualquier sección del menú.
 const widthField=$('mobilePenWidth')?.closest('label');
