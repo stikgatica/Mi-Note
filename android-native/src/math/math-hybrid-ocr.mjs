@@ -141,7 +141,7 @@ export function fuseMathCandidates({mlCandidates=[],localText='',localConfidence
  * punctuation (+, colon dots, minus, equals) to the nearest row.
  * Previously tiny points often became their own row, causing ML Kit to
  * read "24:7=" as fragments or drop it entirely. */
-export function mathematicalLines(strokes,{maxStrokes=160}={}){
+export function mathematicalLines(strokes,{maxStrokes=160,maxWidth=700}={}){
  const entries=(strokes||[]).slice(-maxStrokes).map((stroke,i)=>{
   const b=bounds([stroke]);
   if(!stroke?.id||!b||b.height>150||b.width>180||b.width+b.height<3)return null;
@@ -185,7 +185,7 @@ export function mathematicalLines(strokes,{maxStrokes=160}={}){
   const items=r.items.sort((a,b)=>a.i-b.i),part=items.map(x=>x.stroke);
   return {strokes:part,box:bounds(part),strokeIds:items.map(x=>x.stroke.id),
    lastIndex:Math.max(...items.map(x=>x.i))};
- }).filter(line=>line.strokes.length<=80&&line.box.width<=700&&line.box.height<=155)
+ }).filter(line=>line.strokes.length<=80&&line.box.width<=maxWidth&&line.box.height<=155)
   .sort((a,b)=>a.box.y-b.box.y);
 }
 export function sampledMathStrokes(strokes){
@@ -231,9 +231,9 @@ export function reviewDigitAmbiguities(text){
  return normalizeArithmetic(alternate)?[alternate]:[];
 }
 
-export async function recognizeHybridLine(strokes,recognizeNative){
+export async function recognizeHybridLine(strokes,recognizeNative,{maxWidth=700}={}){
  const box=bounds(strokes);
- if(!box||box.width>700||box.height>155||strokes.length>80||
+ if(!box||box.width>maxWidth||box.height>155||strokes.length>80||
     enclosedMathAnnotation(strokes))return null;
  const local=strokes.length<=16?recognizeInk(strokes):null;
  let candidates=[];
