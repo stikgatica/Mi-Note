@@ -53,7 +53,7 @@ test('la interfaz permite seleccionar cada compromiso sin abrir Calendar ni camb
  assert.match(ui,/miNoteCalendarDetectedList/);
  assert.match(ui,/showDetectedEvents\(extracted\)/);
  assert.match(ui,/button\.addEventListener\('click'/);
- assert.match(ui,/eventTitle\.value=event\.title/);
+ assert.match(ui,/eventTitle\.value=event\.needsTitle\?'':event\.title/);
  assert.match(ui,/date\.value=event\.date/);
  assert.match(ui,/time\.value=event\.time/);
 });
