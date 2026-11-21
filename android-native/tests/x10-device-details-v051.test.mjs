@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
-test('El panel muestra batería real, memoria no disponible y no simula 50 páginas libres',()=>{
+test('El panel muestra respuesta Huion, memoria directa y respaldo sin inventar cifras',()=>{
  const ui=read('../src/x10-device-info-v051.js');
  assert.match(ui,/Batería restante/);
  assert.match(ui,/Memoria restante/);
- assert.match(ui,/Sin lectura de capacidad libre/);
- assert.match(ui,/No equivale a espacio libre/);
+ assert.match(ui,/Sin lectura de memoria 0x8F/);
+ assert.match(ui,/NO equivale a espacio libre/);
  assert.match(ui,/minote:x10-battery/);
  assert.match(ui,/minote:x10-memory-index/);
  assert.doesNotMatch(ui,/(?:46\/50|50\/50|78%)/);
