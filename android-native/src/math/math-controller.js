@@ -266,9 +266,11 @@ async function scanHybridMath(all=false){
  try{
   // Analizar según la orientación de lectura visible, sin girar la tinta original.
   const orientation=pg.orientation||'landscape-cw';
-  const originals=new Map(pg.strokes.map(stroke=>[stroke.id,stroke]));
+  // Solo copiar los últimos trazos al girar: el resto de la hoja no se toca.
+  const recent=pg.strokes.slice(-(all?160:85));
+  const originals=new Map(recent.map(stroke=>[stroke.id,stroke]));
   const maxMathWidth=orientation==='portrait'?700:1150;
-  const lines=mathematicalLines(toReadingStrokes(pg.strokes,orientation),{maxStrokes:all?160:85,maxWidth:maxMathWidth});
+  const lines=mathematicalLines(toReadingStrokes(recent,orientation),{maxStrokes:recent.length,maxWidth:maxMathWidth});
   const lastId=pg.strokes.at(-1)?.id;
   const active=all?lines:lines.filter(line=>line.strokeIds.includes(lastId));
   let found=0;
