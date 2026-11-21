@@ -3,7 +3,7 @@
    sin nube, sin modificar tinta fuente, sin trabajo en el hilo de escritura. */
 import {AXES,fingerprint,validObject} from './math-geometry.mjs';
 import {registerPlugin} from '@capacitor/core';
-import {mathematicalLines,normalizeArithmetic,recognizeHybridLine} from './math-hybrid-ocr.mjs';
+import {mathematicalLines,normalizeArithmetic,recognizeHybridLine,formatMathDisplay,canAutoConvertMath} from './math-hybrid-ocr.mjs';
 import {mergeAutomatic} from './math-auto.mjs';
 import {DRAW_INTENTIONS} from './math-intention.mjs';
 import {compactAutomatic,listObjects,nearDuplicate} from './math-objects.mjs';
@@ -24,11 +24,11 @@ dialog.innerHTML=`
  <label class="field">Eje<select id="mathAxis"></select></label>
  <p class="math-hint">Mi Note mejora automáticamente figuras y propone texto digital al terminar de escribir en la Huion. El original permanece intacto.</p>
  <section id="mathNumbersControls" hidden>
-  <label class="math-switch"><input id="mathAutoDigital" type="checkbox" checked> Convertir automáticamente solo si coinciden ambos reconocedores</label>
+  <label class="math-switch"><input id="mathAutoDigital" type="checkbox" checked> Convertir automáticamente las operaciones reconocidas (=)</label>
   <label class="math-switch"><input id="mathNumbersShowLayer" type="checkbox" checked> Mostrar texto matemático digital</label>
   <div class="math-actions"><button type="button" id="mathDownloadModel">Preparar ML Kit</button>
   <button type="button" id="mathScanNumbers">Reconocer operaciones de esta hoja</button></div>
-  <p class="math-hint">Se combinan plantillas locales y ML Kit. No se calculan resultados; si la lectura es dudosa, se puede editar antes de convertir. La tinta manuscrita permanece guardada.</p>
+  <p class="math-hint">Con este selector activo, las operaciones completas reconocidas se convierten en texto digital con espacios, sin pulsar Confirmar. Las lecturas dudosas entre 0 y 8 requieren revisión. Puede desactivar la conversión automática. La tinta original permanece guardada y no se calculan resultados.</p>
   <div id="mathHybridCandidates" class="math-hybrid-candidates" aria-live="polite"></div>
  </section>
  <section id="mathGeometryControls" hidden>
@@ -161,7 +161,7 @@ function renderOverlay(pg){
    const label=svg('text',{x:clamp(g.x,0,1000),y:clamp(g.y,0,1400),'text-anchor':'middle',
     'font-family':'sans-serif','font-size':Math.max(15,Number(g.size)||28),
     fill:object.style?.color||'#000000'});
-   label.textContent=g.text;group.append(label);
+   label.textContent=formatMathDisplay(g.text);group.append(label);
   }else{const node=shapeNode(g,object.style);if(node)group.append(node);}
   if(highlightId===object.id){
    const node=shapeNode(g,{color:'#e65b20',width:Math.max(5,Number(object.style?.width)||3)+5});
@@ -200,14 +200,14 @@ function renderMathSuggestions(){
   const item=elm('div',{class:'math-hybrid-item'});
   item.append(elm('small',{},proposal.autoAccept?'Coincidencia de dos reconocedores':
     proposal.source==='mlkit-es'?'ML Kit · confirmar lectura':'Plantillas locales · confirmar lectura'));
-  const field=elm('input',{type:'text',maxlength:'60',value:proposal.text,'aria-label':'Editar operación matemática'});
-  field.value=proposal.text;
+  const field=elm('input',{type:'text',maxlength:'60',value:formatMathDisplay(proposal.text),'aria-label':'Editar operación matemática'});
+  field.value=formatMathDisplay(proposal.text);
   if((proposal.alternatives||[]).length>1){
    const label=elm('label',{class:'math-hint'},'Otras lecturas posibles (revise con su escritura): ');
    const selector=elm('select',{'aria-label':'Alternativas de lectura matemática'});
-   for(const text of proposal.alternatives)selector.append(elm('option',{value:text},text));
+   for(const text of proposal.alternatives)selector.append(elm('option',{value:text},formatMathDisplay(text)));
    selector.value=proposal.text;
-   selector.addEventListener('change',()=>{field.value=selector.value;});
+   selector.addEventListener('change',()=>{field.value=formatMathDisplay(selector.value);});
    label.append(selector);item.append(label);
   }
   if(proposal.uncertainDigits){
@@ -219,7 +219,7 @@ function renderMathSuggestions(){
   confirm.addEventListener('click',()=>{
    const parsed=normalizeArithmetic(field.value);
    if(!parsed){tell('Operación no válida. Revise números, comas y signos + − × ÷ =.');return;}
-   void acceptMath({...proposal,text:parsed.text,geometry:{...proposal.geometry,text:parsed.text}})
+   void acceptMath({...proposal,text:parsed.text,geometry:{...proposal.geometry,text:formatMathDisplay(parsed.text)}})
     .then(()=>{mathSuggestions.delete(key);renderMathSuggestions();})
     .catch(e=>tell(e.message));
   });
@@ -236,7 +236,7 @@ async function acceptMath(proposal){
   throw Error('Los trazos cambiaron desde su lectura. Vuelva a reconocer.');
  const sources=selected.map(stroke=>({id:stroke.id,signature:fingerprint(stroke)}));
  if(storedMathObject(pg,proposal.strokeIds))return false;
- const candidate={type:'text',label:'Texto matemático',geometry:proposal.geometry,
+ const candidate={type:'text',label:'Texto matemático',geometry:{...proposal.geometry,text:formatMathDisplay(proposal.geometry.text)}, 
   style:proposal.style,sources,automatic:true};
  const prior=layerOf(pg).objects||[];
  const merge=mergeAutomatic(prior,candidate);
@@ -267,7 +267,7 @@ async function scanHybridMath(all=false){
    if(!recognized)continue;
    const fingerprints=Object.fromEntries(line.strokes.map(stroke=>[stroke.id,fingerprint(stroke)]));
    const proposal={...recognized,pageId:pg.id,fingerprints};
-   if(recognized.autoAccept&&$('mathAutoDigital').checked){
+   if(canAutoConvertMath(recognized,$('mathAutoDigital').checked)){
     try{await acceptMath(proposal);found++;continue;}
     catch(error){tell('Lectura por confirmar: '+error.message);}
    }
@@ -466,7 +466,7 @@ function readGeometry(geometry){
     const text=input.value.trim();
     if(!text||text.length>60||(!normalizeArithmetic(text)&&!/^[\dcm°., -]+$/i.test(text)))
      throw Error('Texto matemático o medida inválidos.');
-    vals.text=normalizeArithmetic(text)?.text||text;continue;
+    vals.text=normalizeArithmetic(text)?formatMathDisplay(text):text;continue;
    }
   if(!input.value.trim()||!Number.isFinite(Number(input.value)))throw Error('Coordenada inválida.');
   vals[input.dataset.key]=Number(input.value);
@@ -500,6 +500,16 @@ $('mathDownloadModel').addEventListener('click',async()=>{
  }catch(error){tell('Modelo no preparado: '+(error?.message||String(error)));}
  finally{button.disabled=false;}
 });
+$('mathAutoDigital').addEventListener('change',event=>{
+ try{localStorage.setItem('minote:math-auto-convert',event.target.checked?'1':'0');}catch{}
+ tell(event.target.checked?
+  'Conversión automática activada para operaciones completas que terminan en =. Los dígitos dudosos requieren revisión.':
+  'Conversión automática desactivada. Las operaciones se mostrarán para revisar y convertir manualmente.');
+});
+try{
+ const savedAuto=localStorage.getItem('minote:math-auto-convert');
+ if(savedAuto!==null)$('mathAutoDigital').checked=savedAuto==='1';
+}catch{}
 $('mathScanNumbers').addEventListener('click',()=>void scanHybridMath(true));
 $('mathNumbersShowLayer').addEventListener('change',async e=>{
  const pg=get();if(!pg)return;
