@@ -150,8 +150,8 @@ const normalizeNumeric=(text,role)=> {
   .replace(/\s*[:h.;]\s*/g,':');
  return s;
 };
-export function structuredRowMeeting(rowOptions,{now=new Date(),regionId=''}={}){
- if(!Array.isArray(rowOptions)||rowOptions.length<2||rowOptions.length>4)return null;
+export function structuredRowMeetings(rowOptions,{now=new Date(),regionId=''}={}){
+ if(!Array.isArray(rowOptions)||rowOptions.length<2)return [];
  const rows=rowOptions.map(row=>Array.isArray(row)?row.filter(x=>typeof x==='string').slice(0,4):[]);
  const findDate=row=>{
   for(const raw of row){
@@ -169,6 +169,7 @@ export function structuredRowMeeting(rowOptions,{now=new Date(),regionId=''}={})
    if(sample?.time)return {raw:line,value:sample.time};
   }return null;
  };
+ const result=[];
  for(let i=0;i<rows.length-1;i++){
   const date=findDate(rows[i]),time=findTime(rows[i+1]);
   if(!date||!time)continue;
@@ -181,12 +182,16 @@ export function structuredRowMeeting(rowOptions,{now=new Date(),regionId=''}={})
   const fromTitle=recognized?autoReminderCandidate(title+' '+date.raw+' '+time.raw,{now}):null;
   const parsed=fromTitle||parseReminder(date.raw+' '+time.raw,now);
   if(!parsed||!calendarDraftIsValid(parsed)||!parsed.time)continue;
-  return {...parsed,title:needsTitle?'Recordatorio por revisar':title,
+  result.push({...parsed,title:needsTitle?'Recordatorio por revisar':title,
    source,allDay:false,needsTitle,needsReview:true,
    confidence:needsTitle?'date-time-only':'structured-rows',
-   regionId:regionId?regionId+'-item-0':'structured-item-0'};
+   regionId:regionId?regionId+'-item-'+result.length:'structured-item-'+result.length});
+  i++; // Evitar reutilizar el renglón de hora como nueva fecha.
  }
- return null;
+ return result;
+}
+export function structuredRowMeeting(rowOptions,options={}){
+ return structuredRowMeetings(rowOptions,options)[0]||null;
 }
 
 export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
@@ -239,12 +244,14 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
   }
   const primary=rowOptions.map(options=>options[0]||'').filter(Boolean);
   const oldCount=events.length;
-  const structured=structuredRowMeeting(rowOptions,{now,regionId});
-  if(structured){
-   const fingerprint=reminderKey(structured);
-   if(fingerprint&&!seen.has(fingerprint)){
-    seen.add(fingerprint);
-    events.push(structured);
+  const structured=structuredRowMeetings(rowOptions,{now,regionId});
+  if(structured.length){
+   for(const event of structured){
+    const fingerprint=reminderKey(event);
+    if(fingerprint&&!seen.has(fingerprint)){
+     seen.add(fingerprint);
+     events.push(event);
+    }
    }
    // No aceptar una segunda hipótesis de "todo el día" cuando las filas
    // ya sustentan fecha + hora dentro de este bloque físico.
