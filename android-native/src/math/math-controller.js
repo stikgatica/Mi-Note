@@ -7,6 +7,9 @@ import {mathematicalLines,normalizeArithmetic,recognizeHybridLine,formatMathDisp
 import {mergeAutomatic} from './math-auto.mjs';
 import {DRAW_INTENTIONS} from './math-intention.mjs';
 import {compactAutomatic,listObjects,nearDuplicate} from './math-objects.mjs';
+import {findCircleMeasurements,chooseCircleLabel} from './math-circle-measurements.mjs';
+import {recognizeInk} from './math-ink-ocr.mjs';
+import {sampledMathStrokes} from './math-hybrid-ocr.mjs';
 import './math-ui.css';
 
 const $=id=>document.getElementById(id),ns='http://www.w3.org/2000/svg';
@@ -35,6 +38,7 @@ dialog.innerHTML=`
   <label class="math-switch"><input id="mathShowLayer" type="checkbox" checked> Mostrar capa digital mejorada</label>
   <p class="math-hint">No es necesario seleccionar trazos ni pulsar Mejorar. Los números y medidas solo se digitalizan si el reconocimiento local alcanza una confianza alta; los casos dudosos permanecen manuscritos.</p>
   <button type="button" id="mathScanPage">Analizar también los trazos de esta hoja</button>
+  <p class="math-hint">Radios y diámetros: reconoce segmentos que pasan por el centro o unen el centro con el borde, endereza el trazo y convierte medidas manuscritas como 7 cm o 9 cm en texto digital. Si la medida no es clara, mantiene la escritura.</p>
   <label class="field">Figura que voy a dibujar
    <select id="mathIntention"></select>
   </label>
@@ -75,6 +79,7 @@ for(const shape of DRAW_INTENTIONS)$('mathIntention').append(elm('option',{value
 $('mathIntention').value='auto';
 
 let enabled=false,worker=null,sequence=0,scanTimer=0,scanRunning=false,scanAgain=false,lastPage='';
+let circleScanRunning=false;
 const mlkitMath=registerPlugin('MiNoteCalendar');
 const mathSuggestions=new Map();
 let hybridScanBusy=false,hybridScanSerial=0;
@@ -398,6 +403,61 @@ async function runOne(pg,strokes){
  tell(candidate.geometry.kind==='text'?'Medida o número detectado: '+candidate.geometry.text+' (revise si es correcto).':'Figura mejorada automáticamente: '+candidate.label+'.');
  return true;
 }
+
+/** Solo las etiquetas cercanas a un radio/diámetro, nunca la hoja completa.
+ * Las lecturas sin unidad o con candidatos contradictorios requieren revisión.
+ */
+async function scanCircleMeasurements(){
+ if(!enabled||numbersSelected()||circleScanRunning)return 0;
+ const page=get();if(!page?.strokes?.length)return 0;
+ const circles=activeObjects(page).filter(obj=>obj.geometry?.kind==='circle');
+ if(!circles.length)return 0;
+ circleScanRunning=true;let added=0;
+ try{
+  const found=findCircleMeasurements(circles,page.strokes.slice(-180));
+  const done=new Set();
+  for(const item of found){
+   if(!enabled||numbersSelected()||get()?.id!==page.id)break;
+   const lineId=item.stroke.id;
+   if(done.has(lineId))continue;
+   done.add(lineId);
+   const sourceStrokes=[item.stroke,...item.labels];
+   if(!item.labels.length||sourceStrokes.length>17)continue;
+   const signatures=sourceStrokes.map(stroke=>({id:stroke.id,signature:fingerprint(stroke)}));
+   // El reconocimiento local es respaldo; ML Kit se ejecuta directamente
+   // también en modo Geometría (el modelo puede haberse descargado antes).
+   const local=recognizeInk(item.labels);
+   let candidates=local?.geometry?.text?[local.geometry.text]:[];
+   try{
+    const remote=await mlkitMath.recognize({strokes:sampledMathStrokes(item.labels)});
+    if(Array.isArray(remote?.candidates))candidates=[...remote.candidates,...candidates];
+    else if(remote?.text)candidates=[remote.text,...candidates];
+   }catch{/* Modelo no preparado: la etiqueta original queda visible. */}
+   const label=chooseCircleLabel(item.line,candidates);
+   if(!label?.reliable||!/ (?:mm|cm|m)$/.test(' '+label.text))continue;
+   const existing=layerOf(get()).objects||[];
+   if(existing.some(obj=>obj.measurementSource===lineId))continue;
+   const live=get();if(live?.id!==page.id||!signatures.every(src=>
+     live.strokes.some(st=>st.id===src.id&&fingerprint(st)===src.signature)))continue;
+   const proposal={type:'line',label:item.line.type==='radius'?'Radio':'Diámetro',
+    geometry:{kind:'line',points:item.line.points},style:{
+     color:item.stroke.color||'#000000',width:2.5},sources:signatures,automatic:true};
+   const merged=mergeAutomatic(existing,proposal);
+   if(!merged)continue;
+   const mid=[(item.line.points[0][0]+item.line.points[1][0])/2,
+    (item.line.points[0][1]+item.line.points[1][1])/2];
+   const labelObject={id:globalThis.crypto?.randomUUID?.()||'measure-'+Date.now()+'-'+(++sequence),
+    type:'line',label:proposal.label,measurementSource:lineId,automatic:true,accepted:true,
+    geometry:proposal.geometry,style:proposal.style,sources:signatures,
+    labels:[{text:label.text,x:mid[0],y:mid[1]-12,size:25}]};
+   await saveLayer([...merged.objects,labelObject],layerOf(live).visible!==false);
+   added++;
+  }
+ }catch(error){tell('Medición geométrica: '+(error?.message||String(error)));}
+ finally{circleScanRunning=false;}
+ return added;
+}
+
 async function scanRecent(all=false){
  if(!enabled)return;
  if(numbersSelected()){await scanHybridMath(all);return;}
@@ -419,7 +479,8 @@ async function scanRecent(all=false){
    if(await runOne(page,window))changed++;
    if(all&&end%8===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
-  if(all)tell('Análisis completado. '+changed+' mejora(s) detectada(s); los originales permanecen intactos.');
+  const circleChanged=await scanCircleMeasurements();
+  if(all)tell('Análisis completado. '+(changed+circleChanged)+' mejora(s) detectada(s), incluidas medidas de círculos; los originales permanecen intactos.');
  }catch(error){tell('Reconocimiento automático: '+error.message);}
  finally{
   scanRunning=false;
