@@ -10,6 +10,7 @@ import {compactAutomatic,listObjects,nearDuplicate} from './math-objects.mjs';
 import {findCircleMeasurements,chooseCircleLabel} from './math-circle-measurements.mjs';
 import {recognizeInk} from './math-ink-ocr.mjs';
 import {sampledMathStrokes} from './math-hybrid-ocr.mjs';
+import {toReadingStrokes,readingGeometryToPage,uprightTextAngle} from '../ink-orientation.mjs';
 import './math-ui.css';
 
 const $=id=>document.getElementById(id),ns='http://www.w3.org/2000/svg';
@@ -156,14 +157,19 @@ function renderOverlay(pg){
  overlay.replaceChildren();
  const visible=enabled&&layerOf(pg).visible!==false;
  overlay.hidden=!visible;
- const rotated=(pg?.orientation||'landscape-cw')==='landscape-cw';
+ const mode=pg?.orientation||'landscape-cw';
+ const rotated=mode==='landscape-cw'||mode==='landscape-ccw';
  overlay.setAttribute('viewBox',rotated?'0 0 1400 1000':'0 0 1000 1400');
  if(!visible||!pg)return;
- const group=svg('g',rotated?{transform:'translate(1400 0) rotate(90)'}:{});
+ const group=svg('g',mode==='landscape-cw'?{transform:'translate(1400 0) rotate(90)'}:
+  mode==='landscape-ccw'?{transform:'translate(0 1000) rotate(-90)'}:{});
+ // La hoja y las figuras rotan juntas; solo la escritura digital se endereza.
+ const angle=uprightTextAngle(mode);
+ const upright=(x,y)=>angle?{transform:`rotate(${angle} ${x} ${y})`}:{};
  for(const object of activeObjects(pg)){
   const g=object.geometry;
   if(g?.kind==='text'){
-   const label=svg('text',{x:clamp(g.x,0,1000),y:clamp(g.y,0,1400),'text-anchor':'middle',
+   const label=svg('text',{...upright(clamp(g.x,0,1000),clamp(g.y,0,1400)),x:clamp(g.x,0,1000),y:clamp(g.y,0,1400),'text-anchor':'middle',
     'font-family':'sans-serif','font-size':Math.max(15,Number(g.size)||28),
     fill:object.style?.color||'#000000'});
    label.textContent=formatMathDisplay(g.text);group.append(label);
@@ -174,7 +180,7 @@ function renderOverlay(pg){
   }
   for(const lab of object.labels||[]){
    if(!lab?.text)continue;
-   const label=svg('text',{x:clamp(lab.x,0,1000),y:clamp(lab.y,0,1400),
+   const label=svg('text',{...upright(clamp(lab.x,0,1000),clamp(lab.y,0,1400)),x:clamp(lab.x,0,1000),y:clamp(lab.y,0,1400),
     fill:object.style?.color||'#000000','font-size':Math.max(14,Number(lab.size)||24),
     'font-family':'sans-serif','text-anchor':'middle'});
    label.textContent=lab.text;group.append(label);
@@ -258,7 +264,10 @@ async function scanHybridMath(all=false){
  const pg=get();if(!pg?.strokes?.length)return;
  hybridScanBusy=true;const serial=++hybridScanSerial,epoch=intentionEpoch;
  try{
-  const lines=mathematicalLines(pg.strokes,{maxStrokes:all?160:85});
+  // Analizar según la orientación de lectura visible, sin girar la tinta original.
+  const orientation=pg.orientation||'landscape-cw';
+  const originals=new Map(pg.strokes.map(stroke=>[stroke.id,stroke]));
+  const lines=mathematicalLines(toReadingStrokes(pg.strokes,orientation),{maxStrokes:all?160:85});
   const lastId=pg.strokes.at(-1)?.id;
   const active=all?lines:lines.filter(line=>line.strokeIds.includes(lastId));
   let found=0;
@@ -278,8 +287,10 @@ async function scanHybridMath(all=false){
    const recognized=await recognizeHybridLine(line.strokes,mathModelReady?
     args=>mlkitMath.recognize(args):null);
    if(!recognized)continue;
-   const fingerprints=Object.fromEntries(line.strokes.map(stroke=>[stroke.id,fingerprint(stroke)]));
-   const proposal={...recognized,pageId:pg.id,fingerprints};
+   const fingerprints=Object.fromEntries(line.strokes.map(stroke=>
+    [stroke.id,fingerprint(originals.get(stroke.id))]));
+   const proposal={...recognized,geometry:readingGeometryToPage(recognized.geometry,orientation),
+    pageId:pg.id,fingerprints};
    if(canAutoConvertMath(recognized,$('mathAutoDigital').checked)){
     try{
      const converted=await acceptMath(proposal);
@@ -439,10 +450,11 @@ async function scanCircleMeasurements(){
    const signatures=sourceStrokes.map(stroke=>({id:stroke.id,signature:fingerprint(stroke)}));
    // El reconocimiento local es respaldo; ML Kit se ejecuta directamente
    // también en modo Geometría (el modelo puede haberse descargado antes).
-   const local=recognizeInk(item.labels);
+   const labelInk=toReadingStrokes(item.labels,page.orientation||'landscape-cw');
+   const local=recognizeInk(labelInk);
    let candidates=local?.geometry?.text?[local.geometry.text]:[];
    try{
-    const remote=await mlkitMath.recognize({strokes:sampledMathStrokes(item.labels)});
+    const remote=await mlkitMath.recognize({strokes:sampledMathStrokes(labelInk)});
     if(Array.isArray(remote?.candidates))candidates=[...remote.candidates,...candidates];
     else if(remote?.text)candidates=[remote.text,...candidates];
    }catch{/* Modelo no preparado: la etiqueta original queda visible. */}
