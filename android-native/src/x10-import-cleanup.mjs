@@ -21,7 +21,9 @@ export async function deleteVerifiedPages(connection,pages,{onProgress=()=>{},ti
  if(typeof connection.send!=='function'||typeof connection.subscribeFrames!=='function')
   throw Error('La conexión Bluetooth no permite confirmar eliminación.');
  if(!validEligiblePages(pages))throw Error('No hay páginas completas verificadas para borrar.');
- if(!proof?.verified||!proof?.driveProvider||typeof proof.sha!=='string'||!proof.sha.match(/^[0-9a-f]{64}$/))
+ if(!proof?.verified||!proof?.driveProvider||!proof?.cloudUserConfirmed||
+    !Number.isInteger(proof.verifiedAt)||Date.now()-proof.verifiedAt>10*60*1000||
+    typeof proof.sha!=='string'||!proof.sha.match(/^[0-9a-f]{64}$/))
   throw Error('El respaldo cifrado en Drive no está comprobado.');
  if(!validEligiblePages(proof.pages)||pages.some(p=>!proof.pages.some(v=>v.index===p.index&&v.digest===p.digest)))
   throw Error('El respaldo no contiene todas las páginas físicas que se pretenden borrar.');
