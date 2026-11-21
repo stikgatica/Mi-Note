@@ -170,11 +170,14 @@ export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
   const primary=rowOptions.map(options=>options[0]||'').filter(Boolean);
   const oldCount=events.length;
   if(primary.length)remember(primary.join('\n'),regionId);
-  // Si el OCR por filas aún no compone un compromiso, probar sus alternativas
-  // sin emparejar títulos/fechas/horas de grupos físicos distintos.
-  if(events.length===oldCount&&rowOptions.some(x=>x.length>1)){
-   const candidates=rowOptions.map(options=>options.find(x=>/^(?:acto|reuni[oó]n|cita|consejo|ceremonia|entrevista)/i.test(x.trim()))||options[0]||'').filter(Boolean);
-   if(candidates.length)remember(candidates.join('\n'),regionId);
+  // ML Kit puede leer un título manuscrito como otra palabra. Dar prioridad
+  // a una alternativa que parezca compromiso, siempre dentro de la MISMA zona.
+  // Examinarla incluso si la primera lectura recuperó otra nota del bloque.
+  if(rowOptions.some(x=>x.length>1)){
+   const TITLE=/^(?:acto|taller|actividad|reuni[oó]n|cita|consejo|ceremonia|entrevista|capacitaci[oó]n)\b/i;
+   const candidates=rowOptions.map(options=>options.find(x=>TITLE.test(x.trim()))||options[0]||'').filter(Boolean);
+   if(candidates.length&&candidates.join('\n')!==primary.join('\n'))
+    remember(candidates.join('\n'),regionId);
   }
   if(events.length===oldCount){
    const combined=await read(group.flat());
