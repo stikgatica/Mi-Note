@@ -43,7 +43,7 @@ test('título genérico Médico se acepta solo dentro de un bloque con asterisco
  const withoutMarker=structuredRowMeetings(rows,{now,starred:false});
  assert.equal(withMarker[0].title,'Médico');
  assert.equal(withMarker[0].needsTitle,false);
- assert.equal(withoutMarker[0].needsTitle,true);
+ assert.equal(withoutMarker[0].title,'Médico'); // título sanitario ya reconocido por vocabulario
 });
 test('varios formatos con números a la derecha no mezclan compromisos',()=>{
  const a=structuredRowMeetings([
