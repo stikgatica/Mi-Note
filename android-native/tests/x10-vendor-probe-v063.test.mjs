@@ -54,8 +54,8 @@ test('la interfaz contiene los diagnósticos y no cambia la orden física de cac
  const module=read('../src/x10-vendor-status.mjs');
  assert.match(stage,/x10-vendor-status\.mjs/);
  assert.match(stage,/queryVendorStatus/);
- assert.match(ui,/x10ProbeVendorStatus/);
- assert.match(ui,/0x8E\/0x8F/);
+ assert.doesNotMatch(ui,/x10ProbeVendorStatus/);
+ assert.match(ui,/minote:x10-vendor-status/);
  assert.match(module,/requestStatusFrame/);
  assert.doesNotMatch(module,/0x8b|0x8c/);
  assert.match(ui,/typed!=='LIMPIAR'/);
