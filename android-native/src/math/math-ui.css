@@ -31,3 +31,11 @@
 .math-shape-grid button{white-space:normal;text-align:left;min-height:42px;padding:8px;font-size:13px;}
 .math-shape-grid button.selected{background:#1451b7;color:#fff;border-color:#1451b7;}
 @media(max-width:360px){.math-shape-grid{gap:5px}.math-shape-grid button{font-size:12px;}}
+
+/* V0.72: propuestas de OCR matemático, compactas, legibles y editables. */
+.minote-math-dialog .math-hybrid-candidates{display:flex;flex-direction:column;gap:8px;margin-top:9px}
+.minote-math-dialog .math-hybrid-item{border:1px solid #bed0e0;background:#f8fbff;border-radius:10px;padding:9px;display:flex;flex-direction:column;gap:7px}
+.minote-math-dialog .math-hybrid-item small{color:#53677e;font-size:12px}
+.minote-math-dialog .math-hybrid-item input[type="text"]{font-size:19px;font-weight:600;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+.minote-math-dialog .math-hybrid-item .math-actions{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.minote-math-dialog .math-hybrid-item button{min-height:39px;white-space:normal}
