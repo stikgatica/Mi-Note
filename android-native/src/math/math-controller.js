@@ -2,6 +2,8 @@
    Motor de geometría + reconocimiento conservador de números y medidas:
    sin nube, sin modificar tinta fuente, sin trabajo en el hilo de escritura. */
 import {AXES,fingerprint,validObject} from './math-geometry.mjs';
+import {registerPlugin} from '@capacitor/core';
+import {mathematicalLines,normalizeArithmetic,recognizeHybridLine} from './math-hybrid-ocr.mjs';
 import {mergeAutomatic} from './math-auto.mjs';
 import {DRAW_INTENTIONS} from './math-intention.mjs';
 import {compactAutomatic,listObjects,nearDuplicate} from './math-objects.mjs';
@@ -21,6 +23,14 @@ dialog.innerHTML=`
  <label class="math-switch"><input id="mathMode" type="checkbox"> <strong>Activar Modo Matemática</strong></label>
  <label class="field">Eje<select id="mathAxis"></select></label>
  <p class="math-hint">Mi Note mejora automáticamente figuras y propone texto digital al terminar de escribir en la Huion. El original permanece intacto.</p>
+ <section id="mathNumbersControls" hidden>
+  <label class="math-switch"><input id="mathAutoDigital" type="checkbox" checked> Convertir automáticamente solo si coinciden ambos reconocedores</label>
+  <label class="math-switch"><input id="mathNumbersShowLayer" type="checkbox" checked> Mostrar texto matemático digital</label>
+  <div class="math-actions"><button type="button" id="mathDownloadModel">Preparar ML Kit</button>
+  <button type="button" id="mathScanNumbers">Reconocer operaciones de esta hoja</button></div>
+  <p class="math-hint">Se combinan plantillas locales y ML Kit. No se calculan resultados; si la lectura es dudosa, se puede editar antes de convertir. La tinta manuscrita permanece guardada.</p>
+  <div id="mathHybridCandidates" class="math-hybrid-candidates" aria-live="polite"></div>
+ </section>
  <section id="mathGeometryControls" hidden>
   <label class="math-switch"><input id="mathShowLayer" type="checkbox" checked> Mostrar capa digital mejorada</label>
   <p class="math-hint">No es necesario seleccionar trazos ni pulsar Mejorar. Los números y medidas solo se digitalizan si el reconocimiento local alcanza una confianza alta; los casos dudosos permanecen manuscritos.</p>
@@ -29,7 +39,8 @@ dialog.innerHTML=`
    <select id="mathIntention"></select>
   </label>
   <p class="math-hint">Seleccione una figura antes de dibujar. La corrección automática respetará esa intención y mantendrá intacta la tinta original.</p>
-  <details id="mathRecognizedDetails"><summary>Figuras reconocidas (administrar)</summary>
+ </section>
+ <details id="mathRecognizedDetails"><summary>Objetos digitales (administrar)</summary>
   <label class="field">Figuras reconocidas en esta hoja
    <select id="mathSavedObjects"></select>
   </label>
@@ -45,7 +56,6 @@ dialog.innerHTML=`
    <div id="mathLabels"></div>
   </details>
   </details>
- </section>
  <p id="mathStatus" class="math-hint" role="status" aria-live="polite"></p>
 `;
 document.body.append(dialog);
@@ -65,6 +75,10 @@ for(const shape of DRAW_INTENTIONS)$('mathIntention').append(elm('option',{value
 $('mathIntention').value='auto';
 
 let enabled=false,worker=null,sequence=0,scanTimer=0,scanRunning=false,scanAgain=false,lastPage='';
+const mlkitMath=registerPlugin('MiNoteCalendar');
+const mathSuggestions=new Map();
+let hybridScanBusy=false,hybridScanSerial=0;
+const numbersSelected=()=>$('mathAxis').value==='numbers';
 const intentCutoffs=new Map();
 let intentionEpoch=0;
 const shapePreference='minote_math_intention_v047';
@@ -209,8 +223,12 @@ async function saveLayer(objects,visible){
 }
 function updateInterface(){
  $('mathMode').checked=enabled;menuToggle.checked=enabled;updateQuickShape();
- $('mathAxis').disabled=!enabled;$('mathGeometryControls').hidden=!enabled;
+ $('mathAxis').disabled=!enabled;
+ $('mathGeometryControls').hidden=!enabled||numbersSelected();
+ $('mathNumbersControls').hidden=!enabled||!numbersSelected();
+ $('mathRecognizedDetails').hidden=!enabled;
  $('mathShowLayer').checked=layerOf(get()).visible!==false;
+ $('mathNumbersShowLayer').checked=layerOf(get()).visible!==false;
  refresh();
 }
 function setEnabled(value){
@@ -249,7 +267,7 @@ const sigsMatch=(candidate,pg)=>{
  });
 };
 async function runOne(pg,strokes){
- if(!enabled||!strokes.length)return false;
+ if(!enabled||numbersSelected()||!strokes.length)return false;
  const epoch=intentionEpoch;
  const candidate=await recognize(strokes);
  if(!candidate||epoch!==intentionEpoch)return false;
@@ -267,6 +285,7 @@ async function runOne(pg,strokes){
 }
 async function scanRecent(all=false){
  if(!enabled)return;
+ if(numbersSelected()){await scanHybridMath(all);return;}
  if(scanRunning){scanAgain=true;return;}
  scanRunning=true;
  try{
@@ -295,7 +314,7 @@ async function scanRecent(all=false){
 function scheduleScan(){
  if(!enabled)return;
  clearTimeout(scanTimer);
- scanTimer=setTimeout(()=>void scanRecent(false),650);
+ scanTimer=setTimeout(()=>void scanRecent(false),numbersSelected()?1300:650);
 }
 function editFields(){
  const obj=selectedObject(),editor=$('mathCoordinateEditor');editor.replaceChildren();$('mathLabels').replaceChildren();
