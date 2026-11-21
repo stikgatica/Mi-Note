@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {memoryFromIndex,batteryFromGatt,compareHuionReadings} from '../src/x10-metrics.mjs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 test('índice 3 genera 46/50 solo como estimación, sin afirmar certeza',()=>{
@@ -53,4 +55,9 @@ test('el build copia las métricas, registra fuente 2A19 y conserva lectura 0x85
  assert.match(ui,/Estimación no verificada/);
  assert.match(ui,/Limpiar caché de la Huion X10/);
  assert.doesNotMatch(ui,/fetch\(|https?:\/\//);
+});
+
+test('etiqueta superior de batería debe compilar sintácticamente',()=>{
+ const file=fileURLToPath(new URL('../src/battery-ui-v022.js',import.meta.url));
+ assert.doesNotThrow(()=>execFileSync(process.execPath,['--check',file]));
 });

@@ -25,7 +25,7 @@ group?.append(button);
 function showBattery(level,connected){
  const ok=connected&&Number.isInteger(level)&&level>=0&&level<=100;
  if(battery){battery.hidden=!ok;if(ok)battery.textContent=level+'%';}
- if(note)note.textContent=ok?'Batería GATT 2A19: '+level+'% (sin corroborar):connected?'Batería: no disponible (la X10 no ofreció lectura compatible)':'Batería: desconectada';
+ if(note)note.textContent=ok?'Batería GATT 2A19: '+level+'% (sin corroborar)':connected?'Batería: no disponible (la X10 no ofreció lectura compatible)':'Batería: desconectada';
  if(button)button.disabled=!connected;
 }
 showBattery(null,false);
