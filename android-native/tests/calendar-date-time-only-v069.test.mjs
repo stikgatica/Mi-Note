@@ -27,7 +27,7 @@ test('dos grupos y solo una palabra reconocida aún dan dos sugerencias',()=>{
 });
 test('no inventa fecha/hora con líneas sueltas ni cálculos',()=>{
  for(const bad of ['15/12','18:00','15/12\n2+2=4','2+2=4\n15/12\n18:00','15/12\n25:30',
-  '15/12\n99:99','15/12\n\n18:00 + 2','18:00\n15/12']){
+  '15/12\n99:99','15/12\n\n18:00 + 2','18:00\n15/12','1/12\n10:00\n2+2=4']){
   const result=extractNaturalMeetings(bad,{now});
   assert.equal(result.length,0,bad+' -> '+JSON.stringify(result));
  }

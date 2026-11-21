@@ -79,8 +79,8 @@ export function extractNaturalMeetings(text,{now=new Date(),regionId=''}={}){
   const dateLine=lines[i],timeLine=lines[i+1];
   if(!DATE_ROW.test(dateLine)||!TIME_ROW.test(timeLine)||
      MATH.test(dateLine)||MATH.test(timeLine))continue;
-  const before=lines[i-1]||'';
-  if(before&&MATH.test(before))continue;
+  const before=lines[i-1]||'',after=lines[i+2]||'';
+  if((before&&MATH.test(before))||(after&&MATH.test(after)))continue;
   const parsed=parseReminder(dateLine+' '+timeLine,now);
   if(!parsed?.time||!calendarDraftIsValid(parsed))continue;
   // Si existe un evento confirmado con la misma pareja de fecha/hora,

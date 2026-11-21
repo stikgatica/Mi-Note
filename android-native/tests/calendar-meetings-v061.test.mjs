@@ -48,8 +48,11 @@ test('dos reuniones del mismo día y nombre sobreviven en la bandeja',()=>{
  assert.equal(inbox.count(),2);
  assert.deepEqual(inbox.all().map(x=>x.event.time),['14:00','16:00']);
 });
-test('matemáticas, fechas solas y falta de fecha no crean compromisos',()=>{
- for(const note of ['11/12\n14:00','Resolver 11/12 + 4 = 5','Reunión\n14:00']){
+test('fecha y hora juntas proponen revisión, pero matemáticas y fecha aislada no',()=>{
+ const proposed=extractNaturalMeetings('11/12\n14:00',{now});
+ assert.equal(proposed.length,1);
+ assert.equal(proposed[0].needsTitle,true);
+ for(const note of ['11/12','Resolver 11/12 + 4 = 5','Reunión\n14:00']){
   assert.equal(extractNaturalMeetings(note,{now}).length,0,note);
  }
 });
