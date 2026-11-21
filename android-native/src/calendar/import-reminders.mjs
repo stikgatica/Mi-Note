@@ -3,6 +3,7 @@
  * No escribe en Google Calendar ni en el dispositivo Huion. */
 import {autoReminderCandidate,reminderKey} from './reminder-auto.mjs';
 import {extractContextualAgenda} from './agenda-context.mjs';
+import {extractNaturalMeetings} from './natural-meetings.mjs';
 
 const DATE=/\b(?:20\d{2}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[./-]\d{1,2}(?:[./-](?:20\d{2}|\d{2}))?|\d{1,2}\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+(?:de|del)\s+\d{2,4})?)\b/gi;
 const AFTER_TIME=/^\s*(?:a\s+las?\s+)?(?:[01]?\d|2[0-3])[:h.]?[0-5]\d(?:\s*(?:hrs?|horas?))?/i;
@@ -10,11 +11,19 @@ const MAX_BANDS=12;
 const MAX_STROKES=250;
 const MAX_POINTS=14000;
 
-export function extractImportedReminders(text,{now=new Date(),heading='',pageDate=null}={}){
+export function extractImportedReminders(text,{now=new Date(),heading='',pageDate=null,regionId=''}={}){
  const input=String(text||'').replace(/\r/g,' ').trim().slice(0,3000);
  if(!input)return [];
  // Los saltos de línea marcan compromisos distintos: no unir fechas de renglones ajenos.
- if(input.includes('\n'))return extractContextualAgenda(input,{now,heading,pageDate});
+ if(input.includes('\n')){
+  const meetings=extractNaturalMeetings(input,{now,regionId});
+  const contextual=extractContextualAgenda(input,{now,heading,pageDate});
+  const known=new Set(meetings.map(reminderKey));
+  for(const item of contextual)if(!known.has(reminderKey(item))){
+   meetings.push({...item,regionId:regionId||item.regionId||''});known.add(reminderKey(item));
+  }
+  return meetings.slice(0,25);
+ }
  const found=[...input.matchAll(DATE)];
  if(!found.length)return extractContextualAgenda(input,{now,heading,pageDate});
  const out=[],known=new Set();
@@ -86,37 +95,75 @@ function compactStrokes(strokes){
  }
  return out;
 }
+/** Agrupa renglones próximos en bloques físicos sin tocar ni reordenar la tinta. */
+export function noteBlocksFromBands(bands){
+ if(!Array.isArray(bands)||!bands.length)return [];
+ const rows=bands.map((strokes,i)=>{
+  const ys=strokes.flatMap(points=>points.map(p=>p[1]));
+  return {i,strokes,top:Math.min(...ys),bottom:Math.max(...ys)};
+ }).sort((a,b)=>a.top-b.top);
+ const gaps=rows.slice(1).map((row,i)=>Math.max(0,row.top-rows[i].bottom));
+ const nonzero=gaps.filter(g=>g>0);
+ const middle=median(nonzero);
+ // Separaciones normales entre título, fecha y hora no separan el compromiso.
+ // El salto vertical grande entre dos notas crea un nuevo bloque.
+ const split=Math.max(125,Math.min(300,middle*1.9));
+ const groups=[];let group=[];
+ for(let i=0;i<rows.length;i++){
+  if(i>0&&rows[i].top-rows[i-1].bottom>split&&group.length){
+   groups.push(group);group=[];
+  }
+  group.push(rows[i]);
+ }
+ if(group.length)groups.push(group);
+ return groups.map(g=>g.map(row=>row.strokes));
+}
 export async function recognizeImportedPage(page,recognize,{now=new Date()}={}){
  if(!page||page.huion?.partial||!Array.isArray(page.strokes)||!page.strokes.length)return [];
  if(typeof recognize!=='function')return [];
  const bands=lineBandsFromPage(page.strokes);
  if(!bands.length)return [];
- const seen=new Set(),events=[];
- const remember=text=>{
-  for(const event of extractImportedReminders(text,{now,heading:page.notebookTitle||page.title||'',pageDate:page.createdAt||null})){
-   const key=reminderKey(event);
-   if(key&&!seen.has(key)){seen.add(key);events.push(event);}
-  }
- };
- // Primero intentar leer toda la página si cabe: conserva encabezados.
- const full=compactStrokes(bands.flat());
- const requests=[];
- const recognizedBands=[];
- if(full.length>=2&&full.length<=MAX_STROKES)requests.push(full);
- if(bands.length>1){
-  for(const band of bands){
-   const chunk=compactStrokes(band);
-   if(chunk.length>=2)requests.push(chunk);
+ const groups=noteBlocksFromBands(bands);
+ const events=[],seen=new Set();
+ const heading=page.notebookTitle||page.title||'',pageDate=page.createdAt||null;
+ function remember(text,regionId=''){
+  const list=extractImportedReminders(text,{now,heading,pageDate,regionId});
+  for(const item of list){
+   const event={...item,regionId:regionId||item.regionId||''};
+   const fingerprint=reminderKey(event);
+   if(fingerprint&&!seen.has(fingerprint)){
+    seen.add(fingerprint);events.push(event);
+   }
   }
  }
- for(const [index,strokes] of requests.slice(0,MAX_BANDS+1).entries()){
+ async function read(strokes){
+  const prepared=compactStrokes(strokes);
+  if(prepared.length<1)return [];
   try{
-   const result=await recognize({strokes});
-   const options=[result?.text,...(Array.isArray(result?.candidates)?result.candidates:[])].filter(x=>typeof x==='string');
-   for(const option of options.slice(0,4))remember(option);
-   if(index>0&&options[0])recognizedBands.push(options[0]);
-  }catch{/* Una lectura fallida no impide revisar otros renglones. */}
+   const result=await recognize({strokes:prepared});
+   return [result?.text,...(Array.isArray(result?.candidates)?result.candidates:[])]
+    .filter(x=>typeof x==='string'&&x.trim()).slice(0,3);
+  }catch{return [];}
  }
- if(recognizedBands.length>1)remember(recognizedBands.join('\n'));
+ // OCR por bloque y renglón: soporta "Reunión" / "11/12" / "14:00"
+ // y otra reunión en otra zona de la misma página, incluso si está inclinada.
+ for(const [i,group] of groups.slice(0,MAX_BANDS).entries()){
+  const regionId='region-'+i;
+  const combined=await read(group.flat());
+  for(const text of combined)remember(text,regionId);
+  if(group.length>1){
+   const rows=[];
+   for(const line of group.slice(0,MAX_BANDS)){
+    const options=await read(line);
+    if(options.length)rows.push(options[0]);
+   }
+   if(rows.length)remember(rows.join('\n'),regionId);
+  }
+ }
+ // Fallback conservador para encabezados contextuales cuando no hubo OCR útil por bloques.
+ if(!events.length){
+  const full=await read(bands.flat());
+  for(const text of full)remember(text);
+ }
  return events.slice(0,25);
 }
