@@ -149,6 +149,48 @@ el('personalBackupUnlink')?.addEventListener('click',async()=>{
  await native.unlink();documentInfo=null;key=null;salt=null;remoteSha=null;locked=false;
  setStatus('Desvinculado. Sus cuadernos locales permanecen en el dispositivo.');
 });
+/* Importación X10: una comprobación explícita del respaldo cifrado.
+ * Android SAF puede tardar en subir a Drive; el usuario debe confirmar que
+ * el documento ya está disponible en Drive antes de borrar memoria física. */
+window.MiNoteDriveBackup={
+ async prepareForPhysicalDelete(pages){
+  if(!Array.isArray(pages)||!pages.length||pages.length>64)
+   throw Error('No hay páginas completas para respaldar.');
+  if(!native||!key||!salt||!documentInfo?.linked||locked)
+   throw Error('Configure y desbloquee Copia automática en Drive antes de importar.');
+  const currentStatus=await native.status();
+  if(!currentStatus.driveProvider)
+   throw Error('El respaldo debe estar vinculado mediante Google Drive, no un archivo local.');
+  if(!currentStatus.canRead||!currentStatus.canWrite)
+   throw Error('Se perdieron los permisos de acceso al archivo de Drive.');
+  clearTimeout(debounce);
+  const task=working.catch(()=>{}).then(async()=>{
+   if(locked)throw Error('La copia automática está detenida; revise la configuración.');
+   // Incluye TODAS las hojas de Mi Note, no solo la última importación.
+   await sync();
+   const verified=await native.read();
+   if(verified.empty||verified.sha!==remoteSha)
+    throw Error('El archivo de respaldo cambió o no coincide tras escribirlo.');
+   const data=await decryptEnvelope(JSON.parse(verified.content),key);
+   const stored=data.notebooks.flatMap(n=>n.pages||[]);
+   const matched=pages.every(target=>stored.some(p=>
+    p.huion?.source==='internal-memory'&&p.huion?.physicalPage===target.index&&
+    p.huion?.digest===target.digest&&p.huion?.partial!==true&&
+    Array.isArray(p.strokes)&&p.strokes.length>0));
+   if(!matched)throw Error('La copia leída desde Drive no contiene todas las páginas completas.');
+   const nowStatus=await native.status();
+   if(!nowStatus.driveProvider||!nowStatus.canRead||!nowStatus.canWrite)
+    throw Error('Se perdió el acceso a Google Drive durante la verificación.');
+   return {verified:true,driveProvider:true,sha:verified.sha,
+    pages:pages.map(p=>({index:p.index,digest:p.digest})),
+    name:nowStatus.name||'copia cifrada',verifiedAt:Date.now(),
+    cloudUploadGuaranteed:false};
+  });
+  working=task.catch(()=>{});
+  return task;
+ }
+};
+
 window.addEventListener('minote:changed',changed);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&key&&!locked)void queue(sync);});
 window.addEventListener('online',()=>{if(key&&!locked)void queue(sync);});
