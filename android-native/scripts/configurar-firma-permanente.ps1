@@ -14,6 +14,24 @@ function Exigir($nombre) {
 }
 Exigir keytool
 Exigir gh
+# Enviar secretos por stdin SIN salto de línea y SIN argumentos visibles.
+function Registrar-Secreto([string]$Nombre,[string]$Valor) {
+ $psi=New-Object System.Diagnostics.ProcessStartInfo
+ $psi.FileName=(Get-Command gh).Source
+ $psi.Arguments="secret set $Nombre -R $Repositorio"
+ $psi.UseShellExecute=$false
+ $psi.RedirectStandardInput=$true
+ $psi.RedirectStandardError=$true
+ $psi.CreateNoWindow=$true
+ $process=[System.Diagnostics.Process]::Start($psi)
+ try {
+  $process.StandardInput.Write($Valor)
+  $process.StandardInput.Close()
+  $errorText=$process.StandardError.ReadToEnd()
+  $process.WaitForExit()
+  if($process.ExitCode -ne 0) { throw "Error configurando $Nombre: $errorText" }
+ } finally { $process.Dispose() }
+}
 & gh auth status 1>$null
 if ($LASTEXITCODE -ne 0) { throw 'Primero ejecute gh auth login en este equipo.' }
 $carpeta=Split-Path $RutaClave -Parent
@@ -46,15 +64,10 @@ try {
  $fingerprint=($Matches[1] -replace ':','').ToLowerInvariant()
  if ($fingerprint.Length -ne 64) { throw 'Huella SHA256 inválida.' }
  Write-Host 'Registrando secretos cifrados en GitHub. No se mostrará la clave.'
- [Convert]::ToBase64String([IO.File]::ReadAllBytes($RutaClave)) |
-   & gh secret set MINOTE_RELEASE_KEYSTORE_BASE64 -R $Repositorio
- if ($LASTEXITCODE -ne 0) { throw 'No se pudo registrar el archivo de clave en GitHub.' }
- $pass | & gh secret set MINOTE_RELEASE_STORE_PASSWORD -R $Repositorio
- if ($LASTEXITCODE -ne 0) { throw 'No se pudo registrar la contraseña de almacén.' }
- $pass | & gh secret set MINOTE_RELEASE_KEY_PASSWORD -R $Repositorio
- if ($LASTEXITCODE -ne 0) { throw 'No se pudo registrar la contraseña de clave.' }
- $aliasClave | & gh secret set MINOTE_RELEASE_KEY_ALIAS -R $Repositorio
- if ($LASTEXITCODE -ne 0) { throw 'No se pudo registrar el alias.' }
+ Registrar-Secreto 'MINOTE_RELEASE_KEYSTORE_BASE64' ([Convert]::ToBase64String([IO.File]::ReadAllBytes($RutaClave)))
+ Registrar-Secreto 'MINOTE_RELEASE_STORE_PASSWORD' $pass
+ Registrar-Secreto 'MINOTE_RELEASE_KEY_PASSWORD' $pass
+ Registrar-Secreto 'MINOTE_RELEASE_KEY_ALIAS' $aliasClave
  & gh variable set MINOTE_RELEASE_CERT_SHA256 -R $Repositorio --body $fingerprint
  if ($LASTEXITCODE -ne 0) { throw 'No se pudo registrar la huella pública.' }
  Write-Host 'Firma permanente configurada. Conserve el archivo .p12 y su contraseña fuera del repositorio.'
