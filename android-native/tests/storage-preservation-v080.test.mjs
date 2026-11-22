@@ -26,3 +26,10 @@ test('jamás genera claves efímeras durante la publicación',()=>{
  assert.match(workflow,/signing-guard\.mjs check-env/);
  assert.match(workflow,/signing-guard\.mjs verify-apk/);
 });
+test('respaldo de transición usa selector de archivos Android, sin afirmar guardado antes de confirmación',()=>{
+ assert.match(app,/await exportBlob\(blob,filename,'application\/json','save'\)/);
+ assert.match(app,/if\(!result\?\.saved\)throw Error/);
+ assert.match(app,/await saveQueue/);
+ assert.match(app,/NO desinstale la aplicación/);
+ assert.match(app,/32\*1024\*1024/);
+});
