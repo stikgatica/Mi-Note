@@ -33,7 +33,7 @@ export function validateReleaseSigning(env={}){
 }
 export function verifyApkSigner(output,expected){
  const normalizedExpected=normalizeCertificateDigest(expected);
- const found=[...String(output||'').matchAll(/Signer\s+#\d+\s+certificate\s+SHA-256\s+digest:\s*([a-fA-F0-9:\s]{64,95})/gi)];
+ const found=[...String(output||'').matchAll(/Signer\s+#\d+\s+certificate\s+SHA-256\s+digest:\s*([a-fA-F0-9:]{64,95})/gi)];
  if(found.length!==1)throw Error('No se pudo confirmar un único certificado de firma en apksigner.');
  const actual=normalizeCertificateDigest(found[0][1]);
  if(actual!==normalizedExpected)throw Error('FIRMA DIFERENTE: el certificado del APK no coincide con la firma permanente registrada. Publicación bloqueada.');
