@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {validateReleaseSigning,verifyApkSigner,normalizeCertificateDigest} from '../scripts/signing-guard.mjs';
 const a='2f'.repeat(32),b='3b'.repeat(32);
-const env={MINOTE_RELEASE_KEYSTORE_BASE64:'QWxhZGRpbjpvcGVuIHNlc2FtZQ=='.repeat(5),
+const env={MINOTE_RELEASE_KEYSTORE_BASE64:Buffer.from('fake-keystore-fixture-'.repeat(12)).toString('base64'),
  MINOTE_RELEASE_STORE_PASSWORD:'passphrase-long-stable',
  MINOTE_RELEASE_KEY_PASSWORD:'passphrase-long-stable',
  MINOTE_RELEASE_KEY_ALIAS:'minote-x10',
