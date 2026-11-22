@@ -34,6 +34,23 @@ jobs:
           npm test
           node --check src/app.js
           node --check scripts/signing-guard.mjs
+      - name: Verificar empaquetado de interfaz Android sin publicar APK
+        run: |
+          npm run prepare:android
+          node scripts/features.mjs
+          node scripts/mobile.mjs
+          node scripts/landscape.mjs
+          node scripts/safe-page-delete.mjs
+          node scripts/android-actions.mjs
+          node scripts/enable-v019.mjs
+          node scripts/performance-v020.mjs
+          node scripts/enable-v021.mjs
+          node scripts/battery-v022.mjs
+          node scripts/enable-v022.mjs
+          node scripts/math-stage.mjs
+          node --check stage/app.js
+          node --check stage/android-ui-main.js
+          npx vite build
       - name: Comprobar que falta de firma impide publicar
         run: |
           if env -u MINOTE_RELEASE_KEYSTORE_BASE64 \
