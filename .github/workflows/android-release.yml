@@ -150,14 +150,11 @@ jobs:
           trap 'rm -f "$KEYSTORE" signed/unsigned-aligned.apk' EXIT
           printf '%s' "$MINOTE_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
           test -s "$KEYSTORE"
-          # Verify expected fingerprint from the keystore BEFORE using it.
-          keytool -list -v -keystore "$KEYSTORE" -storetype PKCS12             -storepass:env MINOTE_RELEASE_STORE_PASSWORD -alias "$MINOTE_RELEASE_KEY_ALIAS"             | sed -n '/SHA256:/p' | head -n 1 > signed/cert-from-keystore.txt
-          # Do not print the certificate here; verify the APK after signing.
+          # El certificado se verifica en el APK antes de permitir publicación.
           "$TOOLS/zipalign" -p -f 4 "$UNSIGNED" signed/unsigned-aligned.apk
           "$TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-type PKCS12             --ks-key-alias "$MINOTE_RELEASE_KEY_ALIAS"             --ks-pass env:MINOTE_RELEASE_STORE_PASSWORD             --key-pass env:MINOTE_RELEASE_KEY_PASSWORD             --out signed/Mi-Note-X10-Android-v0.80.apk             signed/unsigned-aligned.apk
           "$TOOLS/apksigner" verify --verbose signed/Mi-Note-X10-Android-v0.80.apk
           "$TOOLS/apksigner" verify --print-certs signed/Mi-Note-X10-Android-v0.80.apk             | node scripts/signing-guard.mjs verify-apk
-          rm -f signed/cert-from-keystore.txt
           sha256sum signed/Mi-Note-X10-Android-v0.80.apk | tee signed/SHA256SUMS.txt
       - name: Verificar permisos del APK
         shell: bash
