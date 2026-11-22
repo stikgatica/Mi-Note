@@ -421,5 +421,7 @@ function setupX10(){
  Promise.resolve().then(()=>x10TryAutomatic('inicio'));
 }
 
-async function start(){try{db=await openDb();state=await getSaved();if(!state||state.schema!==VERSION||!Array.isArray(state.notebooks))state=starter();syncActive();setupEvents();render();await persist();}catch(err){console.error(err);document.body.innerHTML='<main style="padding:25px"><h1>No se pudo iniciar Mi Note</h1><p>El navegador debe permitir IndexedDB. Prueba Chrome o Edge en HTTPS o localhost.</p><pre>'+esc(err.message)+'</pre></main>';}}
+async function start(){try{db=await openDb();state=await getSaved();if(state&&(state.schema!==VERSION||!Array.isArray(state.notebooks)))
+  throw Error('Formato de cuadernos incompatible. La base original permanece intacta; no se sobrescribió ni creó un cuaderno nuevo. Conserve la aplicación y el respaldo.');
+  if(!state)state=starter();syncActive();setupEvents();render();await persist();}catch(err){console.error(err);document.body.innerHTML='<main style="padding:25px"><h1>No se pudo iniciar Mi Note</h1><p>El navegador debe permitir IndexedDB. Prueba Chrome o Edge en HTTPS o localhost.</p><pre>'+esc(err.message)+'</pre></main>';}}
 start();
