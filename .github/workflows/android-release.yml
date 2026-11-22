@@ -1,4 +1,4 @@
-name: Mi Note X10 Android v0.79 - compartir Android y selector de figura
+name: Mi Note X10 Android v0.80 - compartir Android y selector de figura
 on:
   push:
     branches: [main]
@@ -35,6 +35,16 @@ jobs:
           java-version: '21'
       - name: Comprobar SDK Android
         run: test -d "$ANDROID_HOME/build-tools"
+      # No build signed or release can proceed without one persistent signing identity.
+      # An old installation signed with a throwaway key cannot be updated in place.
+      - name: Exigir firma permanente antes de compilar
+        env:
+          MINOTE_RELEASE_KEYSTORE_BASE64: ${{ secrets.MINOTE_RELEASE_KEYSTORE_BASE64 }}
+          MINOTE_RELEASE_STORE_PASSWORD: ${{ secrets.MINOTE_RELEASE_STORE_PASSWORD }}
+          MINOTE_RELEASE_KEY_PASSWORD: ${{ secrets.MINOTE_RELEASE_KEY_PASSWORD }}
+          MINOTE_RELEASE_KEY_ALIAS: ${{ secrets.MINOTE_RELEASE_KEY_ALIAS }}
+          MINOTE_RELEASE_CERT_SHA256: ${{ vars.MINOTE_RELEASE_CERT_SHA256 }}
+        run: node scripts/signing-guard.mjs check-env
       - name: Dependencias y pruebas
         run: |
           npm install --no-audit --no-fund
@@ -90,7 +100,7 @@ jobs:
           # Revision final de mejoras en trazos, guardado e interfaz.
           # Validar selector sin expresiones regulares ambiguas en Node 22.
           npx vite build
-          sed -i 's/Mi Note X10 Android V0.42/Mi Note X10 Android V0.79/g' dist/index.html
+          sed -i 's/Mi Note X10 Android V0.42/Mi Note X10 Android V0.80/g' dist/index.html
       - name: Crear Android y configurar privacidad
         run: |
           npx cap add android
@@ -102,7 +112,7 @@ jobs:
           node native-backup/setup.mjs
           grep -Fq 'MiNoteShareProvider' android/app/src/main/AndroidManifest.xml
           grep -Fq 'minote_share_paths' android/app/src/main/AndroidManifest.xml
-          sed -i -E 's/versionCode [0-9]+/versionCode 79/; s/versionName "[^"]+"/versionName "0.79.0"/' android/app/build.gradle
+          sed -i -E 's/versionCode [0-9]+/versionCode 80/; s/versionName "[^"]+"/versionName "0.80.0"/' android/app/build.gradle
       - name: Generar APK release sin depuracion
         run: |
           cd android
@@ -118,36 +128,44 @@ jobs:
             echo "Fallo transitorio de dependencias: reintento $n/4."
             sleep 20
           done
-      - name: Firmar APK de produccion para pruebas privadas
+      - name: Firmar APK con clave permanente protegida
         shell: bash
+        env:
+          MINOTE_RELEASE_KEYSTORE_BASE64: ${{ secrets.MINOTE_RELEASE_KEYSTORE_BASE64 }}
+          MINOTE_RELEASE_STORE_PASSWORD: ${{ secrets.MINOTE_RELEASE_STORE_PASSWORD }}
+          MINOTE_RELEASE_KEY_PASSWORD: ${{ secrets.MINOTE_RELEASE_KEY_PASSWORD }}
+          MINOTE_RELEASE_KEY_ALIAS: ${{ secrets.MINOTE_RELEASE_KEY_ALIAS }}
+          MINOTE_RELEASE_CERT_SHA256: ${{ vars.MINOTE_RELEASE_CERT_SHA256 }}
         run: |
           set -euo pipefail
           umask 077
+          node scripts/signing-guard.mjs check-env
           UNSIGNED="android/app/build/outputs/apk/release/app-release-unsigned.apk"
           test -s "$UNSIGNED"
           TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           test -x "$TOOLS/zipalign"
           test -x "$TOOLS/apksigner"
           mkdir -p signed
-          PASSWORD="$(openssl rand -hex 28)"
-          keytool -genkeypair -noprompt -keyalg RSA -keysize 3072 -validity 10000 \
-            -alias minote-x10 -dname "CN=Mi Note X10 Android, OU=Private Project" \
-            -keystore "$RUNNER_TEMP/minote-v02-release.jks" -storetype PKCS12 \
-            -storepass "$PASSWORD" -keypass "$PASSWORD"
+          KEYSTORE="$RUNNER_TEMP/minote-release-permanent.p12"
+          trap 'rm -f "$KEYSTORE" signed/unsigned-aligned.apk' EXIT
+          printf '%s' "$MINOTE_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          test -s "$KEYSTORE"
+          # Verify expected fingerprint from the keystore BEFORE using it.
+          keytool -list -v -keystore "$KEYSTORE" -storetype PKCS12             -storepass:env MINOTE_RELEASE_STORE_PASSWORD -alias "$MINOTE_RELEASE_KEY_ALIAS"             | sed -n '/SHA256:/p' | head -n 1 > signed/cert-from-keystore.txt
+          # Do not print the certificate here; verify the APK after signing.
           "$TOOLS/zipalign" -p -f 4 "$UNSIGNED" signed/unsigned-aligned.apk
-          "$TOOLS/apksigner" sign --ks "$RUNNER_TEMP/minote-v02-release.jks" \
-            --ks-key-alias minote-x10 --ks-pass "pass:$PASSWORD" \
-            --key-pass "pass:$PASSWORD" --out signed/Mi-Note-X10-Android-v0.79.apk \
-            signed/unsigned-aligned.apk
-          "$TOOLS/apksigner" verify --verbose --print-certs signed/Mi-Note-X10-Android-v0.79.apk
-          sha256sum signed/Mi-Note-X10-Android-v0.79.apk | tee signed/SHA256SUMS.txt
+          "$TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-type PKCS12             --ks-key-alias "$MINOTE_RELEASE_KEY_ALIAS"             --ks-pass env:MINOTE_RELEASE_STORE_PASSWORD             --key-pass env:MINOTE_RELEASE_KEY_PASSWORD             --out signed/Mi-Note-X10-Android-v0.80.apk             signed/unsigned-aligned.apk
+          "$TOOLS/apksigner" verify --verbose signed/Mi-Note-X10-Android-v0.80.apk
+          "$TOOLS/apksigner" verify --print-certs signed/Mi-Note-X10-Android-v0.80.apk             | node scripts/signing-guard.mjs verify-apk
+          rm -f signed/cert-from-keystore.txt
+          sha256sum signed/Mi-Note-X10-Android-v0.80.apk | tee signed/SHA256SUMS.txt
       - name: Verificar permisos del APK
         shell: bash
         run: |
           set -euo pipefail
           TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.79.apk | tee signed/PERMISOS.txt
-          "$TOOLS/aapt" dump xmltree signed/Mi-Note-X10-Android-v0.79.apk AndroidManifest.xml | tee signed/MANIFIESTO.txt
+          "$TOOLS/aapt" dump permissions signed/Mi-Note-X10-Android-v0.80.apk | tee signed/PERMISOS.txt
+          "$TOOLS/aapt" dump xmltree signed/Mi-Note-X10-Android-v0.80.apk AndroidManifest.xml | tee signed/MANIFIESTO.txt
           grep -Fq 'cl.stikgatica.minote.x10.minote.files' signed/MANIFIESTO.txt
           # INTERNET se usa solamente para descargar el modelo español ML Kit
           # tras acción explícita del usuario. El reconocimiento ya descargado es local.
@@ -159,23 +177,33 @@ jobs:
       - name: Guardar APK para respaldo
         uses: actions/upload-artifact@v4
         with:
-          name: Mi-Note-X10-v0.79-APK
+          name: Mi-Note-X10-v0.80-APK
           path: |
-            android-native/signed/Mi-Note-X10-Android-v0.79.apk
+            android-native/signed/Mi-Note-X10-Android-v0.80.apk
             android-native/signed/SHA256SUMS.txt
             android-native/signed/PERMISOS.txt
           if-no-files-found: error
-      - name: Publicar Mi Note X10 Android v0.79
+      # Independent gate: no release may be uploaded without certificate pin.
+      - name: Confirmar identidad antes de publicar
+        shell: bash
+        env:
+          MINOTE_RELEASE_CERT_SHA256: ${{ vars.MINOTE_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$TOOLS/apksigner" verify --verbose signed/Mi-Note-X10-Android-v0.80.apk
+          "$TOOLS/apksigner" verify --print-certs signed/Mi-Note-X10-Android-v0.80.apk             | node scripts/signing-guard.mjs verify-apk
+      - name: Publicar Mi Note X10 Android v0.80
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           # La publicación final reemplaza artefactos de compilaciones previas de prueba.
-          if gh release view android-v0.79 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete android-v0.79 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          if gh release view android-v0.80 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete android-v0.80 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
           fi
-          gh release create android-v0.79 signed/Mi-Note-X10-Android-v0.79.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
+          gh release create android-v0.80 signed/Mi-Note-X10-Android-v0.80.apk signed/SHA256SUMS.txt signed/PERMISOS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title 'Mi Note X10 Android V0.79 — igual completo y tamaño manuscrito' \
-            --notes 'V0.79: mejora el reconocimiento automático de operaciones manuscritas grandes. El signo igual dibujado con dos trazos se incorpora al renglón aun con pequeñas inclinaciones. Evita conversiones prematuras antes del igual. El tamaño y el ancho del texto digital siguen la tinta original en vertical y horizontal sin modificar la Huion, los cuadernos ni el reconocimiento de fechas. Incorpora pruebas de ambos giros; conserve respaldo antes de instalar.' \
+            --title 'Mi Note X10 Android V0.80 — actualizaciones con firma permanente' \
+            --notes 'V0.80: firma permanente obligatoria desde secretos protegidos GitHub; se verifica el SHA-256 del certificado antes de publicar. Compatible con actualizaciones sobre APK previamente firmadas con esta MISMA clave. Instalaciones V0.79 y anteriores con firma efímera requieren exportar cuadernos, comprobar el respaldo y migrar una única vez; no desinstalar sin respaldo comprobado. Conserva OCR matemático y datos locales sin migración ni borrado.' \
             --prerelease --latest=false
