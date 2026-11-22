@@ -1,0 +1,48 @@
+name: Mi Note Android - pruebas de integridad y actualizaciones
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android-native/**'
+      - '.github/workflows/android-test.yml'
+      - '.github/workflows/android-release.yml'
+  pull_request:
+    paths:
+      - 'android-native/**'
+      - '.github/workflows/android-test.yml'
+      - '.github/workflows/android-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: android-native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pruebas de cuadernos y firma sin usar secretos
+        run: |
+          npm install --no-audit --no-fund
+          npm test
+          node --check src/app.js
+          node --check scripts/signing-guard.mjs
+      - name: Comprobar que falta de firma impide publicar
+        run: |
+          if env -u MINOTE_RELEASE_KEYSTORE_BASE64 \
+                 -u MINOTE_RELEASE_STORE_PASSWORD \
+                 -u MINOTE_RELEASE_KEY_PASSWORD \
+                 -u MINOTE_RELEASE_KEY_ALIAS \
+                 -u MINOTE_RELEASE_CERT_SHA256 \
+                 node scripts/signing-guard.mjs check-env; then
+            echo "ERROR: sin secretos no puede aprobarse una publicación" >&2
+            exit 1
+          fi
+          echo "Correcto: publicación bloqueada sin identidad de firma"
