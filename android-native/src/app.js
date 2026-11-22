@@ -50,7 +50,32 @@ function safeFile(s){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/
 function download(data,filename,mime){const blob=data instanceof Blob?data:new Blob([data],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 function svgFor(pg){let s=`<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1400" viewBox="0 0 1000 1400"><rect width="1000" height="1400" fill="white"/>`;if(pg.template==='grid'){for(let x=0;x<=W;x+=40)s+=`<path d="M ${x} 0 V ${H}" stroke="#dce7f4" stroke-width="1"/>`;for(let y=0;y<=H;y+=40)s+=`<path d="M 0 ${y} H ${W}" stroke="#dce7f4" stroke-width="1"/>`;}else if(pg.template==='ruled'){for(let y=75;y<H;y+=55)s+=`<path d="M 0 ${y} H ${W}" stroke="#e6ebf3" stroke-width="1"/>`;}for(const stroke of pg.strokes){const p=stroke.pts;if(!p.length)continue;const color=/^#[0-9A-Fa-f]{6}$/.test(stroke.color)?stroke.color:'#153f82';const sw=Math.max(.6,Math.min(20,Number(stroke.width)||3));if(p.length===1){s+=`<circle cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="${(sw/2).toFixed(2)}" fill="${color}"/>`;}else{const d=p.map((v,i)=>(i?'L':'M')+v[0].toFixed(2)+' '+v[1].toFixed(2)).join(' ');s+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"/>`;}}return s+'</svg>';}
 function backupObject(){return {schema:VERSION,exportedAt:now(),notebooks:clone(state.notebooks)};}
-function exportBackup(){x10Flush();download(JSON.stringify(backupObject(),null,2),`MiNote_respaldo_${stamp()}.json`,'application/json');notice('Respaldo descargado. Guarda una copia en un lugar seguro.');}
+async function exportBackup(){
+ x10Flush();
+ // El guardado de los trazos y el exportador deben terminar antes de aconsejar
+ // desinstalar la aplicación anterior. No afirmar que un archivo se guardó
+ // si el selector de Android se cerró o falló.
+ await saveQueue;
+ const filename=`MiNote_respaldo_${stamp()}.json`;
+ const json=JSON.stringify(backupObject(),null,2);
+ const blob=new Blob([json],{type:'application/json'});
+ if(blob.size>32*1024*1024){
+  notice('El respaldo supera 32 MB. No desinstale Mi Note; divida los datos con una copia segura antes de actualizar.',true);
+  return;
+ }
+ if(window.MiNoteFileExport){
+  try{
+   const {exportBlob}=await import('./export-native.js');
+   const result=await exportBlob(blob,filename,'application/json','save');
+   if(result?.cancelled){notice('Respaldo cancelado. Sus cuadernos siguen guardados en Mi Note.',true);return;}
+   if(!result?.saved)throw Error('Android no confirmó el guardado.');
+   notice('Respaldo JSON guardado con Android. Compruebe el archivo fuera de Mi Note antes de migrar.');
+  }catch(error){notice('No se guardó el respaldo: '+(error?.message||error)+'. NO desinstale la aplicación.',true);}
+  return;
+ }
+ download(json,filename,'application/json');
+ notice('Respaldo solicitado al navegador. Compruebe el archivo antes de desinstalar.');
+}
 function validBackup(obj){return obj&&obj.schema===VERSION&&Array.isArray(obj.notebooks)&&obj.notebooks.length<10000&&obj.notebooks.every(n=>typeof n.id==='string'&&Array.isArray(n.pages)&&n.pages.length<10000&&n.pages.every(p=>typeof p.id==='string'&&Array.isArray(p.strokes)));}
 function pageContent(p){return JSON.stringify({title:(p.title||'').replace(/ \(conflicto importado\)$/,''),template:p.template,strokes:p.strokes});}
 function mergeBackup(remote){if(!validBackup(remote))throw Error('El archivo no corresponde a un respaldo Mi Note compatible.');let added=0,conflicts=0;for(const n of remote.notebooks){let local=state.notebooks.find(x=>x.id===n.id);if(!local){state.notebooks.push(clone(n));added+=n.pages.length;continue;}for(const rp of n.pages){const lp=local.pages.find(x=>x.id===rp.id);if(!lp){local.pages.push(clone(rp));added++;continue;}if(pageContent(lp)===pageContent(rp))continue;const sameCopy=local.pages.some(x=>x.sourcePageId===rp.id&&pageContent(x)===pageContent(rp));if(sameCopy)continue;const c=clone(rp);c.sourcePageId=rp.id;c.id=uid();c.title=(rp.title||'Hoja')+' (conflicto importado)';local.pages.push(c);added++;conflicts++;}}syncActive();render();persist();return {added,conflicts};}
@@ -72,7 +97,7 @@ function setupEvents(){setupX10();canvas.addEventListener('pointerdown',drawStar
  $('exportPng').onclick=()=>{paint();canvas.toBlob(b=>{if(b)download(b,safeFile(page().title)+'.png','image/png');},'image/png');};
  $('printPdf').onclick=()=>{const blob=new Blob([svgFor(page())],{type:'image/svg+xml'});const url=URL.createObjectURL(blob);const win=window.open('','_blank');if(!win){URL.revokeObjectURL(url);notice('El navegador bloqueó la ventana de impresión.',true);return;}win.document.write('<!doctype html><html><head><title>Imprimir Mi Note</title><style>body{margin:0}img{display:block;width:100%;max-height:100vh;object-fit:contain}@page{size:A4;margin:8mm}</style></head><body><img id="doc" alt="Hoja"/></body></html>');win.document.close();const img=win.document.getElementById('doc');img.onload=()=>{win.focus();win.print();setTimeout(()=>URL.revokeObjectURL(url),4000);};img.src=url;};
  $('backupBtn').onclick=exportBackup;
- $('importBtn').onclick=()=>$('importInput').click();$('importInput').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;if(f.size>15*1024*1024){notice('Archivo demasiado grande para este importador (máximo 15 MB).',true);return;}try{const obj=JSON.parse(await f.text());if(validBackup(obj)){const result=mergeBackup(obj);notice(`Combinación completa: ${result.added} hojas añadidas; ${result.conflicts} conflictos preservados.`);}else if(Array.isArray(obj.strokes)&&('max_x'in obj||'maxX'in obj))importHuion(obj);else throw Error('No reconozco el formato JSON. Usa un respaldo Mi Note o el formato de extracción Huion X10.');}catch(err){notice('Importación fallida: '+err.message,true);}};
+ $('importBtn').onclick=()=>$('importInput').click();$('importInput').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;if(f.size>32*1024*1024){notice('Archivo demasiado grande para este importador (máximo 32 MB).',true);return;}try{const obj=JSON.parse(await f.text());if(validBackup(obj)){const result=mergeBackup(obj);notice(`Combinación completa: ${result.added} hojas añadidas; ${result.conflicts} conflictos preservados.`);}else if(Array.isArray(obj.strokes)&&('max_x'in obj||'maxX'in obj))importHuion(obj);else throw Error('No reconozco el formato JSON. Usa un respaldo Mi Note o el formato de extracción Huion X10.');}catch(err){notice('Importación fallida: '+err.message,true);}};
  $('toggleSidebar').onclick=()=>$('sidebar').classList.toggle('open');$('fullscreenBtn').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen?.();};
  document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){if(e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}}});
 
