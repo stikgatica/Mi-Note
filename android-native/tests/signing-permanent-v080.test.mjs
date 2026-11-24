@@ -20,6 +20,9 @@ test('huella de 64 caracteres, también con separadores hexadecimales',()=>{
 });
 test('un APK de firma distinta nunca se publica',()=>{
  assert.equal(verifyApkSigner('Signer #1 certificate SHA-256 digest: '+a,a),a);
+ assert.equal(verifyApkSigner('Signer #1 (minSdkVersion=24, maxSdkVersion=2147483647) certificate SHA-256 digest: '+a,a),a);
+ assert.equal(verifyApkSigner('Signer #1 certificate SHA-256 digest: '+a+'\nSigner #1 (minSdkVersion=28) certificate SHA-256 digest: '+a,a),a);
+ assert.throws(()=>verifyApkSigner('Signer #1 certificate SHA-256 digest: '+a+'\nSigner #2 certificate SHA-256 digest: '+a,a),/único certificado/);
  assert.throws(()=>verifyApkSigner('Signer #1 certificate SHA-256 digest: '+b,a),/FIRMA DIFERENTE/);
  assert.throws(()=>verifyApkSigner('',a),/único certificado/);
 });
