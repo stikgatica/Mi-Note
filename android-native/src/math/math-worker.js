@@ -26,7 +26,7 @@ export function handleWorkerMessage(data, state = workerState) {
     type,
     action,
     intention = 'auto',
-    orientation = 'portrait',
+    orientation='portrait',
     category = 'auto',
     interventionLevel = 'smart',
     existingObjects = [],
@@ -79,7 +79,7 @@ export function handleWorkerMessage(data, state = workerState) {
 
     // V0.80 backward-compatible actions ('automatic' and default 'propose')
     const result = action === 'automatic'
-      ? recognizeAutomatic(strokes, intention, orientation)
+      ? recognizeAutomatic(strokes,intention,orientation)
       : propose(strokes, type);
     return { id, result };
   } catch (error) {
