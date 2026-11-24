@@ -1,28 +1,52 @@
-/* Matemática automática: módulo opcional; analiza solo trazos finalizados. */
+/* Matemática automática y Profesional: módulo opcional; analiza solo trazos finalizados. */
+:root{
+ --minote-ui-bg:#ffffff;
+ --minote-ui-surface:#f8fbff;
+ --minote-ui-text:#192e48;
+ --minote-ui-muted:#556982;
+ --minote-ui-border:#afc3d9;
+ --minote-ui-accent:#1451b7;
+ --minote-ui-accent-soft:#edf4ff;
+}
+:root[data-minote-theme="dark"]{
+ --minote-ui-bg:#111827;
+ --minote-ui-surface:#1f2937;
+ --minote-ui-text:#f3f4f6;
+ --minote-ui-muted:#9ca3af;
+ --minote-ui-border:#374151;
+ --minote-ui-accent:#60a5fa;
+ --minote-ui-accent-soft:#1e3a5f;
+}
+/* Respetar siempre el papel A5 blanco y la identidad de Mi Note en ambos temas. */
+:root[data-minote-theme="dark"] body{background:#0b1120;color:var(--minote-ui-text);}
+:root[data-minote-theme="dark"] canvas#paper{background:#ffffff;}
+:root[data-minote-theme="dark"] dialog.dialog{background:var(--minote-ui-bg);color:var(--minote-ui-text);border-color:var(--minote-ui-border);}
+:root[data-minote-theme="dark"] dialog.dialog button{background:var(--minote-ui-surface);color:var(--minote-ui-text);border-color:var(--minote-ui-border);}
+
 #mathOverlay{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;background:transparent;overflow:visible;}
 #mathOverlay[hidden]{display:none!important;}
 #paper.math-selecting{cursor:crosshair!important;touch-action:none!important;}
-.minote-math-dialog{width:min(95vw,525px);max-height:90dvh;overflow-y:auto;padding:14px;box-sizing:border-box;}
+.minote-math-dialog{width:min(95vw,525px);max-height:90dvh;overflow-y:auto;padding:14px;box-sizing:border-box;background:var(--minote-ui-bg);color:var(--minote-ui-text);}
 .minote-math-dialog .math-switch{display:flex;align-items:center;gap:9px;padding:8px;border-radius:9px;}
 .minote-math-dialog .math-switch input{width:19px;height:19px;accent-color:#236dd0;}
-.minote-math-dialog .math-hint{font-size:13px;line-height:1.4;color:#556982;margin:8px 0;white-space:normal;}
+.minote-math-dialog .math-hint{font-size:13px;line-height:1.4;color:var(--minote-ui-muted);margin:8px 0;white-space:normal;}
 .minote-math-dialog .math-actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;}
 .minote-math-dialog button{min-height:36px;}
 .minote-math-dialog .field{display:flex;flex-direction:column;gap:4px;margin:8px 0;}
-.minote-math-dialog select,.minote-math-dialog input[type="text"],.minote-math-dialog input[type="number"]{box-sizing:border-box;width:100%;padding:9px;border:1px solid #afc3d9;border-radius:8px;color:#192e48;background:#fff;}
-.minote-math-dialog details{border:1px solid #cbd6e5;padding:10px;border-radius:10px;margin:12px 0;}
+.minote-math-dialog select,.minote-math-dialog input[type="text"],.minote-math-dialog input[type="number"]{box-sizing:border-box;width:100%;padding:9px;border:1px solid var(--minote-ui-border);border-radius:8px;color:var(--minote-ui-text);background:var(--minote-ui-bg);}
+.minote-math-dialog details{border:1px solid var(--minote-ui-border);padding:10px;border-radius:10px;margin:12px 0;}
 .minote-math-dialog details summary{font-weight:700;cursor:pointer;}
 .minote-math-dialog .math-edit-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:210px;overflow-y:auto;margin:10px 0;}
 .minote-math-dialog .math-edit-fields label{font-size:12px;display:flex;flex-direction:column;}
 .minote-math-dialog .math-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin:7px 0;}
 .minote-math-dialog .math-row label{flex:1;min-width:0;font-size:12px;}
-.math-menu-entry{border:1px solid #aec6e6;border-radius:9px;background:#edf4ff;padding:10px;margin:4px 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.math-menu-entry .math-switch{display:flex;gap:7px;align-items:center;flex:1;min-width:130px;font-weight:600;color:#163e75;}
-.math-menu-entry button{padding:8px 10px;border:1px solid #adc4e4;border-radius:8px;background:white;color:#204d8f;}
+.math-menu-entry{border:1px solid var(--minote-ui-border);border-radius:9px;background:var(--minote-ui-accent-soft);padding:10px;margin:4px 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.math-menu-entry .math-switch{display:flex;gap:7px;align-items:center;flex:1;min-width:130px;font-weight:600;color:var(--minote-ui-accent);}
+.math-menu-entry button{padding:8px 10px;border:1px solid var(--minote-ui-border);border-radius:8px;background:var(--minote-ui-bg);color:var(--minote-ui-accent);}
 
 /* Selector rápido disponible en la barra flotante solo en Modo Matemática. */
 #mathShapeShortcut{min-width:34px;min-height:34px;font-size:23px;line-height:1;
- padding:4px 7px;border-radius:9px;color:#1451b7;background:#eaf2ff;border:1px solid #7dabe7;}
+ padding:4px 7px;border-radius:9px;color:var(--minote-ui-accent);background:var(--minote-ui-accent-soft);border:1px solid #7dabe7;}
 #mathShapeShortcut[hidden]{display:none!important;}
 .math-quick-floating{position:fixed;right:12px;bottom:74px;z-index:950;}
 .minote-shape-dialog{width:min(94vw,490px);max-height:85dvh;overflow-y:auto;padding:16px;}
@@ -32,10 +56,15 @@
 .math-shape-grid button.selected{background:#1451b7;color:#fff;border-color:#1451b7;}
 @media(max-width:360px){.math-shape-grid{gap:5px}.math-shape-grid button{font-size:12px;}}
 
-/* V0.72: propuestas de OCR matemático, compactas, legibles y editables. */
+/* V0.72 + Profesional: propuestas de OCR y pipeline unificado, compactas, legibles y editables. */
 .minote-math-dialog .math-hybrid-candidates{display:flex;flex-direction:column;gap:8px;margin-top:9px}
-.minote-math-dialog .math-hybrid-item{border:1px solid #bed0e0;background:#f8fbff;border-radius:10px;padding:9px;display:flex;flex-direction:column;gap:7px}
-.minote-math-dialog .math-hybrid-item small{color:#53677e;font-size:12px}
+.minote-math-dialog .math-hybrid-item{border:1px solid var(--minote-ui-border);background:var(--minote-ui-surface);border-radius:10px;padding:9px;display:flex;flex-direction:column;gap:7px}
+.minote-math-dialog .math-hybrid-item small{color:var(--minote-ui-muted);font-size:12px}
 .minote-math-dialog .math-hybrid-item input[type="text"]{font-size:19px;font-weight:600;letter-spacing:.5px;font-variant-numeric:tabular-nums}
 .minote-math-dialog .math-hybrid-item .math-actions{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .minote-math-dialog .math-hybrid-item button{min-height:39px;white-space:normal}
+.math-conf-pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;}
+.math-conf-high{background:#dcfce7;color:#166534;}
+.math-conf-medium{background:#fef9c3;color:#854d0e;}
+.math-conf-low{background:#fee2e2;color:#991b1b;}
+.minote-theme-btn,.minote-lab-btn{width:100%;text-align:left;}

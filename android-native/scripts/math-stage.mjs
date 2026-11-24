@@ -4,6 +4,26 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 const root=process.cwd(),stage=path.join(root,'stage');
 await fs.cp(path.join(root,'src','math'),path.join(stage,'math'),{recursive:true});
+// Verificar que TODOS los módulos del Motor Matemático Profesional estén presentes en stage/math/
+const requiredProMathFiles=[
+ 'math-dsp.mjs',
+ 'math-structural.mjs',
+ 'math-geometry-contextual.mjs',
+ 'math-data-charts.mjs',
+ 'math-personalization.mjs',
+ 'math-replay-harness.mjs',
+ 'math-pipeline.mjs',
+ 'math-lab.js',
+ 'math-lab.css',
+ 'math-worker.js',
+ 'math-controller.js',
+ 'math-ui.css'
+];
+for(const file of requiredProMathFiles){
+ const srcFile=path.join(root,'src','math',file);
+ const dstFile=path.join(stage,'math',file);
+ await fs.copyFile(srcFile,dstFile);
+}
 await fs.cp(path.join(root,'src','calendar'),path.join(stage,'calendar'),{recursive:true});
 // Transformación visual común para OCR de Matemática y Calendar.
 await fs.copyFile(path.join(root,'src','ink-orientation.mjs'),path.join(stage,'ink-orientation.mjs'));
@@ -73,7 +93,7 @@ window.MiNoteMathBridge={
   const pg=page();
   if(!pg||!layer||!Array.isArray(layer.objects)||layer.objects.length>250)
    throw Error('Capa matemática inválida.');
-  const payload=clone({version:1,axis:'geometry',visible:layer.visible!==false,objects:layer.objects});
+  const payload=clone({version:1,axis:layer.axis||'auto',visible:layer.visible!==false,objects:layer.objects});
   // Las referencias son metadatos de una capa secundaria, nunca alteran pg.strokes.
   pg.mathLayer=payload;
   pg.updatedAt=now();note().updatedAt=now();
@@ -117,6 +137,6 @@ const entry=path.join(stage,'android-ui-main.js');
 let ui=await fs.readFile(entry,'utf8');
 const anchor="await load('batería X10',()=>import('./battery-ui-v022.js'));";
 if(!ui.includes(anchor))throw Error('Matemática requiere la inicialización final Android tras batería.');
-ui=ui.replace(anchor,anchor+"\nawait load('Modo Matemática',()=>import('./math/math-controller.js'));\nawait load('Indicador de punta',()=>import('./pen-hover.js'));\nawait load('Detalles seguros X10',()=>import('./x10-device-info-v051.js'));\nawait load('Recordatorios y Calendar',()=>import('./calendar/calendar-ui.js'));");
+ui=ui.replace(anchor,anchor+"\nimport './math/math-lab.css';\nawait load('Modo Matemática',()=>import('./math/math-controller.js'));\nawait load('Indicador de punta',()=>import('./pen-hover.js'));\nawait load('Detalles seguros X10',()=>import('./x10-device-info-v051.js'));\nawait load('Recordatorios y Calendar',()=>import('./calendar/calendar-ui.js'));");
 await fs.writeFile(entry,ui);
-console.log('Matemática: análisis automático al finalizar trazos X10/táctiles y capa reversible integrada.');
+console.log('Matemática Profesional: análisis automático, laboratorio y capa reversible integrada.');

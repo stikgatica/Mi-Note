@@ -56,22 +56,32 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
     };
     let serviceInfo = [];
     const chars = new Map();
+    let connectGeneration = 0;
+    let connectingPromise = null;
     const gatt = {
       connected: false,
       async connect() {
         await ready();
         if (gatt.connected) return gatt;
-        // Android BLE permite reutilizar un deviceId conocido sin escanear.
-        await BleClient.connect(id, () => {
-          gatt.connected = false;
-          serviceInfo = [];
-          chars.clear();
-          events.emit('gattserverdisconnected', { type: 'gattserverdisconnected', target: device });
-        });
-        gatt.connected = true;
-        try { serviceInfo = await BleClient.getServices(id); }
-        catch (_) { serviceInfo = []; } // GATT se verifica al usar cada característica.
-        return gatt;
+        if (connectingPromise) return connectingPromise;
+        const gen = ++connectGeneration;
+        connectingPromise = (async () => {
+          // Android BLE permite reutilizar un deviceId conocido sin escanear.
+          await BleClient.connect(id, () => {
+            if (gen !== connectGeneration) return;
+            gatt.connected = false;
+            serviceInfo = [];
+            chars.clear();
+            events.emit('gattserverdisconnected', { type: 'gattserverdisconnected', target: device });
+          });
+          if (gen !== connectGeneration) return gatt;
+          gatt.connected = true;
+          try { serviceInfo = await BleClient.getServices(id); }
+          catch (_) { serviceInfo = []; } // GATT se verifica al usar cada característica.
+          return gatt;
+        })();
+        try { return await connectingPromise; }
+        finally { connectingPromise = null; }
       },
       async getPrimaryService(uuid) {
         if (!gatt.connected) throw Error('La Huion está desconectada.');
@@ -97,7 +107,9 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
                 return view(await BleClient.read(id, uuid, charUuid));
               },
               async startNotifications() {
+                const notifyGen = connectGeneration;
                 await BleClient.startNotifications(id, uuid, charUuid, data => {
+                  if (!gatt.connected || notifyGen !== connectGeneration) return;
                   characteristic.value = view(data);
                   ev.emit('characteristicvaluechanged',
                     { type: 'characteristicvaluechanged', target: characteristic });
@@ -124,8 +136,15 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
         };
       },
       disconnect() {
-        if (!gatt.connected) return;
+        connectGeneration++;
+        if (!gatt.connected) {
+          serviceInfo = [];
+          chars.clear();
+          return;
+        }
         gatt.connected = false;
+        serviceInfo = [];
+        chars.clear();
         // Intencionadamente no se espera esta Promise: Web Bluetooth hace lo mismo.
         void BleClient.disconnect(id).catch(() => {});
       },
@@ -133,6 +152,7 @@ export function createNativeBLE(BleClient, store = globalThis.localStorage) {
       // sesión limpia de agenda, para que el aviso tardío de la conexión anterior
       // no marque como desconectada la conexión nueva.
       async disconnectAsync() {
+        connectGeneration++;
         gatt.connected = false;
         serviceInfo = [];
         chars.clear();

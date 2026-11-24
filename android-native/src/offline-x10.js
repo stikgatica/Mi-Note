@@ -300,7 +300,10 @@
      try{p=await inbox.wait(0x87,Math.min(3500,Math.max(250,deadline-Date.now())),validPacket);}
      catch{break;}
      const seq=u16(p,3);
-     got.set(seq,p);
+     const prevPkt=got.get(seq);
+     if(!prevPkt||decodePacket(p).filter(v=>v.pen_down).length>decodePacket(prevPkt).filter(v=>v.pen_down).length){
+      got.set(seq,p);
+     }
      if(p.length<126)shortPacketCount++;
      if(seq===total){lastSeen=true;break;}
     }

@@ -1,6 +1,6 @@
-/* Mi Note X10 — Matemática automática. Se ejecuta solo tras terminar un trazo.
-   Motor de geometría + reconocimiento conservador de números y medidas:
-   sin nube, sin modificar tinta fuente, sin trabajo en el hilo de escritura. */
+/* Mi Note X10 — Matemática Profesional. Se ejecuta solo tras terminar un trazo.
+   Motor unificado (DSP + Símbolos + Estructural 2D + Geometría contextual + Datos/Gráficos + Personalización):
+   sin nube, sin modificar tinta fuente, sin trabajo en el hilo de escritura y con aislamiento de fallos. */
 import {AXES,fingerprint,validObject} from './math-geometry.mjs';
 import {registerPlugin} from '@capacitor/core';
 import {mathematicalLines,normalizeArithmetic,recognizeHybridLine,formatMathDisplay,canAutoConvertMath} from './math-hybrid-ocr.mjs';
@@ -11,7 +11,25 @@ import {findCircleMeasurements,chooseCircleLabel} from './math-circle-measuremen
 import {recognizeInk} from './math-ink-ocr.mjs';
 import {sampledMathStrokes} from './math-hybrid-ocr.mjs';
 import {toReadingStrokes,readingGeometryToPage,uprightTextAngle} from '../ink-orientation.mjs';
+import {MATH_CATEGORIES,INTERVENTION_LEVELS,runMathPipeline} from './math-pipeline.mjs';
+import {createUserProfile,resetUserProfile,recordUserCorrection,serializeUserProfile,deserializeUserProfile} from './math-personalization.mjs';
+import {createMathLabUI} from './math-lab.js';
 import './math-ui.css';
+import './math-lab.css';
+
+export const PRO_AXES=Object.freeze([
+ {id:'auto',label:'Automático (inteligente)',ready:true},
+ {id:'numbers',label:'Números y operaciones',ready:true},
+ {id:'algebra',label:'Álgebra y funciones',ready:true},
+ {id:'geometry',label:'Geometría y medición',ready:true},
+ {id:'data',label:'Datos y probabilidades',ready:true}
+]);
+export const PRO_INTERVENTION_OPTIONS=Object.freeze([
+ {id:'original',label:'Original (conservar trazos manuscritos)'},
+ {id:'assisted',label:'Asistido (sugerencias editables)'},
+ {id:'smart',label:'Inteligente (alta confianza automática)'},
+ {id:'digital',label:'Digital (objetos editables · reversión 1 clic)'}
+]);
 
 const $=id=>document.getElementById(id),ns='http://www.w3.org/2000/svg';
 const elm=(tag,attrs={},text)=>{const e=document.createElement(tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;};
@@ -19,14 +37,37 @@ const svg=(tag,attrs={})=>{const e=document.createElementNS(ns,tag);for(const [k
 const copy=v=>JSON.parse(JSON.stringify(v)),clamp=(x,a,b)=>Math.max(a,Math.min(b,Number(x)||0));
 const get=()=>window.MiNoteMathBridge?.snapshot?.();
 const original=()=>window.MiNoteMathBridge;
-const layerOf=pg=>pg?.mathLayer||{version:1,axis:'geometry',visible:true,objects:[]};
+const layerOf=pg=>pg?.mathLayer||{version:1,axis:'auto',visible:true,objects:[]};
 const valid=pg=>(layerOf(pg).objects||[]).filter(obj=>validObject(obj,pg));
+
+const PROFILE_KEY='minote_math_profile_v1';
+const CATEGORY_KEY='minote_math_category_v1';
+const INTERVENTION_KEY='minote_math_intervention_v1';
+
+function loadUserProfile(){
+ try{
+  const raw=localStorage.getItem(PROFILE_KEY);
+  return raw?deserializeUserProfile(raw):createUserProfile();
+ }catch{return createUserProfile();}
+}
+function saveUserProfile(next){
+ const safe=createUserProfile(next||{});
+ try{localStorage.setItem(PROFILE_KEY,serializeUserProfile(safe));}catch{}
+ return safe;
+}
+
 const dialog=elm('dialog',{id:'mathDialog',class:'dialog minote-math-dialog','aria-labelledby':'mathTitle'});
 dialog.innerHTML=`
- <div class="dialog-head"><h2 id="mathTitle">Modo Matemática</h2><button type="button" id="mathClose" class="icon-btn" aria-label="Cerrar">✕</button></div>
+ <div class="dialog-head"><h2 id="mathTitle">Modo Matemática Profesional</h2><button type="button" id="mathClose" class="icon-btn" aria-label="Cerrar">✕</button></div>
  <label class="math-switch"><input id="mathMode" type="checkbox"> <strong>Activar Modo Matemática</strong></label>
- <label class="field">Eje<select id="mathAxis"></select></label>
- <p class="math-hint">Mi Note mejora automáticamente figuras y propone texto digital al terminar de escribir en la Huion. El original permanece intacto.</p>
+ <label class="field">Categoría matemática<select id="mathAxis"></select></label>
+ <label class="field">Nivel de intervención<select id="mathInterventionLevel"></select></label>
+ <p class="math-hint">Mi Note reconoce números, álgebra 2D, geometría contextual y datos/gráficos en segundo plano. La tinta original siempre permanece intacta y reversible en 1 clic.</p>
+ <div class="math-actions">
+  <button type="button" id="mathOpenLab">Laboratorio y calibración personal</button>
+  <button type="button" id="mathRevertLast" class="subtle">Deshacer último objeto digital</button>
+ </div>
+ <div id="mathPipelineCandidates" class="math-hybrid-candidates" aria-live="polite"></div>
  <section id="mathNumbersControls" hidden>
   <label class="math-switch"><input id="mathAutoDigital" type="checkbox" checked> Convertir automáticamente números y operaciones reconocidas</label>
   <label class="math-switch"><input id="mathNumbersShowLayer" type="checkbox" checked> Mostrar texto matemático digital</label>
@@ -60,7 +101,7 @@ dialog.innerHTML=`
    <button type="button" id="mathAddLabel">Añadir etiqueta</button>
    <div id="mathLabels"></div>
   </details>
-  </details>
+ </details>
  <p id="mathStatus" class="math-hint" role="status" aria-live="polite"></p>
 `;
 document.body.append(dialog);
@@ -74,17 +115,34 @@ const paper=$('paper'),shell=document.querySelector('.paper-shell');
 if(!paper||!shell)throw Error('No se encontró la hoja de Mi Note.');
 const overlay=svg('svg',{id:'mathOverlay',preserveAspectRatio:'none','aria-label':'Figuras y números mejorados'});
 overlay.style.pointerEvents='none';shell.style.position='relative';paper.after(overlay);
-for(const axis of AXES)$('mathAxis').append(elm('option',{value:axis.id,...(axis.ready?{}:{disabled:'disabled'})},axis.label+(axis.ready?'':' (próximamente)')));
-$('mathAxis').value='geometry';
+
+// Activar las 5 categorías profesionales (todas ready: true)
+for(const axis of PRO_AXES)$('mathAxis').append(elm('option',{value:axis.id},axis.label));
+for(const level of PRO_INTERVENTION_OPTIONS)$('mathInterventionLevel').append(elm('option',{value:level.id},level.label));
+
+let savedCategory='auto',savedIntervention='smart';
+try{
+ const c=localStorage.getItem(CATEGORY_KEY);
+ if(MATH_CATEGORIES.includes(c))savedCategory=c;
+ const lv=localStorage.getItem(INTERVENTION_KEY);
+ if(INTERVENTION_LEVELS.includes(lv))savedIntervention=lv;
+}catch{}
+$('mathAxis').value=savedCategory;
+$('mathInterventionLevel').value=savedIntervention;
+
 for(const shape of DRAW_INTENTIONS)$('mathIntention').append(elm('option',{value:shape.id},shape.label));
 $('mathIntention').value='auto';
 
 let enabled=false,worker=null,sequence=0,scanTimer=0,scanRunning=false,scanAgain=false,lastPage='';
-let circleScanRunning=false;
+let circleScanRunning=false,pipelineEpoch=0;
 const mlkitMath=registerPlugin('MiNoteCalendar');
 const mathSuggestions=new Map();
+const pipelineProposals=new Map();
 let hybridScanBusy=false,hybridScanSerial=0;
-const numbersSelected=()=>$('mathAxis').value==='numbers';
+const activeCategory=()=>MATH_CATEGORIES.includes($('mathAxis').value)?$('mathAxis').value:'auto';
+const activeInterventionLevel=()=>INTERVENTION_LEVELS.includes($('mathInterventionLevel').value)?$('mathInterventionLevel').value:'smart';
+const numbersSelected=()=>activeCategory()==='numbers';
+const geometrySelected=()=>activeCategory()==='geometry';
 const intentCutoffs=new Map();
 let intentionEpoch=0;
 const shapePreference='minote_math_intention_v047';
@@ -95,7 +153,7 @@ try{
 }catch{}
 $('mathIntention').value=intendedShape;
 const quickDialog=elm('dialog',{id:'mathShapeDialog',class:'dialog minote-shape-dialog','aria-label':'Elegir figura geométrica'});
-quickDialog.innerHTML='<div class="dialog-head"><h2>Figura que dibujaré</h2><button type="button" class="icon-btn" id="mathShapeClose" aria-label="Cerrar">✕</button></div><p class="math-hint">Elija primero la figura. Al levantar el lápiz se corregirá automáticamente, sin seleccionar trazos.</p><div class="math-shape-grid" id="mathShapeGrid"></div>';
+quickDialog.innerHTML='<div class="dialog-head"><h2>Figura que dibujaré</h2><button type="button" id="mathShapeClose" class="icon-btn" aria-label="Cerrar">✕</button></div><p class="math-hint">Elija primero la figura. Al levantar el lápiz se corregirá automáticamente, sin seleccionar trazos.</p><div class="math-shape-grid" id="mathShapeGrid"></div>';
 document.body.append(quickDialog);
 const quickButton=elm('button',{type:'button',id:'mathShapeShortcut','aria-label':'Elegir figura matemática',title:'Elegir figura matemática'},'◯');
 const floatingToolbar=$('tvBoardToolbar');
@@ -140,12 +198,16 @@ function syncHidden(pg){
  for(const item of activeObjects(pg))for(const source of item.sources||[])hiddenIds.add(source.id);
 }
 window.MiNoteMathVisibility=(pageId,id)=>enabled&&pageId===cachedPage&&hiddenIds.has(id);
+
 function shapeNode(g,style){
  const attributes={fill:'none',stroke:style?.color||'#000000','stroke-width':Math.max(1,Number(style?.width)||3),
   'stroke-linecap':'round','stroke-linejoin':'round'};
- if(g?.kind==='line')return svg('line',{...attributes,x1:g.points[0][0],y1:g.points[0][1],x2:g.points[1][0],y2:g.points[1][1]});
- if(g?.kind==='polygon')return svg('polygon',{...attributes,points:g.points.map(p=>p.join(',')).join(' ')});
+ if(g?.kind==='line'||g?.kind==='segment')return svg('line',{...attributes,x1:g.points[0][0],y1:g.points[0][1],x2:g.points[1][0],y2:g.points[1][1]});
+ if(g?.kind==='polygon'||Array.isArray(g?.points)&&g.points.length>=3)
+  return svg('polygon',{...attributes,points:g.points.map(p=>p.join(',')).join(' ')});
  if(g?.kind==='circle')return svg('circle',{...attributes,cx:g.cx,cy:g.cy,r:g.r});
+ if(g?.kind==='ellipse')return svg('ellipse',{...attributes,cx:g.cx,cy:g.cy,rx:g.rx,ry:g.ry,
+  ...(Number.isFinite(g.angleDeg)?{transform:`rotate(${g.angleDeg} ${g.cx} ${g.cy})`}:{})});
  if(g?.kind==='segments'){
   const group=svg('g');
   for(const [a,b] of g.segments||[])group.append(svg('line',{...attributes,x1:a[0],y1:a[1],x2:b[0],y2:b[1]}));
@@ -153,6 +215,29 @@ function shapeNode(g,style){
  }
  return null;
 }
+
+function renderDataStructureNode(structure,style,upright){
+ if(!structure)return null;
+ const group=svg('g');
+ const attrs={fill:'none',stroke:style?.color||'#000000','stroke-width':Math.max(1.5,Number(style?.width)||2.2)};
+ if((structure.kind==='table'||structure.kind==='frequency_table')&&Array.isArray(structure.rowBoundaries)&&Array.isArray(structure.colBoundaries)){
+  const xs=structure.colBoundaries,ys=structure.rowBoundaries;
+  for(const y of ys)group.append(svg('line',{...attrs,x1:xs[0],y1:y,x2:xs.at(-1),y2:y}));
+  for(const x of xs)group.append(svg('line',{...attrs,x1:x,y1:ys[0],x2:x,y2:ys.at(-1)}));
+  for(const row of structure.cells||[]){
+   for(const cell of row){
+    if(!cell?.writtenText)continue;
+    const cx=(cell.bounds.minX+cell.bounds.maxX)/2,cy=(cell.bounds.minY+cell.bounds.maxY)/2;
+    const t=svg('text',{...upright(cx,cy),x:cx,y:cy,'text-anchor':'middle','dominant-baseline':'central',
+     'font-family':'sans-serif','font-size':20,fill:style?.color||'#000000'});
+    t.textContent=cell.writtenText;group.append(t);
+   }
+  }
+  return group;
+ }
+ return null;
+}
+
 function renderOverlay(pg){
  overlay.replaceChildren();
  const visible=enabled&&layerOf(pg).visible!==false;
@@ -168,7 +253,10 @@ function renderOverlay(pg){
  const upright=(x,y)=>angle?{transform:`rotate(${angle} ${x} ${y})`}:{};
  for(const object of activeObjects(pg)){
   const g=object.geometry;
-  if(g?.kind==='text'){
+  if(object.domain==='data'&&object.structure){
+   const dataNode=renderDataStructureNode(object.structure,object.style,upright);
+   if(dataNode)group.append(dataNode);
+  }else if(g?.kind==='text'){
    // Igualar la altura y anchura del texto digital al manuscrito real.
    const size=Math.max(15,Number(g.size)||28);
    const inkWidth=Number(g.inkWidth);
@@ -178,7 +266,9 @@ function renderOverlay(pg){
     'font-family':'sans-serif','font-size':size,
     ...(fitted?{'textLength':inkWidth,'lengthAdjust':'spacingAndGlyphs'}:{}),
     fill:object.style?.color||'#000000'});
-   label.textContent=formatMathDisplay(g.text);group.append(label);
+   label.textContent=formatMathDisplay(g.text);
+   if(object.domain==='math'&&object.plainText)label.textContent=object.plainText;
+   group.append(label);
   }else{const node=shapeNode(g,object.style);if(node)group.append(node);}
   if(highlightId===object.id){
    const node=shapeNode(g,{color:'#e65b20',width:Math.max(5,Number(object.style?.width)||3)+5});
@@ -194,6 +284,7 @@ function renderOverlay(pg){
  }
  overlay.append(group);
 }
+
 let mathModelReady=false;
 const rejectedMath=new Set();
 const activeMathPage=()=>get()?.id||'';
@@ -205,6 +296,103 @@ function storedMathObject(pg,ids){
  return (layerOf(pg).objects||[]).some(o=>o.geometry?.kind==='text'&&
   (o.sources||[]).length===ids.length&&o.sources.every(x=>key.has(x.id)));
 }
+
+function renderPipelineCandidates(){
+ const root=$('mathPipelineCandidates');
+ if(!root)return;
+ root.replaceChildren();
+ for(const [key,entryItem] of pipelineProposals){
+  if(entryItem.pageId!==activeMathPage())continue;
+  const {result,strokes}=entryItem;
+  const winner=result?.winner;
+  if(!winner)continue;
+  const item=elm('div',{class:'math-hybrid-item'});
+  const conf=result.confidence||{score:0,level:'low'};
+  const badge=elm('span',{class:`math-conf-pill math-conf-${conf.level||'low'}`},
+   `${winner.domain} · ${Math.round((conf.score||0)*100)}% (${conf.level})`);
+  const head=elm('div',{class:'math-row'});
+  head.append(elm('strong',{},winner.label||winner.plainText||winner.kind||'Propuesta'),badge);
+  item.append(head);
+
+  const allOptions=[winner,...(result.alternatives||[])];
+  let chosenIndex=0;
+  if(allOptions.length>1){
+   const lbl=elm('label',{class:'math-hint'},'Alternativas detectadas: ');
+   const sel=elm('select',{'aria-label':'Seleccionar alternativa matemática'});
+   allOptions.forEach((opt,i)=>{
+    const txt=opt.plainText||opt.label||opt.kind||`Opción ${i+1}`;
+    const sc=Math.round(((opt.confidence?.score??opt.rawScore??0))*100);
+    sel.append(elm('option',{value:String(i)},`${txt} (${sc}%)`));
+   });
+   sel.addEventListener('change',()=>{chosenIndex=Number(sel.value)||0;});
+   lbl.append(sel);item.append(lbl);
+  }
+
+  const actions=elm('div',{class:'math-actions'});
+  const applyBtn=elm('button',{type:'button'},'Aplicar objeto digital');
+  const keepBtn=elm('button',{type:'button',class:'subtle'},'Conservar manuscrito');
+  applyBtn.addEventListener('click',async()=>{
+   try{
+    const chosen=allOptions[chosenIndex]||winner;
+    if(chosen!==winner&&chosen.plainText&&winner.plainText){
+     saveUserProfile(recordUserCorrection(loadUserProfile(),{
+      predicted:winner.plainText,actual:chosen.plainText,strokes,category:activeCategory()
+     }));
+    }
+    await acceptPipelineWinner(entryItem.pageId,chosen,strokes,result.confidence);
+    pipelineProposals.delete(key);
+    renderPipelineCandidates();
+   }catch(err){tell(err?.message||'No se pudo aplicar la propuesta.');}
+  });
+  keepBtn.addEventListener('click',()=>{
+   pipelineProposals.delete(key);
+   renderPipelineCandidates();
+   tell('Escritura manuscrita conservada intacta.');
+  });
+  actions.append(applyBtn,keepBtn);
+  item.append(actions);
+  root.append(item);
+ }
+}
+
+async function acceptPipelineWinner(pageId,winner,strokes,confidence){
+ const pg=get();
+ if(!pg||pg.id!==pageId)throw Error('La página activa cambió.');
+ const sources=strokes.map(s=>({id:s.id,signature:fingerprint(s)}));
+ const prior=layerOf(pg).objects||[];
+ const geometry=winner.geometry||{kind:'text',text:winner.plainText||winner.label||'',x:500,y:700,size:28};
+ const candidate={
+  type:winner.type||winner.kind||winner.domain,
+  label:winner.label||winner.plainText||'Objeto matemático',
+  domain:winner.domain,
+  geometry:copy(geometry),
+  style:{color:strokes[0]?.color||'#000000',width:Number(strokes[0]?.width)||2.5},
+  sources,
+  automatic:true
+ };
+ const merge=mergeAutomatic(prior,candidate);
+ if(!merge)return false;
+ const obj={
+  id:globalThis.crypto?.randomUUID?.()||'math-'+Date.now()+'-'+(++sequence),
+  accepted:true,
+  automatic:true,
+  revertable:true,
+  domain:winner.domain,
+  type:candidate.type,
+  label:candidate.label,
+  geometry:candidate.geometry,
+  style:candidate.style,
+  sources:copy(sources),
+  labels:[],
+  confidence,
+  ...(winner.domain==='math'?{plainText:winner.plainText,latex:winner.latex,mathml:winner.mathml,ast:winner.ast,preservedAsWritten:true}:{}),
+  ...(winner.domain==='data'?{structure:winner.structure,editableModel:winner.editableModel,onlyWrittenDataPreserved:true}:{})
+ };
+ await saveLayer([...merge.objects,obj],layerOf(pg).visible!==false);
+ tell('Objeto digital aplicado: '+(obj.plainText||obj.label)+'. Trazos originales conservados (reversible en 1 clic).');
+ return true;
+}
+
 function renderMathSuggestions(){
  const root=$('mathHybridCandidates');
  root.replaceChildren();
@@ -236,6 +424,11 @@ function renderMathSuggestions(){
   confirm.addEventListener('click',()=>{
    const parsed=normalizeArithmetic(field.value);
    if(!parsed){tell('Operación no válida. Revise números, comas y signos + − × ÷ =.');return;}
+   if(parsed.text!==proposal.text){
+    saveUserProfile(recordUserCorrection(loadUserProfile(),{
+     predicted:proposal.text,actual:parsed.text,category:'numbers'
+    }));
+   }
    void acceptMath({...proposal,text:parsed.text,geometry:{...proposal.geometry,text:formatMathDisplay(parsed.text)}})
     .then(()=>{mathSuggestions.delete(key);renderMathSuggestions();})
     .catch(e=>tell(e.message));
@@ -253,7 +446,7 @@ async function acceptMath(proposal){
   throw Error('Los trazos cambiaron desde su lectura. Vuelva a reconocer.');
  const sources=selected.map(stroke=>({id:stroke.id,signature:fingerprint(stroke)}));
  if(storedMathObject(pg,proposal.strokeIds))return false;
- const candidate={type:'text',label:'Texto matemático',geometry:{...proposal.geometry,text:formatMathDisplay(proposal.geometry.text)}, 
+ const candidate={type:'text',label:'Texto matemático',geometry:{...proposal.geometry,text:formatMathDisplay(proposal.geometry.text)},
   style:proposal.style,sources,automatic:true};
  const prior=layerOf(pg).objects||[];
  const merge=mergeAutomatic(prior,candidate);
@@ -268,6 +461,7 @@ async function acceptMath(proposal){
 async function scanHybridMath(all=false){
  if(!enabled||!numbersSelected()||hybridScanBusy)return;
  const pg=get();if(!pg?.strokes?.length)return;
+ if(activeInterventionLevel()==='original')return;
  hybridScanBusy=true;const serial=++hybridScanSerial,epoch=intentionEpoch;
  try{
   // Analizar según la orientación de lectura visible, sin girar la tinta original.
@@ -300,7 +494,7 @@ async function scanHybridMath(all=false){
     [stroke.id,fingerprint(originals.get(stroke.id))]));
    const proposal={...recognized,geometry:readingGeometryToPage(recognized.geometry,orientation),
     pageId:pg.id,fingerprints};
-   if(canAutoConvertMath(recognized,$('mathAutoDigital').checked)){
+   if(activeInterventionLevel()!=='assisted'&&canAutoConvertMath(recognized,$('mathAutoDigital').checked)){
     try{
      const converted=await acceptMath(proposal);
      if(converted||storedMathObject(get(),line.strokeIds)){
@@ -348,6 +542,7 @@ function updateList(pg){
  $('mathRecognizedDetails').querySelector('summary').textContent='Figuras reconocidas ('+records.length+') · administrar';
  $('mathFindObject').disabled=!select.value;
  $('mathCleanDuplicates').disabled=compactAutomatic(objects).length===objects.length;
+ if($('mathRevertLast'))$('mathRevertLast').disabled=records.length===0;
 }
 let highlightId='',highlightTimer=null;
 function highlightSelected(){
@@ -370,13 +565,14 @@ function refresh(){
  });
 }
 async function saveLayer(objects,visible){
- const success=await original()?.saveLayer?.({version:1,axis:'geometry',visible,objects:compactAutomatic(objects)});
+ const success=await original()?.saveLayer?.({version:1,axis:activeCategory(),visible,objects:compactAutomatic(objects)});
  if(!success)throw Error('No se pudo guardar la capa mejorada.');
  refresh();return true;
 }
 function updateInterface(){
  $('mathMode').checked=enabled;menuToggle.checked=enabled;updateQuickShape();
  $('mathAxis').disabled=!enabled;
+ $('mathInterventionLevel').disabled=!enabled;
  $('mathGeometryControls').hidden=!enabled||numbersSelected();
  $('mathNumbersControls').hidden=!enabled||!numbersSelected();
  $('mathRecognizedDetails').hidden=!enabled;
@@ -386,10 +582,10 @@ function updateInterface(){
 }
 function setEnabled(value){
  const previously=enabled;
- enabled=!!value;clearTimeout(scanTimer);intentionEpoch++;
+ enabled=!!value;clearTimeout(scanTimer);intentionEpoch++;pipelineEpoch++;
  if(enabled&&!previously){const page=get();if(page)intentCutoffs.set(page.id,page.strokes?.length||0);}
  updateInterface();
- tell(enabled?'Automático activo. Escriba normalmente en la agenda; las mejoras aparecen al terminar cada trazo.':'Modo normal: todos los trazos manuscritos se conservan.');
+ tell(enabled?'Modo Matemática Profesional activo ('+activeCategory()+' · '+activeInterventionLevel()+'). La tinta original se conserva intacta.':'Modo normal: todos los trazos manuscritos se conservan.');
 }
 function ensureWorker(){
  if(worker)return worker;
@@ -397,7 +593,7 @@ function ensureWorker(){
  worker=new Worker(new URL('./math-worker.js',import.meta.url),{type:'module'});
  worker.onmessage=({data})=>{
   const job=jobs.get(data?.id);if(!job)return;jobs.delete(data.id);clearTimeout(job.timer);
-  data.error?job.reject(Error(data.error)):job.resolve(data.result);
+  data.error?job.reject(Error(data.error)):job.resolve(data);
  };
  worker.onerror=()=>{
   for(const job of jobs.values()){clearTimeout(job.timer);job.reject(Error('Falló el reconocimiento local.'));}
@@ -409,11 +605,39 @@ function recognize(strokes){
  const service=ensureWorker(),id=++sequence;
  return new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>{jobs.delete(id);reject(Error('El reconocedor local tardó demasiado.'));},3500);
-  jobs.set(id,{resolve,reject,timer});
+  jobs.set(id,{resolve:data=>resolve(data?.result),reject,timer});
   service.postMessage({id,action:'automatic',strokes,intention:intendedShape,
     orientation:get()?.orientation||'landscape-cw'});
  });
 }
+async function recognizeWithPipeline(strokes,existingObjects=[]){
+ const epoch=++pipelineEpoch;
+ const orientation=get()?.orientation||'landscape-cw';
+ const category=activeCategory();
+ const interventionLevel=activeInterventionLevel();
+ const profile=loadUserProfile();
+ try{
+  const service=ensureWorker(),id=++sequence;
+  const response=await new Promise((resolve,reject)=>{
+   const timer=setTimeout(()=>{jobs.delete(id);reject(Error('Pipeline timeout'));},3500);
+   jobs.set(id,{resolve,reject,timer});
+   service.postMessage({
+    id,jobId:'pipe-'+id,epoch,action:'pipeline',strokes,existingObjects,
+    category,interventionLevel,intention:intendedShape,orientation,profile
+   });
+  });
+  if(response?.cancelled)return null;
+  return response?.result||null;
+ }catch{
+  // Aislamiento total de fallos: si el Worker falla o no existe, ejecutar en modo seguro local sin bloquear escritura.
+  try{
+   return runMathPipeline(strokes,{category,interventionLevel,intention:intendedShape,orientation,existingObjects,profile});
+  }catch{
+   return null;
+  }
+ }
+}
+
 const sigsMatch=(candidate,pg)=>{
  const byId=new Map((pg?.strokes||[]).map(s=>[s.id,s]));
  return candidate.sources.every(source=>{
@@ -422,7 +646,29 @@ const sigsMatch=(candidate,pg)=>{
 };
 async function runOne(pg,strokes){
  if(!enabled||numbersSelected()||!strokes.length)return false;
+ const level=activeInterventionLevel();
+ if(level==='original')return false;
+ const cat=activeCategory();
  const epoch=intentionEpoch;
+
+ // Para categorías profesionales unificadas (auto, algebra, data) o modo assisted/digital, usar pipeline unificado
+ if(cat==='algebra'||cat==='data'||level==='assisted'||level==='digital'){
+  const pipeResult=await recognizeWithPipeline(strokes,activeObjects(pg));
+  if(!pipeResult||!pipeResult.winner||epoch!==intentionEpoch)return false;
+  if(pipeResult.intervention?.shouldAutoApply){
+   return acceptPipelineWinner(pg.id,pipeResult.winner,strokes,pipeResult.confidence);
+  }
+  if(pipeResult.intervention?.showSuggestions){
+   const key=mathProposalKey(pg.id,strokes.map(s=>s.id));
+   pipelineProposals.set(key,{pageId:pg.id,result:pipeResult,strokes});
+   renderPipelineCandidates();
+   tell('Propuesta lista para revisar ('+pipeResult.winner.label+').');
+   return false;
+  }
+  return false;
+ }
+
+ // Flujo V0.80 de geometría rápida + respaldo de pipeline unificado
  const candidate=await recognize(strokes);
  if(!candidate||epoch!==intentionEpoch)return false;
  const current=get();if(!current||current.id!==pg.id||!sigsMatch(candidate,current))return false;
@@ -495,6 +741,7 @@ async function scanCircleMeasurements(){
 
 async function scanRecent(all=false){
  if(!enabled)return;
+ if(activeInterventionLevel()==='original')return;
  if(numbersSelected()){await scanHybridMath(all);return;}
  if(scanRunning){scanAgain=true;return;}
  scanRunning=true;
@@ -514,7 +761,7 @@ async function scanRecent(all=false){
    if(await runOne(page,window))changed++;
    if(all&&end%8===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
-  const circleChanged=await scanCircleMeasurements();
+  const circleChanged=geometrySelected()||activeCategory()==='auto'?await scanCircleMeasurements():0;
   if(all)tell('Análisis completado. '+(changed+circleChanged)+' mejora(s) detectada(s), incluidas medidas de círculos; los originales permanecen intactos.');
  }catch(error){tell('Reconocimiento automático: '+error.message);}
  finally{
@@ -527,6 +774,33 @@ function scheduleScan(){
  clearTimeout(scanTimer);
  scanTimer=setTimeout(()=>void scanRecent(false),numbersSelected()?1900:650);
 }
+
+let labUI=null;
+function openMathLab(){
+ try{
+  if(!labUI){
+   labUI=createMathLabUI({
+    getCurrentPage:()=>get()||{id:'empty',strokes:[]},
+    runPipeline:(strokes,opts)=>runMathPipeline(strokes,{
+     ...opts,
+     category:opts?.category||activeCategory(),
+     interventionLevel:opts?.interventionLevel||activeInterventionLevel(),
+     profile:opts?.profile||loadUserProfile()
+    }),
+    getProfile:()=>loadUserProfile(),
+    saveProfile:next=>saveUserProfile(next),
+    applyCorrection:({predicted,actual,strokes,category})=>saveUserProfile(
+     recordUserCorrection(loadUserProfile(),{predicted,actual,strokes,category:category||activeCategory()})
+    )
+   });
+  }
+  dialog.open&&dialog.close();
+  labUI.open();
+ }catch(err){
+  tell('No se pudo abrir el laboratorio: '+(err?.message||String(err)));
+ }
+}
+
 function editFields(){
  const obj=selectedObject(),editor=$('mathCoordinateEditor');editor.replaceChildren();$('mathLabels').replaceChildren();
  if(!obj)return;
@@ -537,10 +811,10 @@ function editFields(){
   row.append(input);editor.append(row);
  };
  const g=obj.geometry;
- if(g.kind==='text'){add('text','Número o medida',g.text,false);add('x','X',g.x);add('y','Y',g.y);add('size','Tamaño',g.size);}
- else if(g.kind==='circle'){add('cx','Centro X',g.cx);add('cy','Centro Y',g.cy);add('r','Radio',g.r);}
- else if(g.kind==='line'||g.kind==='polygon')g.points.forEach((p,i)=>{add('p'+i+'x','Vértice '+(i+1)+' X',p[0]);add('p'+i+'y','Vértice '+(i+1)+' Y',p[1]);});
- else if(g.kind==='segments')g.segments.forEach((segment,i)=>segment.forEach((p,j)=>{add('s'+i+j+'x','Arista '+i+' X',p[0]);add('s'+i+j+'y','Arista '+i+' Y',p[1]);}));
+ if(g?.kind==='text'){add('text','Número o medida',g.text,false);add('x','X',g.x);add('y','Y',g.y);add('size','Tamaño',g.size);}
+ else if(g?.kind==='circle'){add('cx','Centro X',g.cx);add('cy','Centro Y',g.cy);add('r','Radio',g.r);}
+ else if(g?.kind==='line'||g?.kind==='polygon')g.points.forEach((p,i)=>{add('p'+i+'x','Vértice '+(i+1)+' X',p[0]);add('p'+i+'y','Vértice '+(i+1)+' Y',p[1]);});
+ else if(g?.kind==='segments')g.segments.forEach((segment,i)=>segment.forEach((p,j)=>{add('s'+i+j+'x','Arista '+i+' X',p[0]);add('s'+i+j+'y','Arista '+i+' Y',p[1]);}));
  for(let i=0;i<(obj.labels||[]).length;i++){
   const lab=obj.labels[i],row=elm('div',{class:'math-row'});
   const remove=elm('button',{type:'button'},'Quitar');
@@ -577,14 +851,30 @@ function readGeometry(geometry){
  return result;
 }
 $('mathAxis').addEventListener('change',()=>{
- clearTimeout(scanTimer);intentionEpoch++;
- mathSuggestions.clear();renderMathSuggestions();
+ clearTimeout(scanTimer);intentionEpoch++;pipelineEpoch++;
+ mathSuggestions.clear();pipelineProposals.clear();
+ renderMathSuggestions();renderPipelineCandidates();
+ try{localStorage.setItem(CATEGORY_KEY,activeCategory());}catch{}
  const page=get();if(page)intentCutoffs.set(page.id,page.strokes?.length||0);
  updateInterface();
  if(numbersSelected()){
   void checkMathModel();
-  tell('Modo números y operaciones activo. Escriba una expresión, espere un instante y confirme las lecturas dudosas.');
- }else tell('Modo geometría activo. Los trazos originales permanecen intactos.');
+  tell('Modo Números y operaciones activo. Escriba una expresión, espere un instante y confirme las lecturas dudosas.');
+ }else tell('Categoría activa: '+($('mathAxis').selectedOptions[0]?.textContent||activeCategory())+'. Los trazos originales permanecen intactos.');
+});
+$('mathInterventionLevel').addEventListener('change',()=>{
+ try{localStorage.setItem(INTERVENTION_KEY,activeInterventionLevel());}catch{}
+ tell('Nivel de intervención: '+($('mathInterventionLevel').selectedOptions[0]?.textContent||activeInterventionLevel())+'.');
+});
+$('mathOpenLab').addEventListener('click',openMathLab);
+$('mathRevertLast').addEventListener('click',()=>{
+ const pg=get();if(!pg)return;
+ const objects=layerOf(pg).objects||[];
+ if(!objects.length){tell('No hay objetos digitales que revertir.');return;}
+ const next=objects.slice(0,-1);
+ void saveLayer(next,layerOf(pg).visible!==false)
+  .then(()=>tell('Último objeto digital revertido. Los trazos manuscritos originales vuelven a mostrarse.'))
+  .catch(e=>tell(e.message));
 });
 $('mathDownloadModel').addEventListener('click',async()=>{
  const button=$('mathDownloadModel');
@@ -625,7 +915,7 @@ $('mathShowLayer').addEventListener('change',async e=>{
 });
 $('mathIntention').addEventListener('change',event=>{
  intendedShape=event.target.value;
- clearTimeout(scanTimer);intentionEpoch++;
+ clearTimeout(scanTimer);intentionEpoch++;pipelineEpoch++;
  const current=get();if(current)intentCutoffs.set(current.id,current.strokes?.length||0);
  try{localStorage.setItem(shapePreference,intendedShape);}catch{}
  updateQuickShape();
@@ -662,17 +952,27 @@ $('mathAddLabel').addEventListener('click',()=>{
  if(!txt||txt.length>40||!Number.isFinite(x)||!Number.isFinite(y)||!selectedObject()){tell('Seleccione una figura y escriba una etiqueta válida.');return;}
  void mutate(o=>{(o.labels||=[]).push({text:txt,x:clamp(x,0,1000),y:clamp(y,0,1400),size:24});});
 });
+document.addEventListener('minote:open-math-lab',openMathLab);
 document.addEventListener('minote:stroke-finished',({detail})=>{
  if(!enabled||!detail?.pageId)return;
  if(detail.pageId!==original()?.activePageId?.())return;
  scheduleScan();
 });
 document.addEventListener('minote:statechange',()=>{
- const pg=get();if(pg?.id!==lastPage){lastPage=pg?.id||'';clearTimeout(scanTimer);mathSuggestions.clear();renderMathSuggestions();}
+ const pg=get();if(pg?.id!==lastPage){lastPage=pg?.id||'';clearTimeout(scanTimer);mathSuggestions.clear();pipelineProposals.clear();renderMathSuggestions();renderPipelineCandidates();}
  refresh();
 });
 document.addEventListener('minote:page-rendered',refresh);
 window.addEventListener('minote:changed',()=>{if(enabled)refresh();});
 window.addEventListener('resize',refresh,{passive:true});
 updateInterface();
-window.MiNoteMath={get enabled(){return enabled;},setEnabled};
+window.MiNoteMath={
+ get enabled(){return enabled;},
+ setEnabled,
+ get category(){return activeCategory();},
+ get interventionLevel(){return activeInterventionLevel();},
+ openLab:openMathLab,
+ getProfile:loadUserProfile,
+ resetProfile:()=>saveUserProfile(resetUserProfile()),
+ runPipeline:(strokes,opts)=>runMathPipeline(strokes,{...opts,category:opts?.category||activeCategory(),interventionLevel:opts?.interventionLevel||activeInterventionLevel(),profile:opts?.profile||loadUserProfile()})
+};

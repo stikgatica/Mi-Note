@@ -29,22 +29,43 @@ function mapPoint(raw,maxX,maxY,rotation=0,width=1000,height=1400,physicalA5=fal
  }
  return [nx*width,ny*height,Math.min(1,Math.max(.08,Number(raw.press||0)/8191))];
 }
+function mapPointWithMeta(raw,maxX,maxY,rotation=0,width=1000,height=1400,physicalA5=false,meta=null){
+ const pt=mapPoint(raw,maxX,maxY,rotation,width,height,physicalA5);
+ if(!pt)return null;
+ return {pt,meta:meta?{...meta}:null};
+}
 // Protocolo Huion Note: una notificación puede contener dos tramas
 // ONLINE_DATA CD 8D 0B (11 bytes cada una). No confundir con el ACK CD 8D 04 01.
-function parseNotePenFrames(value){
+function parseNotePenFrames(value,limits=DEFAULT_NOTE){
  const b=value instanceof Uint8Array?value:new Uint8Array(value);
  if(!b.length||b.length%11!==0)return null;
+ const maxX=limits?.maxX||DEFAULT_NOTE.maxX;
+ const maxY=limits?.maxY||DEFAULT_NOTE.maxY;
  const out=[];
  for(let offset=0;offset<b.length;offset+=11){
   if(b[offset]!==0xcd||b[offset+1]!==0x8d||b[offset+2]!==11)return null;
   const part=b.subarray(offset,offset+11);
   const status=part[3],x=u16(part,4),y=u16(part,6),press=u16(part,8);
-  if(status>7||x>DEFAULT_NOTE.maxX||y>DEFAULT_NOTE.maxY||press>16383)return null;
+  if(status>7||x>maxX||y>maxY||press>16383)return null;
   // 0x02 indica lápiz en contacto, incluso cuando otra notificación
   // todavía anuncia la última posición con presión cero.
   out.push({status,x,y,press,touch:(status&2)!==0&&press>0});
  }
  return out;
+}
+function sampleKinematics(prev,curr,t,seq,batchIndex=0,batchSize=1){
+ const dt=prev?Math.max(0,t-prev.t):0;
+ const bothTouch=!!(prev?.touch&&curr?.touch);
+ const dx=bothTouch?curr.x-prev.x:0;
+ const dy=bothTouch?curr.y-prev.y:0;
+ const dist=bothTouch?Math.hypot(dx,dy):0;
+ const speed=bothTouch&&dt>0?dist/dt:null;
+ const dPress=bothTouch?curr.press-prev.press:0;
+ return {
+  t,dt,seq,batchIndex,batchSize,dx,dy,dist,speed,dPress,
+  strokeStart:!!curr?.touch&&!prev?.touch,
+  strokeEnd:!curr?.touch&&!!prev?.touch
+ };
 }
 class Connection{
  constructor(handlers={}){
@@ -56,6 +77,7 @@ class Connection{
   this.tabletCommandsSent=false;this.sessionKind=null;this.noteLivePackets=0;
   this.noteRx={notifications:0,onlineFrames:0,onlineSamples:0,invalidOnline:0,onlineAcks:0,otherPackets:0};
   this.noteBuffer=new Uint8Array(0);
+  this._sampleSeq=0;this._lastSample=null;this._lastSampleTime=0;this.lastSampleMeta=null;
   this._onData=this._onData.bind(this);this._onDisconnected=this._onDisconnected.bind(this);
  }
  get connected(){return !!this.device?.gatt?.connected;}
@@ -85,6 +107,7 @@ class Connection{
   this.tabletCommandsSent=false;this.sessionKind=null;this.noteLivePackets=0;
   this.noteRx={notifications:0,onlineFrames:0,onlineSamples:0,invalidOnline:0,onlineAcks:0,otherPackets:0};
   this.noteBuffer=new Uint8Array(0);
+  this._sampleSeq=0;this._lastSample=null;this._lastSampleTime=0;this.lastSampleMeta=null;
   if(this.data)try{this.data.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
   if(this.cmd)try{this.cmd.removeEventListener('characteristicvaluechanged',this._onData);}catch{}
   if(this.device)try{this.device.removeEventListener('gattserverdisconnected',this._onDisconnected);}catch{}
@@ -160,11 +183,11 @@ class Connection{
   if(!bytes?.length)return [];
   const pending=this.noteBuffer;
   this.noteBuffer=new Uint8Array(0);
-  if(!pending.length&&!(bytes[0]===0xcd&&bytes[1]===0x8d)){
+  if(!pending.length&&(bytes[0]!==0xcd||(bytes.length>=2&&bytes[1]!==0x8d))){
    this.noteRx.otherPackets++;return [];
   }
-  if(pending.length&&bytes[0]===0xcd&&bytes[1]!==0x8d){
-   // El periférico cambió a otra respuesta; descartar una muestra truncada.
+  if(pending.length&&bytes.length>=3&&bytes[0]===0xcd&&bytes[1]!==0x8d&&bytes[2]===bytes.length){
+   // El periférico envió otra respuesta de protocolo completa; descartar la muestra truncada.
    this.noteRx.invalidOnline++;
    this.noteRx.otherPackets++;return [];
   }
@@ -174,8 +197,8 @@ class Connection{
   while(cursor<data.length){
    const remaining=data.length-cursor;
    if(remaining<3){
-    // Solo reservar cabecera parcial cuando comienza por el marcador CD.
-    if(data[cursor]===0xcd)this.noteBuffer=data.slice(cursor);
+    // Solo reservar cabecera parcial cuando comienza por el marcador CD (y 0x8D si ya llegó el 2.º byte).
+    if(data[cursor]===0xcd&&(remaining===1||data[cursor+1]===0x8d))this.noteBuffer=data.slice(cursor);
     break;
    }
    if(data[cursor]!==0xcd||data[cursor+1]!==0x8d){
@@ -190,7 +213,7 @@ class Connection{
     this.noteRx.onlineAcks++;cursor+=4;continue;
    }
    this.noteRx.onlineFrames++;
-   const parsed=parseNotePenFrames(data.subarray(cursor,cursor+11));
+   const parsed=parseNotePenFrames(data.subarray(cursor,cursor+11),this.limits);
    if(parsed?.length)samples.push(...parsed);
    else this.noteRx.invalidOnline++;
    cursor+=11;
@@ -216,7 +239,17 @@ class Connection{
    if(samples.length){
     this.mode='agenda';this.noteLivePackets+=samples.length;
     if(this.noteLivePackets===samples.length)this.status('Se reciben trazos en vivo del modo agenda.');
-    for(const p of samples)this.handlers.onPen?.(p,this.limits,'agenda');
+    const nowMs=Math.max(Date.now(),this._lastSampleTime);
+    this._lastSampleTime=nowMs;
+    const batchSize=samples.length;
+    for(let idx=0;idx<batchSize;idx++){
+     const p=samples[idx];
+     const seq=++this._sampleSeq;
+     const meta=sampleKinematics(this._lastSample,p,nowMs,seq,idx,batchSize);
+     this._lastSample={x:p.x,y:p.y,press:p.press,touch:p.touch,t:nowMs};
+     this.lastSampleMeta=meta;
+     this.handlers.onPen?.(p,this.limits,'agenda',meta);
+    }
     return;
    }
    // Las muestras 0x8D inválidas no se descartan silenciosamente: se registran
@@ -256,6 +289,7 @@ class Connection{
  }
  _onDisconnected(){
   this.mode='desconectado';this.noteBuffer=new Uint8Array(0);clearInterval(this.keepalive);this.keepalive=null;
+  this._lastSample=null;
   this.handlers.onDisconnected?.({unexpected:!this.intentionalDisconnect});
   this.status('X10 desconectada. Las notas locales permanecen guardadas.');
  }
@@ -267,10 +301,11 @@ class Connection{
   if(this.device){this.device.removeEventListener('gattserverdisconnected',this._onDisconnected);
    try{this.device.gatt?.disconnect();}catch{}}
   this.device=null;this.cmd=null;this.data=null;this.mode='desconectado';this.offlineReading=false;
+  this.noteBuffer=new Uint8Array(0);this._lastSample=null;
   this.handlers.onDisconnected?.({unexpected:false});
  }
 }
-const api={Connection,mapPoint,parseNotePenFrames,frame,DEFAULT_NOTE};
+const api={Connection,mapPoint,mapPointWithMeta,parseNotePenFrames,sampleKinematics,frame,DEFAULT_NOTE};
 root.MiNoteX10Ble=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

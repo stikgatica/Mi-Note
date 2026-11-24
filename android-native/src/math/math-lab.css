@@ -1,0 +1,257 @@
+/* Mi Note Professional — Estilos del Laboratorio de Reconocimiento y Calibración.
+ * Compatible con modo claro/oscuro, vertical/horizontal y pantallas móviles. */
+
+.minote-math-lab-dialog {
+  --lab-bg: #ffffff;
+  --lab-surface: #f4f7fb;
+  --lab-border: #c5d3e3;
+  --lab-text: #162436;
+  --lab-muted: #53677e;
+  --lab-accent: #1d5fd1;
+  --lab-accent-fg: #ffffff;
+  --lab-orig: #236dd0;
+  --lab-proc: #e65b20;
+
+  width: min(96vw, 680px);
+  max-height: 92dvh;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-bg);
+  color: var(--lab-text);
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  .minote-math-lab-dialog {
+    --lab-bg: #111827;
+    --lab-surface: #1f2937;
+    --lab-border: #374151;
+    --lab-text: #f3f4f6;
+    --lab-muted: #9ca3af;
+    --lab-accent: #3b82f6;
+    --lab-accent-fg: #ffffff;
+  }
+}
+
+[data-theme="dark"] .minote-math-lab-dialog,
+.dark-mode .minote-math-lab-dialog {
+  --lab-bg: #111827;
+  --lab-surface: #1f2937;
+  --lab-border: #374151;
+  --lab-text: #f3f4f6;
+  --lab-muted: #9ca3af;
+  --lab-accent: #3b82f6;
+  --lab-accent-fg: #ffffff;
+}
+
+.math-lab-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.math-lab-head h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.math-lab-icon-btn {
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface);
+  color: var(--lab-text);
+  cursor: pointer;
+}
+
+.math-lab-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--lab-border);
+}
+
+.math-lab-tabs button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface);
+  color: var(--lab-text);
+  cursor: pointer;
+}
+
+.math-lab-tabs button.active,
+.math-lab-tabs button[aria-selected="true"] {
+  background: var(--lab-accent);
+  color: var(--lab-accent-fg);
+  border-color: var(--lab-accent);
+  font-weight: 600;
+}
+
+.math-lab-panel[hidden] {
+  display: none !important;
+}
+
+.math-lab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: 8px 0;
+}
+
+.math-lab-actions button {
+  min-height: 36px;
+  padding: 6px 11px;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-accent);
+  color: var(--lab-accent-fg);
+  cursor: pointer;
+}
+
+.math-lab-actions button.subtle {
+  background: var(--lab-surface);
+  color: var(--lab-text);
+}
+
+.math-lab-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface);
+  color: var(--lab-text);
+}
+
+.math-lab-canvas {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  border: 1px solid var(--lab-border);
+  border-radius: 8px;
+  background: #ffffff;
+  margin: 6px auto;
+}
+
+.math-lab-draw-canvas {
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.math-lab-legend {
+  font-size: 12px;
+  color: var(--lab-muted);
+  text-align: center;
+  margin: 4px 0 8px;
+}
+
+.math-lab-legend .dot-orig,
+.math-lab-legend .dot-proc {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.math-lab-legend .dot-orig { background: var(--lab-orig); }
+.math-lab-legend .dot-proc { background: var(--lab-proc); }
+
+.math-lab-card {
+  border: 1px solid var(--lab-border);
+  border-radius: 9px;
+  background: var(--lab-surface);
+  padding: 9px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 8px 0;
+}
+
+.math-lab-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.math-lab-field input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-bg);
+  color: var(--lab-text);
+  font-size: 14px;
+}
+
+.math-lab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.math-lab-chip {
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface);
+}
+
+.math-lab-cal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.math-lab-pre {
+  max-height: 190px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface);
+  font-size: 11.5px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.math-lab-hint,
+.math-lab-status {
+  font-size: 12.5px;
+  color: var(--lab-muted);
+  margin: 6px 0;
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .minote-math-lab-dialog {
+    width: min(96vw, 760px);
+    padding: 8px 12px;
+  }
+  .math-lab-canvas {
+    max-width: 260px;
+  }
+}
