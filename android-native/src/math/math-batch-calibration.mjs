@@ -44,7 +44,7 @@ export function trainBatch(profile, symbol, cells) {
     const sig=extractStrokeSignature(cell.strokes);
     if(!cell.valid||!sig||sig.bbox.diag<4||cell.strokes.some(s=>!s.id||seen.has(s.id)))throw Error('Muestras inválidas o duplicadas.');
     cell.strokes.forEach(s=>seen.add(s.id));
-    next=recordUserCorrection(next,{actual:symbol,strokes:cell.strokes,category:/^\\d$/.test(symbol)?'numbers':'operators'});
+    next=recordUserCorrection(next,{actual:symbol,strokes:cell.strokes,category:/^\d$/.test(symbol)?'numbers':'operators'});
   }
   return next;
 }
