@@ -290,6 +290,10 @@ export function createMathLabState(hooks = {}) {
   function submitCalibrationSample(strokes, { repeat = false } = {}) {
     if (!calibrationSession) startCalibration();
     const res = calibrationSession.submitSample(deepClone(strokes), { repeat });
+    if (res.accepted) {
+      profile = calibrationSession.finish();
+      void saveProfileHook(deepClone(profile));
+    }
     return { ...res, progress: calibrationSession.getProgress() };
   }
 

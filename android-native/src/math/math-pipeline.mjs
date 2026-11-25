@@ -48,7 +48,9 @@ import {
 import {
   MAX_BIAS_DELTA,
   createUserProfile,
-  applyProfileToCandidates
+  applyProfileToCandidates,
+  extractStrokeSignature,
+  compareSignatures
 } from './math-personalization.mjs';
 
 export const MATH_CATEGORIES = Object.freeze(['auto', 'numbers', 'algebra', 'geometry', 'data']);
@@ -519,12 +521,13 @@ function clusterSymbolStrokes(strokes, featById) {
  * Classifies a single symbol cluster using exact geometric operator/bar detectors
  * plus normalized 16x16 raster + online-feature template matching.
  */
-function classifyLocalSymbolCluster(cluster, { category = 'auto' } = {}) {
+function classifyLocalSymbolCluster(cluster, { category = 'auto', profile = null } = {}) {
   const { strokes, metrics, box } = cluster;
   if (!strokes.length || !box) return null;
 
-  // Reject oversized geometry shapes (circles, rectangles, long lines) from math glyph OCR
-  if (Math.max(box.w, box.h) > 140 && !(strokes.length === 1 && metrics[0].isHorizBar && box.h <= 18)) {
+  // Reject oversized full-page geometry shapes (circles, rectangles, long lines) from math glyph OCR,
+  // while allowing comfortable S Pen and Huion X10 handwritten digits up to ~320 units.
+  if (Math.max(box.w, box.h) > 320 && !(strokes.length === 1 && metrics[0].isHorizBar && box.h <= 26)) {
     return null;
   }
 
@@ -663,6 +666,28 @@ function classifyLocalSymbolCluster(cluster, { category = 'auto' } = {}) {
     if (!prev || score > prev) bestBySymbol.set(tpl.symbol, score);
   }
 
+  // Match directly against the user's calibrated prototypes (from Lab Calibration / Corrections)
+  if (profile?.enabled && profile.symbolPrototypes && typeof profile.symbolPrototypes === 'object') {
+    const userSig = extractStrokeSignature(strokes);
+    if (userSig) {
+      for (const [sym, protoList] of Object.entries(profile.symbolPrototypes)) {
+        if (!Array.isArray(protoList) || !protoList.length) continue;
+        if (sym.length !== 1) continue; // Single-glyph prototypes only (skip 'circle', '1/2', 'x^2', etc.)
+        if (category === 'numbers' && /^[a-zA-Z]$/.test(sym)) continue;
+        let bestProtoSim = 0;
+        for (const proto of protoList) {
+          const sim = compareSignatures(userSig, proto);
+          if (sim > bestProtoSim) bestProtoSim = sim;
+        }
+        if (bestProtoSim >= 0.68) {
+          const personalScore = clamp(0.50 + bestProtoSim * 0.46, 0, 0.96);
+          const prev = bestBySymbol.get(sym) || 0;
+          if (personalScore > prev) bestBySymbol.set(sym, personalScore);
+        }
+      }
+    }
+  }
+
   // Consult legacy recognizeInk only as a cross-check for borderline single-glyph matches
   let bestSoFar = 0;
   for (const sc of bestBySymbol.values()) if (sc > bestSoFar) bestSoFar = sc;
@@ -700,6 +725,7 @@ export function extractLocalSymbolTokens(readingStrokes, dsp, options = {}) {
   if (!Array.isArray(readingStrokes) || !readingStrokes.length) return tokens;
 
   const category = options.category || 'auto';
+  const profile = options.profile || null;
   const accidentalIds = new Set(dsp?.features?.summary?.accidentalDotIds || []);
   const activeStrokes = readingStrokes.filter(s => !accidentalIds.has(s.id));
   if (!activeStrokes.length) return tokens;
@@ -709,7 +735,7 @@ export function extractLocalSymbolTokens(readingStrokes, dsp, options = {}) {
 
   let tokenIdx = 0;
   for (const cluster of clusters) {
-    const cls = classifyLocalSymbolCluster(cluster, { category });
+    const cls = classifyLocalSymbolCluster(cluster, { category, profile });
     if (!cls) continue;
     tokens.push({
       id: `tok_${tokenIdx++}`,

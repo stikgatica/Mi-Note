@@ -494,3 +494,22 @@ test('KI-102: local multi-stroke symbol tokenization recognizes raw 2+2=5 (prese
   assert.equal(resNoise.winner, null);
   assert.equal(resNoise.action, 'keep-handwriting');
 });
+
+test('S Pen tall handwriting (>140px) and calibrated user prototypes are matched directly in extractLocalSymbolTokens', () => {
+  // Custom personal style for '7' drawn at S Pen size (~210 units tall, previously rejected by >140 guard)
+  const customSevenCal = [
+    polyStroke('cal7_a', [[40, 30], [170, 30], [95, 240]], 100),
+    polyStroke('cal7_b', [[70, 130], [160, 128]], 260)
+  ];
+  let profile = createUserProfile();
+  for (let i = 0; i < 3; i++) {
+    profile = recordUserCorrection(profile, { actual: '7', strokes: customSevenCal, category: 'numbers' });
+  }
+  const liveTallSeven = [
+    polyStroke('live7_a', [[300, 300], [430, 302], [355, 510]], 100),
+    polyStroke('live7_b', [[330, 400], [420, 398]], 260)
+  ];
+  const res = runMathPipeline(liveTallSeven, { category: 'numbers', interventionLevel: 'smart', profile });
+  assert.equal(res.winner?.domain, 'math');
+  assert.equal(res.winner?.plainText, '7');
+});
