@@ -3,7 +3,7 @@
    sin nube, sin modificar tinta fuente, sin trabajo en el hilo de escritura y con aislamiento de fallos. */
 import {AXES,fingerprint,validObject} from './math-geometry.mjs';
 import {registerPlugin} from '@capacitor/core';
-import {mathematicalLines,normalizeArithmetic,recognizeHybridLine,formatMathDisplay,canAutoConvertMath} from './math-hybrid-ocr.mjs';
+import {mathematicalLines,normalizeArithmetic,recognizeHybridLine,formatMathDisplay} from './math-hybrid-ocr.mjs';
 import {mergeAutomatic} from './math-auto.mjs';
 import {DRAW_INTENTIONS} from './math-intention.mjs';
 import {compactAutomatic,listObjects,nearDuplicate} from './math-objects.mjs';
@@ -335,8 +335,8 @@ function renderPipelineCandidates(){
    try{
     const chosen=allOptions[chosenIndex]||winner;
     if(chosen!==winner&&chosen.plainText&&winner.plainText){
-     saveUserProfile(recordUserCorrection(loadUserProfile(),{
-      predicted:winner.plainText,actual:chosen.plainText,strokes,category:activeCategory()
+     if(Array.from(chosen.plainText).length===1&&Array.from(winner.plainText).length===1)saveUserProfile(recordUserCorrection(loadUserProfile(),{
+      predicted:winner.plainText,actual:chosen.plainText,strokes:toReadingStrokes(strokes,get()?.orientation),category:activeCategory()
      }));
     }
     await acceptPipelineWinner(entryItem.pageId,chosen,strokes,result.confidence);
@@ -526,15 +526,6 @@ async function scanHybridMath(all=false){
     [stroke.id,fingerprint(originals.get(stroke.id))]));
    const proposal={...recognized,geometry:readingGeometryToPage(recognized.geometry,orientation),
     pageId:pg.id,fingerprints};
-   if(false&&activeInterventionLevel()!=='assisted'&&canAutoConvertMath(recognized,$('mathAutoDigital').checked)){
-    try{
-     const converted=await acceptMath(proposal);
-     if(converted||storedMathObject(get(),line.strokeIds)){
-      mathSuggestions.delete(key);
-      found++;continue;
-     }
-    }catch(error){tell('Lectura por confirmar: '+error.message);}
-   }
    mathSuggestions.set(key,proposal);found++;
   }
   renderMathSuggestions();renderPipelineCandidates();
