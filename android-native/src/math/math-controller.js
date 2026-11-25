@@ -487,6 +487,28 @@ async function scanHybridMath(all=false){
    // la conversión automática, sin exigir que el usuario pulse Convertir.
    const previous=mathSuggestions.get(key);
    if(!all&&previous&&!$('mathAutoDigital').checked)continue;
+   const origLineStrokes=line.strokes.map(s=>originals.get(s.id)).filter(Boolean);
+   const mlkitCandidates=await collectMlkitCandidates(origLineStrokes,orientation);
+   const pipeResult=origLineStrokes.length
+    ?await recognizeWithPipeline(origLineStrokes,activeObjects(pg),{mlkitCandidates})
+    :null;
+   if(pipeResult?.winner&&pipeResult.winner.domain==='math'&&
+      (pipeResult.confidence?.score>=0.62||/\\frac|\^|\\sqrt/.test(pipeResult.winner.latex||''))){
+    if(activeInterventionLevel()!=='assisted'&&pipeResult.intervention?.shouldAutoApply&&
+       (activeInterventionLevel()==='digital'||$('mathAutoDigital').checked)){
+     try{
+      const applied=await acceptPipelineWinner(pg.id,pipeResult.winner,origLineStrokes,pipeResult.confidence);
+      if(applied){
+       mathSuggestions.delete(key);
+       pipelineProposals.delete(key);
+       found++;continue;
+      }
+     }catch(error){tell('Lectura por confirmar: '+error.message);}
+    }
+    pipelineProposals.set(key,{pageId:pg.id,result:pipeResult,strokes:origLineStrokes});
+    renderPipelineCandidates();
+    found++;continue;
+   }
    const recognized=await recognizeHybridLine(line.strokes,mathModelReady?
     args=>mlkitMath.recognize(args):null,{maxWidth:maxMathWidth});
    if(!recognized)continue;
@@ -610,12 +632,33 @@ function recognize(strokes){
     orientation:get()?.orientation||'landscape-cw'});
  });
 }
-async function recognizeWithPipeline(strokes,existingObjects=[]){
+async function collectMlkitCandidates(strokes,orientation){
+ if(!mathModelReady||!Array.isArray(strokes)||!strokes.length||typeof mlkitMath?.recognize!=='function')return [];
+ try{
+  const reading=toReadingStrokes(strokes,orientation);
+  const remote=await mlkitMath.recognize({strokes:sampledMathStrokes(reading)});
+  const rawList=Array.isArray(remote?.candidates)?remote.candidates:(remote?.text?[remote.text]:[]);
+  return rawList
+   .map((item,idx)=>{
+    const text=typeof item==='string'?item.trim():String(item?.text||'').trim();
+    if(!text)return null;
+    const score=Number.isFinite(Number(item?.score))?Number(item.score):Math.max(0.45,0.82-idx*0.08);
+    return {text,score,source:'mlkit-es'};
+   })
+   .filter(Boolean);
+ }catch{
+  return [];
+ }
+}
+async function recognizeWithPipeline(strokes,existingObjects=[],extra={}){
  const epoch=++pipelineEpoch;
  const orientation=get()?.orientation||'landscape-cw';
  const category=activeCategory();
  const interventionLevel=activeInterventionLevel();
  const profile=loadUserProfile();
+ const mlkitCandidates=Array.isArray(extra?.mlkitCandidates)
+  ?extra.mlkitCandidates
+  :await collectMlkitCandidates(strokes,orientation);
  try{
   const service=ensureWorker(),id=++sequence;
   const response=await new Promise((resolve,reject)=>{
@@ -623,7 +666,7 @@ async function recognizeWithPipeline(strokes,existingObjects=[]){
    jobs.set(id,{resolve,reject,timer});
    service.postMessage({
     id,jobId:'pipe-'+id,epoch,action:'pipeline',strokes,existingObjects,
-    category,interventionLevel,intention:intendedShape,orientation,profile
+    category,interventionLevel,intention:intendedShape,orientation,profile,mlkitCandidates
    });
   });
   if(response?.cancelled)return null;
@@ -631,7 +674,7 @@ async function recognizeWithPipeline(strokes,existingObjects=[]){
  }catch{
   // Aislamiento total de fallos: si el Worker falla o no existe, ejecutar en modo seguro local sin bloquear escritura.
   try{
-   return runMathPipeline(strokes,{category,interventionLevel,intention:intendedShape,orientation,existingObjects,profile});
+   return runMathPipeline(strokes,{category,interventionLevel,intention:intendedShape,orientation,existingObjects,profile,mlkitCandidates});
   }catch{
    return null;
   }
@@ -652,20 +695,22 @@ async function runOne(pg,strokes){
  const epoch=intentionEpoch;
 
  // Para categorías profesionales unificadas (auto, algebra, data) o modo assisted/digital, usar pipeline unificado
- if(cat==='algebra'||cat==='data'||level==='assisted'||level==='digital'){
+ if(cat==='auto'||cat==='algebra'||cat==='data'||level==='assisted'||level==='digital'){
   const pipeResult=await recognizeWithPipeline(strokes,activeObjects(pg));
-  if(!pipeResult||!pipeResult.winner||epoch!==intentionEpoch)return false;
-  if(pipeResult.intervention?.shouldAutoApply){
-   return acceptPipelineWinner(pg.id,pipeResult.winner,strokes,pipeResult.confidence);
+  if(epoch!==intentionEpoch)return false;
+  if(pipeResult?.winner){
+   if(pipeResult.intervention?.shouldAutoApply){
+    return acceptPipelineWinner(pg.id,pipeResult.winner,strokes,pipeResult.confidence);
+   }
+   if(pipeResult.intervention?.showSuggestions){
+    const key=mathProposalKey(pg.id,strokes.map(s=>s.id));
+    pipelineProposals.set(key,{pageId:pg.id,result:pipeResult,strokes});
+    renderPipelineCandidates();
+    tell('Propuesta lista para revisar ('+pipeResult.winner.label+').');
+    return false;
+   }
   }
-  if(pipeResult.intervention?.showSuggestions){
-   const key=mathProposalKey(pg.id,strokes.map(s=>s.id));
-   pipelineProposals.set(key,{pageId:pg.id,result:pipeResult,strokes});
-   renderPipelineCandidates();
-   tell('Propuesta lista para revisar ('+pipeResult.winner.label+').');
-   return false;
-  }
-  return false;
+  if(cat==='algebra'||cat==='data'||level==='assisted'||level==='digital')return false;
  }
 
  // Flujo V0.80 de geometría rápida + respaldo de pipeline unificado

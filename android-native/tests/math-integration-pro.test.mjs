@@ -35,6 +35,9 @@ test('math-controller.js wires all 5 Pro categories (ready: true), 4 interventio
 
   // V0.80 preservation checks
   assert.ok(src.includes('scanHybridMath'), 'V0.80 hybrid math scan preserved');
+  assert.ok(src.includes('collectMlkitCandidates'), 'ML Kit candidates passed into unified pipeline');
+  assert.match(src, /scanHybridMath[\s\S]*recognizeWithPipeline\(/, 'Numbers axis routes through unified 2D pipeline');
+  assert.match(src, /cat==='auto'\|\|cat==='algebra'\|\|cat==='data'/, 'Auto axis routes through unified pipeline');
   assert.ok(src.includes('scanCircleMeasurements'), 'V0.80 circle measurements preserved');
   assert.ok(src.includes('MiNoteMathVisibility'), 'V0.80 non-destructive visibility hook preserved');
 });
