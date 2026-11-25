@@ -3,7 +3,7 @@
    sin nube, sin modificar tinta fuente, sin trabajo en el hilo de escritura y con aislamiento de fallos. */
 import {AXES,fingerprint,validObject} from './math-geometry.mjs';
 import {registerPlugin} from '@capacitor/core';
-import {mathematicalLines,normalizeArithmetic,recognizeHybridLine,formatMathDisplay,canAutoConvertMath} from './math-hybrid-ocr.mjs';
+import {mathematicalLines,normalizeArithmetic,recognizeHybridLine,formatMathDisplay} from './math-hybrid-ocr.mjs';
 import {mergeAutomatic} from './math-auto.mjs';
 import {DRAW_INTENTIONS} from './math-intention.mjs';
 import {compactAutomatic,listObjects,nearDuplicate} from './math-objects.mjs';
@@ -335,8 +335,8 @@ function renderPipelineCandidates(){
    try{
     const chosen=allOptions[chosenIndex]||winner;
     if(chosen!==winner&&chosen.plainText&&winner.plainText){
-     saveUserProfile(recordUserCorrection(loadUserProfile(),{
-      predicted:winner.plainText,actual:chosen.plainText,strokes,category:activeCategory()
+     if(Array.from(chosen.plainText).length===1&&Array.from(winner.plainText).length===1)saveUserProfile(recordUserCorrection(loadUserProfile(),{
+      predicted:winner.plainText,actual:chosen.plainText,strokes:toReadingStrokes(strokes,get()?.orientation),category:activeCategory()
      }));
     }
     await acceptPipelineWinner(entryItem.pageId,chosen,strokes,result.confidence);
@@ -359,8 +359,10 @@ async function acceptPipelineWinner(pageId,winner,strokes,confidence){
  const pg=get();
  if(!pg||pg.id!==pageId)throw Error('La página activa cambió.');
  const sources=strokes.map(s=>({id:s.id,signature:fingerprint(s)}));
+ if(!sigsMatch({sources},pg))throw Error('La tinta cambió. Vuelva a analizar.');
  const prior=layerOf(pg).objects||[];
- const geometry=winner.geometry||{kind:'text',text:winner.plainText||winner.label||'',x:500,y:700,size:28};
+ const winnerGeometry=winner.domain==='math'&&winner.geometry?.kind==='text'?readingGeometryToPage(winner.geometry,pg.orientation||'landscape-cw'):winner.geometry;
+ const geometry=winnerGeometry||{kind:'text',text:winner.plainText||winner.label||'',x:500,y:700,size:28};
  const candidate={
   type:winner.type||winner.kind||winner.domain,
   label:winner.label||winner.plainText||'Objeto matemático',
@@ -458,6 +460,7 @@ async function acceptMath(proposal){
  tell('Texto digital: '+proposal.geometry.text+'. Los trazos originales están conservados; puede volver al manuscrito.');
  return true;
 }
+// Numbers now run through the professional pipeline first. Legacy OCR remains a fallback.
 async function scanHybridMath(all=false){
  if(!enabled||!numbersSelected()||hybridScanBusy)return;
  const pg=get();if(!pg?.strokes?.length)return;
@@ -474,7 +477,7 @@ async function scanHybridMath(all=false){
   const lastId=pg.strokes.at(-1)?.id;
   const active=all?lines:lines.filter(line=>line.strokeIds.includes(lastId));
   let found=0;
-  for(const line of active.slice(all?0:-1).slice(0,18)){
+  for(const line of active.slice(0,18)){
    if(serial!==hybridScanSerial||epoch!==intentionEpoch||activeMathPage()!==pg.id)break;
    if(line.strokeIds.length>80)continue;
    if(storedMathObject(get(),line.strokeIds)){
@@ -487,25 +490,45 @@ async function scanHybridMath(all=false){
    // la conversión automática, sin exigir que el usuario pulse Convertir.
    const previous=mathSuggestions.get(key);
    if(!all&&previous&&!$('mathAutoDigital').checked)continue;
+   const raw=line.strokeIds.map(id=>originals.get(id)).filter(Boolean);
+   let mlkitCandidates=[];
+   if(mathModelReady){
+    try{
+     const response=await mlkitMath.recognize({strokes:sampledMathStrokes(line.strokes)});
+     mlkitCandidates=Array.isArray(response?.candidates)?response.candidates:response?.text?[response.text]:[];
+    }catch{/* Offline model unavailable: use local pipeline. */}
+   }
+   const pipe=await recognizeWithPipeline(raw,activeObjects(pg),{
+    category:'numbers',
+    interventionLevel:$('mathAutoDigital').checked&&activeInterventionLevel()!=='assisted'?'smart':'assisted',
+    mlkitCandidates
+   });
+   if(serial!==hybridScanSerial||epoch!==intentionEpoch||activeMathPage()!==pg.id||!sigsMatch({sources:raw.map(s=>({id:s.id,signature:fingerprint(s)}))},get()))break;
+   if(!all&&get()?.strokes?.at(-1)?.id!==lastId){scheduleScan();break;}
+   if(pipe?.winner?.domain==='math'){
+    const covered=new Set(pipe.winner.sourceStrokeIds||[]);
+    const completeCoverage=raw.every(s=>covered.has(s.id));
+    // Never hide unrecognized ink or auto-apply an incomplete reading.
+    if(completeCoverage&&pipe.winner.complete&&pipe.intervention?.shouldAutoApply&&pipe.confidence?.level==='high'){
+     if(await acceptPipelineWinner(pg.id,pipe.winner,raw,pipe.confidence)){
+      pipelineProposals.delete(key);mathSuggestions.delete(key);found++;continue;
+     }
+    }
+    if(completeCoverage){
+     pipelineProposals.set(key,{pageId:pg.id,result:{...pipe,alternatives:(pipe.alternatives||[]).filter(a=>a.domain==='math')},strokes:raw});
+     mathSuggestions.delete(key);found++;continue;
+    }
+   }
    const recognized=await recognizeHybridLine(line.strokes,mathModelReady?
-    args=>mlkitMath.recognize(args):null,{maxWidth:maxMathWidth});
+    async()=>({candidates:mlkitCandidates}):null,{maxWidth:maxMathWidth});
    if(!recognized)continue;
    const fingerprints=Object.fromEntries(line.strokes.map(stroke=>
     [stroke.id,fingerprint(originals.get(stroke.id))]));
    const proposal={...recognized,geometry:readingGeometryToPage(recognized.geometry,orientation),
     pageId:pg.id,fingerprints};
-   if(activeInterventionLevel()!=='assisted'&&canAutoConvertMath(recognized,$('mathAutoDigital').checked)){
-    try{
-     const converted=await acceptMath(proposal);
-     if(converted||storedMathObject(get(),line.strokeIds)){
-      mathSuggestions.delete(key);
-      found++;continue;
-     }
-    }catch(error){tell('Lectura por confirmar: '+error.message);}
-   }
    mathSuggestions.set(key,proposal);found++;
   }
-  renderMathSuggestions();
+  renderMathSuggestions();renderPipelineCandidates();
   if(all){
    const pending=[...mathSuggestions.values()].filter(x=>x.pageId===pg.id).length;
    tell('Análisis matemático: '+pending+' propuesta(s) pendientes de revisión ('+found+
@@ -610,12 +633,14 @@ function recognize(strokes){
     orientation:get()?.orientation||'landscape-cw'});
  });
 }
-async function recognizeWithPipeline(strokes,existingObjects=[]){
+async function recognizeWithPipeline(strokes,existingObjects=[],override={}){
  const epoch=++pipelineEpoch;
  const orientation=get()?.orientation||'landscape-cw';
- const category=activeCategory();
- const interventionLevel=activeInterventionLevel();
+ const category=override.category||activeCategory();
+ const interventionLevel=override.interventionLevel||activeInterventionLevel();
  const profile=loadUserProfile();
+ const mlkitCandidates=override.mlkitCandidates||[];
+ const intention=category==='numbers'?'auto':intendedShape;
  try{
   const service=ensureWorker(),id=++sequence;
   const response=await new Promise((resolve,reject)=>{
@@ -623,7 +648,7 @@ async function recognizeWithPipeline(strokes,existingObjects=[]){
    jobs.set(id,{resolve,reject,timer});
    service.postMessage({
     id,jobId:'pipe-'+id,epoch,action:'pipeline',strokes,existingObjects,
-    category,interventionLevel,intention:intendedShape,orientation,profile
+    category,interventionLevel,intention,orientation,profile,mlkitCandidates
    });
   });
   if(response?.cancelled)return null;
@@ -631,7 +656,7 @@ async function recognizeWithPipeline(strokes,existingObjects=[]){
  }catch{
   // Aislamiento total de fallos: si el Worker falla o no existe, ejecutar en modo seguro local sin bloquear escritura.
   try{
-   return runMathPipeline(strokes,{category,interventionLevel,intention:intendedShape,orientation,existingObjects,profile});
+   return runMathPipeline(strokes,{category,interventionLevel,intention,orientation,existingObjects,profile,mlkitCandidates});
   }catch{
    return null;
   }
@@ -652,7 +677,7 @@ async function runOne(pg,strokes){
  const epoch=intentionEpoch;
 
  // Para categorías profesionales unificadas (auto, algebra, data) o modo assisted/digital, usar pipeline unificado
- if(cat==='algebra'||cat==='data'||level==='assisted'||level==='digital'){
+ if(cat==='auto'||cat==='algebra'||cat==='data'||level==='assisted'||level==='digital'){
   const pipeResult=await recognizeWithPipeline(strokes,activeObjects(pg));
   if(!pipeResult||!pipeResult.winner||epoch!==intentionEpoch)return false;
   if(pipeResult.intervention?.shouldAutoApply){
@@ -789,9 +814,8 @@ function openMathLab(){
     }),
     getProfile:()=>loadUserProfile(),
     saveProfile:next=>saveUserProfile(next),
-    applyCorrection:({predicted,actual,strokes,category})=>saveUserProfile(
-     recordUserCorrection(loadUserProfile(),{predicted,actual,strokes,category:category||activeCategory()})
-    )
+    // The lab already saves the confirmed correction; do not double-count it.
+
    });
   }
   dialog.open&&dialog.close();
