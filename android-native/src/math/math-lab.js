@@ -22,6 +22,8 @@ import {
   generateDeterministicDataset
 } from './math-replay-harness.mjs';
 
+import {BATCH_COUNTS,BATCH_SYMBOLS,batchLayout,captureBatchBaseline,readBatchCells,trainBatch} from './math-batch-calibration.mjs';
+
 export const LAB_TABS = Object.freeze([
   { id: 'inspect', label: 'Inspección' },
   { id: 'correct', label: 'Corrección y perfil' },
@@ -279,6 +281,13 @@ export function createMathLabState(hooks = {}) {
     return deepClone(profile);
   }
 
+  async function saveBatch(symbol, cells) {
+    const next=trainBatch(createUserProfile(getProfileHook()||profile),symbol,cells);
+    await saveProfileHook(deepClone(next));
+    profile=next;
+    return deepClone(profile);
+  }
+
   function startCalibration(categories = Object.keys(CALIBRATION_PACKS)) {
     calibrationSession = createCalibrationSession(profile, categories);
     return {
@@ -396,6 +405,7 @@ export function createMathLabState(hooks = {}) {
     inspectCurrentPage,
     submitCorrection,
     resetProfile,
+    saveBatch,
     startCalibration,
     submitCalibrationSample,
     repeatCalibration,
@@ -514,6 +524,15 @@ export function createMathLabUI(options = {}) {
       </section>
 
       <section data-lab-panel="calibrate" class="math-lab-panel" hidden>
+        <h3>Calibración por bloques · Huion X10</h3>
+        <p>Use una hoja libre. Escriba el mismo símbolo una vez por casilla, dejando espacio entre muestras. La hoja original no se borra.</p>
+        <label>Símbolo <select id="mathBatchSymbol"></select></label>
+        <label>Muestras <select id="mathBatchCount"></select></label>
+        <div class="math-lab-actions"><button type="button" id="mathBatchStart">Iniciar bloque en agenda</button><button type="button" id="mathBatchRead">Revisar muestras</button><button type="button" id="mathBatchSave" disabled>Guardar bloque</button></div>
+        <canvas id="mathBatchCanvas" width="350" height="250" class="math-lab-canvas" aria-label="Distribución y trazos por casilla"></canvas>
+        <div id="mathBatchReview" class="math-lab-card"></div>
+        <p id="mathBatchStatus" role="status"></p>
+        <h3>Calibración individual en pantalla</h3>
         <div class="math-lab-cal-head">
           <strong id="mathLabCalTarget">Pulse iniciar para calibrar</strong>
           <span id="mathLabCalProgress" class="math-lab-badge">0%</span>
@@ -614,6 +633,93 @@ export function createMathLabUI(options = {}) {
       return null;
     }
   }
+
+  // Explicit capture from the current notebook page, in reading orientation.
+  const batchSymbol=q('#mathBatchSymbol'), batchCount=q('#mathBatchCount');
+  for(const v of BATCH_SYMBOLS)batchSymbol.append(elm('option',{value:v},v));
+  for(const v of BATCH_COUNTS)batchCount.append(elm('option',{value:v},String(v)));
+  batchCount.value='10';
+  let baseline=null, batchResult=null, batchTarget=null, savingBatch=false;
+  const batchStatus=msg=>{q('#mathBatchStatus').textContent=msg;};
+  function paintBatch(result=null){
+    const page=options.getCurrentPage?.();
+    const layout=result?.layout||batchLayout(Number(batchCount.value),page?.orientation);
+    const c=q('#mathBatchCanvas'),ctx=c.getContext('2d');
+    if(!ctx)return;
+    c.width=350;c.height=Math.round(350*layout.height/layout.width);
+    ctx.clearRect(0,0,c.width,c.height);
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+    const sx=c.width/layout.width,sy=c.height/layout.height;
+    for(let i=0;i<layout.count;i++){
+      const x=(i%layout.cols)*c.width/layout.cols,y=Math.floor(i/layout.cols)*c.height/layout.rows;
+      ctx.strokeStyle='#aab4c4';ctx.strokeRect(x,y,c.width/layout.cols,c.height/layout.rows);
+      ctx.fillStyle='#64748b';ctx.font='12px sans-serif';ctx.fillText(String(i+1),x+4,y+14);
+      if(!result){ctx.font='24px sans-serif';ctx.fillText(batchTarget||batchSymbol.value,x+20,y+38);}
+    }
+    ctx.strokeStyle='#111827';ctx.fillStyle='#111827';ctx.lineWidth=1.8;ctx.lineCap='round';
+    for(const cell of result?.cells||[])for(const stroke of cell.strokes){
+      const pts=stroke.pts;if(!pts.length)continue;
+      if(pts.length===1){ctx.beginPath();ctx.arc(pts[0][0]*sx,pts[0][1]*sy,1.5,0,Math.PI*2);ctx.fill();continue;}
+      ctx.beginPath();ctx.moveTo(pts[0][0]*sx,pts[0][1]*sy);
+      for(const p of pts.slice(1))ctx.lineTo(p[0]*sx,p[1]*sy);
+      ctx.stroke();
+    }
+  }
+  function clearBatchReview(){
+    batchResult=null;q('#mathBatchReview').replaceChildren();q('#mathBatchSave').disabled=true;
+  }
+  function resetBatch(){
+    baseline=null;batchTarget=null;clearBatchReview();paintBatch();
+  }
+  batchSymbol.addEventListener('change',resetBatch);
+  batchCount.addEventListener('change',resetBatch);
+  q('#mathBatchStart').addEventListener('click',()=>{
+    try{
+      baseline=captureBatchBaseline(options.getCurrentPage?.(),Number(batchCount.value));
+      batchTarget=batchSymbol.value;clearBatchReview();paintBatch();
+      batchStatus('Escriba '+baseline.count+' veces '+batchTarget+' en la misma hoja (una muestra por casilla).');
+      tell('Bloque iniciado. Escriba en la agenda y luego abra Calibración guiada para revisar.');
+    }catch(e){batchStatus(e.message);}
+  });
+  q('#mathBatchRead').addEventListener('click',()=>{
+    clearBatchReview();
+    try{
+      if(!baseline)throw Error('Inicie el bloque antes de escribir.');
+      batchResult=readBatchCells(options.getCurrentPage?.(),baseline);
+      paintBatch(batchResult);
+      const root=q('#mathBatchReview');
+      for(const cell of batchResult.cells){
+        const label=elm('label',{class:'math-lab-field'});
+        const cb=elm('input',{type:'checkbox','data-batch-cell':cell.index});
+        cb.checked=cell.valid;cb.disabled=!cell.valid;
+        label.append(cb,document.createTextNode(' Casilla '+(cell.index+1)+' · '+cell.strokes.length+' trazos'+(cell.valid?'':' · vacía/no válida')));
+        root.append(label);
+      }
+      const n=batchResult.cells.filter(c=>c.valid).length;
+      batchStatus(n+'/'+baseline.count+' muestras detectadas. Verifique la imagen y desmarque las incorrectas. '+batchResult.rejected.length+' trazos fuera de casilla.');
+      q('#mathBatchSave').disabled=!n||!!batchResult.rejected.length;
+      if(batchResult.rejected.length)batchStatus('Hay trazos que cruzan casillas: corrija en la hoja o reinicie el bloque; no se guardarán muestras ambiguas.');
+    }catch(e){batchStatus(e.message);}
+  });
+  q('#mathBatchSave').addEventListener('click',async()=>{
+    if(savingBatch||!batchResult||!baseline)return;
+    savingBatch=true;q('#mathBatchSave').disabled=true;
+    try{
+      const current=readBatchCells(options.getCurrentPage?.(),baseline);
+      if(JSON.stringify(current)!==JSON.stringify(batchResult))throw Error('La tinta cambió. Revise de nuevo.');
+      if(current.rejected.length)throw Error('Hay trazos fuera de casilla.');
+      const selected=current.cells.filter(c=>q('[data-batch-cell="'+c.index+'"]')?.checked);
+      await state.saveBatch(batchTarget,selected);
+      const saved=batchTarget;
+      const next=BATCH_SYMBOLS.indexOf(saved)+1;
+      resetBatch();
+      if(next<BATCH_SYMBOLS.length)batchSymbol.value=BATCH_SYMBOLS[next];
+      paintBatch();renderProfileChips();
+      batchStatus(selected.length+' muestras de '+saved+' guardadas. Inicie el siguiente bloque en otra hoja libre.');
+    }catch(e){batchStatus(e.message);q('#mathBatchSave').disabled=false;}
+    finally{savingBatch=false;}
+  });
+  paintBatch();
 
   // Dibujo táctil / stylus en canvas de calibración
   const calCanvas = q('#mathLabCalCanvas');
